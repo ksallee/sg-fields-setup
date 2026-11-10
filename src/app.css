@@ -1,0 +1,166 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn-svelte/tailwind.css';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+
+@custom-variant dark (&:is(.dark *));
+
+/* The scheme follows the `.dark` class `app.html` and `$lib/theme` set; native controls follow it too. */
+html {
+	color-scheme: dark;
+}
+html:not(.dark) {
+	color-scheme: light;
+}
+
+/*
+ * sg-widgets' default theme, copied from `../sg-widgets/apps/site/src/styles/global.css` with its
+ * comments, so a widget dropped in here reads as one family with the docs site. One theme in this
+ * app: the docs say any sg-widgets theme can be swapped in.
+ */
+:root {
+	--background: oklch(0.99 0.004 241.9); /* surface.level200 #f5f5f5 */
+	--foreground: oklch(0.227 0.004 241.9); /* text.default #3c3c3c */
+	--card: oklch(1 0 0); /* surface.level100 #ffffff */
+	--card-foreground: var(--foreground);
+	--popover: oklch(1 0 0);
+	--popover-foreground: var(--foreground);
+	--primary: oklch(0.5154 0.4 241.9);
+	--primary-foreground: oklch(1 0 0); /* surface.level100 */
+	--secondary: oklch(0 0 0 / 0.04); /* surface.level250 #eeeeee */
+	--secondary-foreground: oklch(0.5 0.004 241.9);
+	--muted: oklch(0 0.004 241.9 / 0.03); /* surface.level250 */
+	--muted-foreground: oklch(0.5 0.004 241.9); /* indicator.hover #666666, AA on every surface */
+	--accent: oklch(0 0.004 241.9 / 0.05); /* background.selected over surface.level200 */
+	--accent-foreground: oklch(0.3562 0.004 241.9); /* text.default */
+	--destructive: oklch(0.5763 0.2186 27.6323); /* status.error #dd2222 */
+	--destructive-foreground: oklch(1 0 0);
+	--success: oklch(0.5559 0.1457 129.3125); /* status.success #6a9728, darkened so white reads 4.5:1 */
+	--success-foreground: oklch(1 0 0);
+	--warning: oklch(0.782 0.1643 69.5839); /* status.warning #faa21b */
+	--warning-foreground: oklch(0.3562 0 0);
+	--info: oklch(0.5635 0.1233 238.2409); /* reference.accent #0696d7, darkened so white reads 4.5:1 */
+	--info-foreground: oklch(1 0 0);
+	--border: oklch(0 0 0 / 0.1); /* divider.heavyweight over surface.level200 */
+	--input: oklch(0 0 0 / 0.16); /* border.base over surface.level200 */
+	--ring: oklch(0.5635 0.1233 238.2409); /* reference.accent #0696d7, opaque: 3.21:1 (sg-widgets #213) */
+	--chart-1: oklch(0.6395 0.1412 238.2409);
+	--chart-2: oklch(0.6219 0.1464 129.3125);
+	--chart-3: oklch(0.782 0.1643 69.5839);
+	--chart-4: oklch(0.5763 0.2186 27.6323);
+	--chart-5: oklch(0.5999 0 0);
+	--radius: 0.5rem; /* flyout.borderRadius and modal.shell.borderRadius are 4px, the lg step */
+	--sidebar: oklch(1 0 0);
+	--sidebar-foreground: oklch(0.3562 0.004 241.9);
+	--sidebar-primary: oklch(0.5154 0.4 241.9);
+	--sidebar-primary-foreground: oklch(1 0 0);
+	--sidebar-accent: oklch(0.9399 0.0264 226.5839);
+	--sidebar-accent-foreground: oklch(0.3562 0.004 241.9);
+	--sidebar-border: oklch(0.8522 0.004 241.9);
+	--sidebar-ring: oklch(0.6395 0.1412 238.2409);
+}
+
+.dark {
+	--background: oklch(0.1969 0.0137 241.9); /* surface.level350 #1a1f25 */
+	--foreground: oklch(0.9702 0.0137 241.9); /* text.default #f5f5f5 */
+	--card: oklch(0.2344 0.0229 241.9); /* surface.level250 #2e3440 */
+	--card-foreground: var(--foreground);
+	--popover: oklch(0.244 0.0229 241.9); /* surface.level250 */
+	--popover-foreground: var(--foreground);
+	--primary: oklch(0.564 0.4 241.9); /* reference.accent #38abdf */
+	--primary-foreground: oklch(1 0.0137 241.9); /* surface.level350 */
+	--secondary: oklch(1 0.0283 241.9 / 0.04); /* surface.level200 #3b4453 */
+	--secondary-foreground: oklch(0.9702 0.0137 241.9);
+	--muted: oklch(1 0.0211 241.9 / 0.02); /* surface.level300 #222933 */
+	--muted-foreground: oklch(0.6262 0.0048 241.9); /* text.dim over surface.level300 */
+	--accent: oklch(1 0.0327 241.9 / 0.14); /* surface.level100 #454f61 */
+	--accent-foreground: oklch(0.9702 0.0137 241.9);
+	--destructive: oklch(0.6507 0.1858 23.8376); /* status.error #eb5555 */
+	--destructive-foreground: oklch(0.2369 0.0137 253.0936);
+	--success: oklch(0.7117 0.1513 127.6839); /* status.success #87b340 */
+	--success-foreground: oklch(0.2369 0.0137 253.0936);
+	--warning: oklch(0.8203 0.1452 74.6168); /* status.warning #fbb549 */
+	--warning-foreground: oklch(0.2369 0.0137 253.0936);
+	--info: oklch(0.7002 0.1253 232.5245); /* reference.accent #38abdf */
+	--info-foreground: oklch(0.2369 0.0137 253.0936);
+	/* The site's own corrections after a design review (sg-widgets #213): ring 6.99:1, border
+	   1.32:1, input 1.41:1 and accent 1.50:1 against the page, where they read 1.40, 1.13, 1.24 and 1.10. */
+	--border: oklch(1 0.003 241.9 / 0.1);
+	--input: oklch(1 0.003 241.9 / 0.12);
+	--ring: oklch(0.7002 0.1253 232.5245); /* reference.accent #38abdf */
+	--chart-1: oklch(0.7002 0.1253 232.5245);
+	--chart-2: oklch(0.7117 0.1513 127.6839);
+	--chart-3: oklch(0.8203 0.1452 74.6168);
+	--chart-4: oklch(0.6507 0.1858 23.8376);
+	--chart-5: oklch(0.7251 0.0151 268.4441); /* icon.default #a2a6b0 */
+	--sidebar: oklch(0.2786 0.0211 241.9); /* surface.level300 */
+	--sidebar-foreground: oklch(0.9702 0.0137 241.9);
+	--sidebar-primary: oklch(0.564 0.4 241.9);
+	--sidebar-primary-foreground: oklch(1 0.0137 241.9);
+	--sidebar-accent: oklch(0.426 0.0327 262.1438); /* surface.level100 */
+	--sidebar-accent-foreground: oklch(0.9702 0.0137 241.9);
+	--sidebar-border: oklch(0.44 0.0274 241.9); /* divider.heavyweight over surface.level300 */
+	--sidebar-ring: oklch(0.7002 0.1253 232.5245);
+}
+
+@theme inline {
+	--font-sans: 'Geist Variable', sans-serif;
+	--font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+	--color-sidebar-ring: var(--sidebar-ring);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar: var(--sidebar);
+	--color-chart-5: var(--chart-5);
+	--color-chart-4: var(--chart-4);
+	--color-chart-3: var(--chart-3);
+	--color-chart-2: var(--chart-2);
+	--color-chart-1: var(--chart-1);
+	--color-ring: var(--ring);
+	--color-input: var(--input);
+	--color-border: var(--border);
+	--color-destructive: var(--destructive);
+	--color-success: var(--success);
+	--color-success-foreground: var(--success-foreground);
+	--color-warning: var(--warning);
+	--color-warning-foreground: var(--warning-foreground);
+	--color-info: var(--info);
+	--color-info-foreground: var(--info-foreground);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-accent: var(--accent);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-muted: var(--muted);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-secondary: var(--secondary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-primary: var(--primary);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-popover: var(--popover);
+	--color-card-foreground: var(--card-foreground);
+	--color-card: var(--card);
+	--color-foreground: var(--foreground);
+	--color-background: var(--background);
+	--radius-sm: calc(var(--radius) * 0.6);
+	--radius-md: calc(var(--radius) * 0.8);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) * 1.4);
+	--radius-2xl: calc(var(--radius) * 1.8);
+	--radius-3xl: calc(var(--radius) * 2.2);
+	--radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	body {
+		@apply bg-background text-foreground;
+	}
+	html {
+		@apply font-sans;
+	}
+}
