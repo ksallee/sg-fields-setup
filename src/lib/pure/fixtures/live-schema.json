@@ -1,0 +1,36 @@
+{
+  "data": {
+    "ActionMenuItem": {
+      "name": { "value": "Action Menu Item", "editable": false },
+      "visible": { "value": true, "editable": false }
+    },
+    "Asset": {
+      "name": { "value": "Asset", "editable": false },
+      "visible": { "value": true, "editable": false }
+    },
+    "CustomEntity01": {
+      "name": { "value": "Lens", "editable": false },
+      "visible": { "value": true, "editable": false }
+    },
+    "CustomEntity29": {
+      "name": { "value": "Scene", "editable": false },
+      "visible": { "value": true, "editable": false }
+    },
+    "CustomEntity29_sg_scene_Connection": {
+      "name": { "value": "Custom Entity29 Sg Scene Connection", "editable": false },
+      "visible": { "value": true, "editable": false }
+    },
+    "CustomEntity66": {
+      "name": { "value": "Camera Rig ", "editable": false },
+      "visible": { "value": true, "editable": false }
+    },
+    "CustomNonProjectEntity01": {
+      "name": { "value": "Vendor", "editable": false },
+      "visible": { "value": true, "editable": false }
+    },
+    "Version": {
+      "name": { "value": "Version", "editable": false },
+      "visible": { "value": true, "editable": false }
+    }
+  }
+}

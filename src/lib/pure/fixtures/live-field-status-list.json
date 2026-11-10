@@ -1,0 +1,100 @@
+{
+  "data": {
+    "name": {
+      "value": "Status",
+      "editable": true
+    },
+    "description": {
+      "value": "",
+      "editable": true
+    },
+    "custom_metadata": {
+      "value": "",
+      "editable": true
+    },
+    "entity_type": {
+      "value": "Version",
+      "editable": false
+    },
+    "data_type": {
+      "value": "status_list",
+      "editable": false
+    },
+    "editable": {
+      "value": true,
+      "editable": false
+    },
+    "mandatory": {
+      "value": false,
+      "editable": false
+    },
+    "unique": {
+      "value": false,
+      "editable": false
+    },
+    "visible": {
+      "value": true,
+      "editable": false
+    },
+    "ui_value_displayable": {
+      "value": true,
+      "editable": false
+    },
+    "properties": {
+      "default_value": {
+        "value": "rev",
+        "editable": true
+      },
+      "summary_default": {
+        "value": "none",
+        "editable": true
+      },
+      "display_values": {
+        "value": {
+          "apr": "Approved",
+          "cmpt": "Complete",
+          "ip": "In Progress",
+          "na": "N/A",
+          "rev": "Pending Review",
+          "vwd": "Viewed",
+          "cfrm": "Confirmed",
+          "pndng": "Pending",
+          "fin": "Final",
+          "clsd": "Closed",
+          "custom": "CustomIcon",
+          "pass": "pass",
+          "part": "partial",
+          "pndad": "Pending Art Director",
+          "pndl": "Pending Lead",
+          "pndvs": "Pending VFX Supervisor"
+        },
+        "editable": false
+      },
+      "hidden_values": {
+        "value": [],
+        "editable": false
+      },
+      "valid_values": {
+        "value": [
+          "na",
+          "rev",
+          "vwd",
+          "apr",
+          "custom",
+          "fin",
+          "ip",
+          "clsd",
+          "cmpt",
+          "cfrm",
+          "pndad",
+          "pndl",
+          "pndvs",
+          "part",
+          "pass",
+          "pndng"
+        ],
+        "editable": true
+      }
+    }
+  }
+}

@@ -1,0 +1,766 @@
+{
+  "data": {
+    "sg_uploaded_movie": {
+      "name": {
+        "value": "Uploaded Movie",
+        "editable": true
+      },
+      "description": {
+        "value": "",
+        "editable": true
+      },
+      "custom_metadata": {
+        "value": "",
+        "editable": true
+      },
+      "entity_type": {
+        "value": "Version",
+        "editable": false
+      },
+      "data_type": {
+        "value": "url",
+        "editable": false
+      },
+      "editable": {
+        "value": true,
+        "editable": false
+      },
+      "mandatory": {
+        "value": false,
+        "editable": false
+      },
+      "unique": {
+        "value": false,
+        "editable": false
+      },
+      "visible": {
+        "value": true,
+        "editable": false
+      },
+      "ui_value_displayable": {
+        "value": true,
+        "editable": false
+      },
+      "properties": {
+        "default_value": {
+          "value": null,
+          "editable": false
+        },
+        "summary_default": {
+          "value": "none",
+          "editable": true
+        },
+        "open_in_new_window": {
+          "value": true,
+          "editable": true
+        }
+      }
+    },
+    "flagged": {
+      "name": {
+        "value": "Flagged",
+        "editable": true
+      },
+      "description": {
+        "value": "",
+        "editable": true
+      },
+      "custom_metadata": {
+        "value": "",
+        "editable": true
+      },
+      "entity_type": {
+        "value": "Version",
+        "editable": false
+      },
+      "data_type": {
+        "value": "checkbox",
+        "editable": false
+      },
+      "editable": {
+        "value": true,
+        "editable": false
+      },
+      "mandatory": {
+        "value": false,
+        "editable": false
+      },
+      "unique": {
+        "value": false,
+        "editable": false
+      },
+      "visible": {
+        "value": true,
+        "editable": false
+      },
+      "ui_value_displayable": {
+        "value": true,
+        "editable": false
+      },
+      "properties": {
+        "default_value": {
+          "value": null,
+          "editable": false
+        },
+        "summary_default": {
+          "value": "none",
+          "editable": false
+        }
+      }
+    },
+    "code": {
+      "name": {
+        "value": "Version Name",
+        "editable": true
+      },
+      "description": {
+        "value": "",
+        "editable": true
+      },
+      "custom_metadata": {
+        "value": "",
+        "editable": true
+      },
+      "entity_type": {
+        "value": "Version",
+        "editable": false
+      },
+      "data_type": {
+        "value": "text",
+        "editable": false
+      },
+      "editable": {
+        "value": true,
+        "editable": false
+      },
+      "mandatory": {
+        "value": true,
+        "editable": false
+      },
+      "unique": {
+        "value": false,
+        "editable": false
+      },
+      "visible": {
+        "value": true,
+        "editable": false
+      },
+      "ui_value_displayable": {
+        "value": true,
+        "editable": false
+      },
+      "properties": {
+        "default_value": {
+          "value": null,
+          "editable": false
+        },
+        "summary_default": {
+          "value": "none",
+          "editable": true
+        }
+      }
+    },
+    "sg_status_list": {
+      "name": {
+        "value": "Status",
+        "editable": true
+      },
+      "description": {
+        "value": "",
+        "editable": true
+      },
+      "custom_metadata": {
+        "value": "",
+        "editable": true
+      },
+      "entity_type": {
+        "value": "Version",
+        "editable": false
+      },
+      "data_type": {
+        "value": "status_list",
+        "editable": false
+      },
+      "editable": {
+        "value": true,
+        "editable": false
+      },
+      "mandatory": {
+        "value": false,
+        "editable": false
+      },
+      "unique": {
+        "value": false,
+        "editable": false
+      },
+      "visible": {
+        "value": true,
+        "editable": false
+      },
+      "ui_value_displayable": {
+        "value": true,
+        "editable": false
+      },
+      "properties": {
+        "default_value": {
+          "value": "rev",
+          "editable": true
+        },
+        "summary_default": {
+          "value": "none",
+          "editable": true
+        },
+        "display_values": {
+          "value": {
+            "apr": "Approved",
+            "cmpt": "Complete",
+            "ip": "In Progress",
+            "na": "N/A",
+            "rev": "Pending Review",
+            "vwd": "Viewed",
+            "cfrm": "Confirmed",
+            "pndng": "Pending",
+            "fin": "Final",
+            "clsd": "Closed",
+            "custom": "CustomIcon",
+            "pass": "pass",
+            "part": "partial",
+            "pndad": "Pending Art Director",
+            "pndl": "Pending Lead",
+            "pndvs": "Pending VFX Supervisor"
+          },
+          "editable": false
+        },
+        "hidden_values": {
+          "value": [],
+          "editable": false
+        },
+        "valid_values": {
+          "value": [
+            "na",
+            "rev",
+            "vwd",
+            "apr",
+            "custom",
+            "fin",
+            "ip",
+            "clsd",
+            "cmpt",
+            "cfrm",
+            "pndad",
+            "pndl",
+            "pndvs",
+            "part",
+            "pass",
+            "pndng"
+          ],
+          "editable": true
+        }
+      }
+    },
+    "sg_version_type": {
+      "name": {
+        "value": "Type",
+        "editable": true
+      },
+      "description": {
+        "value": "",
+        "editable": true
+      },
+      "custom_metadata": {
+        "value": "",
+        "editable": true
+      },
+      "entity_type": {
+        "value": "Version",
+        "editable": false
+      },
+      "data_type": {
+        "value": "list",
+        "editable": false
+      },
+      "editable": {
+        "value": true,
+        "editable": false
+      },
+      "mandatory": {
+        "value": false,
+        "editable": false
+      },
+      "unique": {
+        "value": false,
+        "editable": false
+      },
+      "visible": {
+        "value": true,
+        "editable": false
+      },
+      "ui_value_displayable": {
+        "value": true,
+        "editable": false
+      },
+      "properties": {
+        "default_value": {
+          "value": "Type A",
+          "editable": true
+        },
+        "summary_default": {
+          "value": "none",
+          "editable": true
+        },
+        "valid_values": {
+          "value": [
+            "Type A",
+            "Type B",
+            "Type C"
+          ],
+          "editable": true
+        }
+      }
+    },
+    "entity": {
+      "name": {
+        "value": "Link",
+        "editable": true
+      },
+      "description": {
+        "value": "",
+        "editable": true
+      },
+      "custom_metadata": {
+        "value": "",
+        "editable": true
+      },
+      "entity_type": {
+        "value": "Version",
+        "editable": false
+      },
+      "data_type": {
+        "value": "entity",
+        "editable": false
+      },
+      "editable": {
+        "value": true,
+        "editable": false
+      },
+      "mandatory": {
+        "value": false,
+        "editable": false
+      },
+      "unique": {
+        "value": false,
+        "editable": false
+      },
+      "visible": {
+        "value": true,
+        "editable": false
+      },
+      "ui_value_displayable": {
+        "value": true,
+        "editable": false
+      },
+      "properties": {
+        "default_value": {
+          "value": null,
+          "editable": false
+        },
+        "summary_default": {
+          "value": "none",
+          "editable": true
+        },
+        "valid_types": {
+          "value": [
+            "Asset",
+            "Shot",
+            "Sequence",
+            "CustomEntity29",
+            "CustomEntity19"
+          ],
+          "editable": true
+        }
+      }
+    },
+    "sg_task": {
+      "name": {
+        "value": "Task",
+        "editable": true
+      },
+      "description": {
+        "value": "",
+        "editable": true
+      },
+      "custom_metadata": {
+        "value": "",
+        "editable": true
+      },
+      "entity_type": {
+        "value": "Version",
+        "editable": false
+      },
+      "data_type": {
+        "value": "entity",
+        "editable": false
+      },
+      "editable": {
+        "value": true,
+        "editable": false
+      },
+      "mandatory": {
+        "value": false,
+        "editable": false
+      },
+      "unique": {
+        "value": false,
+        "editable": false
+      },
+      "visible": {
+        "value": true,
+        "editable": false
+      },
+      "ui_value_displayable": {
+        "value": true,
+        "editable": false
+      },
+      "properties": {
+        "default_value": {
+          "value": null,
+          "editable": false
+        },
+        "summary_default": {
+          "value": "none",
+          "editable": true
+        },
+        "valid_types": {
+          "value": [
+            "Task"
+          ],
+          "editable": true
+        }
+      }
+    },
+    "platform_status": {
+      "name": {
+        "value": "Platform Status",
+        "editable": true
+      },
+      "description": {
+        "value": "",
+        "editable": true
+      },
+      "custom_metadata": {
+        "value": "",
+        "editable": true
+      },
+      "entity_type": {
+        "value": "Version",
+        "editable": false
+      },
+      "data_type": {
+        "value": "text",
+        "editable": false
+      },
+      "editable": {
+        "value": true,
+        "editable": false
+      },
+      "mandatory": {
+        "value": false,
+        "editable": false
+      },
+      "unique": {
+        "value": false,
+        "editable": false
+      },
+      "visible": {
+        "value": true,
+        "editable": true
+      },
+      "ui_value_displayable": {
+        "value": true,
+        "editable": false
+      },
+      "properties": {
+        "default_value": {
+          "value": null,
+          "editable": false
+        },
+        "summary_default": {
+          "value": "none",
+          "editable": true
+        }
+      }
+    },
+    "sg_ai_generated_from": {
+      "name": {
+        "value": "AI Generated From",
+        "editable": true
+      },
+      "description": {
+        "value": "The versions this one was generated from.",
+        "editable": true
+      },
+      "custom_metadata": {
+        "value": "",
+        "editable": true
+      },
+      "entity_type": {
+        "value": "Version",
+        "editable": false
+      },
+      "data_type": {
+        "value": "multi_entity",
+        "editable": false
+      },
+      "editable": {
+        "value": true,
+        "editable": false
+      },
+      "mandatory": {
+        "value": false,
+        "editable": false
+      },
+      "unique": {
+        "value": false,
+        "editable": false
+      },
+      "visible": {
+        "value": true,
+        "editable": true
+      },
+      "ui_value_displayable": {
+        "value": true,
+        "editable": false
+      },
+      "properties": {
+        "default_value": {
+          "value": null,
+          "editable": false
+        },
+        "summary_default": {
+          "value": "none",
+          "editable": true
+        },
+        "valid_types": {
+          "value": [
+            "Version"
+          ],
+          "editable": true
+        }
+      }
+    },
+    "version_sg_ai_generated_from_versions": {
+      "name": {
+        "value": "AI Generated From <-> Version",
+        "editable": true
+      },
+      "description": {
+        "value": "",
+        "editable": true
+      },
+      "custom_metadata": {
+        "value": "",
+        "editable": true
+      },
+      "entity_type": {
+        "value": "Version",
+        "editable": false
+      },
+      "data_type": {
+        "value": "multi_entity",
+        "editable": false
+      },
+      "editable": {
+        "value": true,
+        "editable": false
+      },
+      "mandatory": {
+        "value": false,
+        "editable": false
+      },
+      "unique": {
+        "value": false,
+        "editable": false
+      },
+      "visible": {
+        "value": true,
+        "editable": true
+      },
+      "ui_value_displayable": {
+        "value": true,
+        "editable": false
+      },
+      "properties": {
+        "default_value": {
+          "value": null,
+          "editable": false
+        },
+        "summary_default": {
+          "value": "none",
+          "editable": true
+        },
+        "valid_types": {
+          "value": [
+            "Version"
+          ],
+          "editable": true
+        }
+      }
+    },
+    "sg_ai_seed": {
+      "name": {
+        "value": "ai seed ",
+        "editable": true
+      },
+      "description": {
+        "value": "",
+        "editable": true
+      },
+      "custom_metadata": {
+        "value": "",
+        "editable": true
+      },
+      "entity_type": {
+        "value": "Version",
+        "editable": false
+      },
+      "data_type": {
+        "value": "text",
+        "editable": false
+      },
+      "editable": {
+        "value": true,
+        "editable": false
+      },
+      "mandatory": {
+        "value": false,
+        "editable": false
+      },
+      "unique": {
+        "value": true,
+        "editable": false
+      },
+      "visible": {
+        "value": true,
+        "editable": true
+      },
+      "ui_value_displayable": {
+        "value": true,
+        "editable": false
+      },
+      "properties": {
+        "default_value": {
+          "value": null,
+          "editable": false
+        },
+        "summary_default": {
+          "value": "none",
+          "editable": true
+        }
+      }
+    },
+    "sg_ai_steps": {
+      "name": {
+        "value": "AI Steps",
+        "editable": true
+      },
+      "description": {
+        "value": "",
+        "editable": true
+      },
+      "custom_metadata": {
+        "value": "",
+        "editable": true
+      },
+      "entity_type": {
+        "value": "Version",
+        "editable": false
+      },
+      "data_type": {
+        "value": "number",
+        "editable": false
+      },
+      "editable": {
+        "value": true,
+        "editable": false
+      },
+      "mandatory": {
+        "value": false,
+        "editable": false
+      },
+      "unique": {
+        "value": false,
+        "editable": false
+      },
+      "visible": {
+        "value": true,
+        "editable": true
+      },
+      "ui_value_displayable": {
+        "value": true,
+        "editable": false
+      },
+      "properties": {
+        "default_value": {
+          "value": null,
+          "editable": false
+        },
+        "summary_default": {
+          "value": "none",
+          "editable": true
+        }
+      }
+    },
+    "sg_ai_approved": {
+      "name": {
+        "value": "AI Approved",
+        "editable": true
+      },
+      "description": {
+        "value": "",
+        "editable": true
+      },
+      "custom_metadata": {
+        "value": "",
+        "editable": true
+      },
+      "entity_type": {
+        "value": "Version",
+        "editable": false
+      },
+      "data_type": {
+        "value": "checkbox",
+        "editable": false
+      },
+      "editable": {
+        "value": true,
+        "editable": false
+      },
+      "mandatory": {
+        "value": false,
+        "editable": false
+      },
+      "unique": {
+        "value": false,
+        "editable": false
+      },
+      "visible": {
+        "value": true,
+        "editable": true
+      },
+      "ui_value_displayable": {
+        "value": true,
+        "editable": false
+      },
+      "properties": {
+        "default_value": {
+          "value": false,
+          "editable": true
+        },
+        "summary_default": {
+          "value": "none",
+          "editable": true
+        }
+      }
+    }
+  }
+}
