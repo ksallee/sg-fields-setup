@@ -1,0 +1,55 @@
+{
+  "format": "provisional, hand-built 2026-11-10; the spec does not fix an export format yet",
+  "name": "On-set camera report: lens",
+  "description": "Lens columns of the same export. Targets the site's Lenses custom entity, whose slot number is specific to the probed site.",
+  "origin": "import",
+  "origin_details": "FlowStudioDemo.xlsx, sheet Sheet1 (wrangler camera report export, 72 columns, 5 takes)",
+  "entries": [
+    {
+      "source_header": "Tk Lens Serial Num",
+      "target_entity_type": "CustomEntity19",
+      "programmatic_name": "sg_lens_serial_number",
+      "display_name": "Lens Serial Number",
+      "data_type": "text",
+      "on_probed_site": "exists",
+      "mapped_from_near_duplicate": true,
+      "review": "Exported per take, but it belongs to the lens, so it sits in this set."
+    },
+    {
+      "source_header": "Lens::Anamorphic Desqueeze Ratio",
+      "target_entity_type": "CustomEntity19",
+      "programmatic_name": "sg_anamorphic_desqueeze_ratio",
+      "display_name": "Anamorphic Desqueeze Ratio",
+      "data_type": "text",
+      "on_probed_site": "new",
+      "review": "Values such as 1.8X, so text."
+    },
+    {
+      "source_header": "Lens::Maximum Aperture",
+      "target_entity_type": "CustomEntity19",
+      "programmatic_name": "sg_maximum_aperture",
+      "display_name": "Maximum Aperture",
+      "data_type": "float",
+      "on_probed_site": "new"
+    },
+    {
+      "source_header": "Lens::Closed Focus",
+      "target_entity_type": "CustomEntity19",
+      "programmatic_name": "sg_closed_focus",
+      "display_name": "Closed Focus",
+      "data_type": "text",
+      "on_probed_site": "new",
+      "review": "Feet and inches, so text."
+    },
+    {
+      "source_header": "Lens::Grid Date",
+      "target_entity_type": "CustomEntity19",
+      "programmatic_name": "sg_grid_date",
+      "display_name": "Grid Date",
+      "data_type": "date",
+      "on_probed_site": "new",
+      "review": "Column is empty in the sample; type is a guess from the name. The entity has a Gridded? checkbox."
+    }
+  ],
+  "skipped_columns": []
+}

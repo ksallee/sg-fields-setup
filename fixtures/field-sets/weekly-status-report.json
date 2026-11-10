@@ -1,0 +1,165 @@
+{
+  "format": "provisional, hand-built 2026-11-10; the spec does not fix an export format yet",
+  "name": "Weekly status report",
+  "description": "Shot columns of a VFX weekly status report. Every column but one already exists on the probed site.",
+  "origin": "import",
+  "origin_details": "20260429_WSR_Test_v1.xlsx, first sheet, read from the Drive preview only (headers and first rows)",
+  "entries": [
+    {
+      "source_header": "Reel",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_reel",
+      "display_name": "Reel",
+      "data_type": "entity",
+      "on_probed_site": "exists",
+      "review": "The site also has a stock Reel field (reel)."
+    },
+    {
+      "source_header": "Sequence",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_sequence",
+      "display_name": "Sequence",
+      "data_type": "entity",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "Shot Code",
+      "target_entity_type": "Shot",
+      "programmatic_name": "code",
+      "display_name": "Shot Code",
+      "data_type": "text",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "Status",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_status_list",
+      "display_name": "Status",
+      "data_type": "status_list",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "Turnover Date",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_turnover_date",
+      "display_name": "Turnover Date",
+      "data_type": "date",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "Vendor",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_vendor_groups",
+      "display_name": "Vendor Groups",
+      "data_type": "multi_entity",
+      "on_probed_site": "exists",
+      "mapped_from_near_duplicate": true,
+      "review": "The file holds a vendor name as text; the site field is a link."
+    },
+    {
+      "source_header": "Turnover",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_turnover",
+      "display_name": "Turnover",
+      "data_type": "entity",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "Latest Vendor Status",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_latest_vendor_status",
+      "display_name": "Latest Vendor Status",
+      "data_type": "status_list",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "Vendor Percentage Complete",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_vendor_percentage_complete",
+      "display_name": "Vendor Percentage Complete",
+      "data_type": "percent",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "Date Next Version Expected",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_date_next_version_expected",
+      "display_name": "Date Next Version Expected",
+      "data_type": "date",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "Layout Due",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_layout_due",
+      "display_name": "Layout Due",
+      "data_type": "date",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "Final Anim Due",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_final_anim_due",
+      "display_name": "Final Anim Due",
+      "data_type": "date",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "WIP Comp Due",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_wip_comp_due",
+      "display_name": "WIP Comp Due",
+      "data_type": "date",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "Final Notes Due",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_final_notes_due",
+      "display_name": "Final Notes Due",
+      "data_type": "date",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "Creative Final Due",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_creative_final_due",
+      "display_name": "Creative Final Due",
+      "data_type": "date",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "Tech Check Final Due",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_tech_check_final_due",
+      "display_name": "Tech Check Final Due",
+      "data_type": "date",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "VFX Production Notes",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_vfx_production_notes",
+      "display_name": "VFX Production Notes",
+      "data_type": "text",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "Latest Vendor Notes",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_latest_vendor_notes",
+      "display_name": "Latest Vendor Notes",
+      "data_type": "text",
+      "on_probed_site": "exists"
+    },
+    {
+      "source_header": "Report Date",
+      "target_entity_type": "Shot",
+      "programmatic_name": "sg_report_date",
+      "display_name": "Report Date",
+      "data_type": "date",
+      "on_probed_site": "exists"
+    }
+  ],
+  "skipped_columns": []
+}
