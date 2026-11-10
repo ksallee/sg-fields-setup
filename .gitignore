@@ -1,0 +1,19 @@
+node_modules/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# SvelteKit / Vite
+/.svelte-kit
+/build
+/.vercel
+vite.config.ts.timestamp-*
+
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+.pytest_cache/
