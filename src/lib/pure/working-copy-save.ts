@@ -1,16 +1,18 @@
 /**
- * What leaves the working copy: the save request (EDT-44, EDT-45), the state after a save
- * (EDT-46, EDT-47), and the entries handed to Duplicate and Install (EDT-9, EDT-10, PLN-1).
- * Rows are cleaned on the way out (MOD-7, MOD-9).
+ * What leaves the working copy: the save request (EDT-44, EDT-45) and the entries handed to
+ * Duplicate and Install (EDT-9, EDT-10, PLN-1). Rows are cleaned on the way out (MOD-7, MOD-9).
+ *
+ * After a successful save the working copy is `openWorkingCopy` on what the store answered
+ * (EDT-46): clean, every row stored and so in manual mode (EDT-25). On a failed save the caller
+ * keeps its working copy as it is (EDT-47).
  */
 import { cleanEntry } from './clean';
-import type { Entry, EntryDraft, FieldSet, Timestamp } from './model';
+import type { Entry, EntryDraft, Timestamp } from './model';
 import {
 	cleanedDescription,
 	cleanedName,
 	definitionOf,
 	detailsChanged,
-	openWorkingCopy,
 	sameCleanedDefinition,
 	savedById,
 	type Row,
@@ -106,15 +108,6 @@ export function saveRequest(workingCopy: WorkingCopy): SaveRequest {
 			entryChangedAt
 		}
 	};
-}
-
-/**
- * After a successful save and reload (EDT-46): a clean working copy on the stored state, as
- * `openWorkingCopy` builds it. Every row is stored, so every row is in manual mode (EDT-25).
- * On a failed save the caller keeps its working copy as it is (EDT-47).
- */
-export function afterSave(_workingCopy: WorkingCopy, storedSet: FieldSet, storedEntries: readonly Entry[]): WorkingCopy {
-	return openWorkingCopy(storedSet, storedEntries);
 }
 
 function pick(workingCopy: WorkingCopy, keys: readonly string[] | undefined): readonly Row[] {

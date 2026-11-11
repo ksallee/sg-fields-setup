@@ -18,7 +18,7 @@ import { test as base, expect, type Page } from '@playwright/test';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/** The set every install case of the fake site is seeded for (`src/lib/io/install-site-fake.ts`). */
+/** The set every install case of the fake site is seeded for (`src/lib/testing/install-site-fake.ts`). */
 export const INSTALL_DRIVE_FILE = path.join(ROOT, 'fixtures/install-drive/install-drive.fieldset.json');
 export const INSTALL_DRIVE_NAME = 'Install drive';
 export const INSTALL_DRIVE_COUNT = 13;

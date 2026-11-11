@@ -1,7 +1,7 @@
 /**
  * The install session, driven as the screen drives it. The session is wiring: these tests hold
  * the seams a pure test cannot reach. The store is a stub. The site is the fake of
- * `$lib/io/install-site-fake`, which `?fake` in the address asks for under vitest as under
+ * `$lib/testing/install-site-fake`, which `?fake` in the address asks for under vitest as under
  * `vite dev`: nothing here reaches a network.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -20,7 +20,7 @@ import { notify } from '$lib/app/toast';
 import { writeInstallSelection } from '$lib/io/install-selection';
 import * as installSiteModule from '$lib/io/install-site';
 import { SetStoreError } from '$lib/io/set-store';
-import type { FakeSite } from '$lib/pure/fixtures/fake-site';
+import type { FakeSite } from '$lib/testing/fake-site';
 import type { EntryDefinition } from '$lib/pure/model';
 import { InstallSession } from './session.svelte';
 

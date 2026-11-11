@@ -1,16 +1,16 @@
 /**
  * The install screen on the dev-only fake site (specs/08-install-run.md, docs/development.md "The
  * fake site"). The set is `fixtures/install-drive/install-drive.fieldset.json`; the header of
- * `src/lib/io/install-site-fake.ts` lists what each of its fields plans and runs as. The fake's
+ * `src/lib/testing/install-site-fake.ts` lists what each of its fields plans and runs as. The fake's
  * state is read through `window.__installFake`.
  */
 import type { Page } from '@playwright/test';
-import type { FakeSite } from '../src/lib/pure/fixtures/fake-site.ts';
+import type { FakeSite } from '../src/lib/testing/fake-site.ts';
 import { expect, importSetFile, test } from './fixtures';
 
 declare global {
 	interface Window {
-		/** The fake site, set by `src/lib/io/install-site-fake.ts`. */
+		/** The fake site, set by `src/lib/testing/install-site-fake.ts`. */
 		__installFake?: FakeSite;
 	}
 }
