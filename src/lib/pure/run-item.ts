@@ -41,12 +41,12 @@
  * **Valid types** (corpus finding 121). A valid type the site does not have is a 400. One in the
  * wrong case (`shot`) is a 500 that takes the field down. So before anything is sent, every valid
  * type of the entry, and of each payload again, is matched exactly against the site's entity
- * types. One stray name fails the item with no call made. The planner refuses such entries; this
+ * types, by the planner's rule (`unknownValidTypes`). One stray name fails the item with no call made. The planner refuses such entries; this
  * is the second guard.
  *
- * **Repeats.** The site drops a repeated value from a list's valid values and from valid types,
- * and keeps it on a status list. The read-back is compared with the entry as the site stores it,
- * so a repeat the site dropped is not a failure.
+ * **Repeats.** The site drops a repeated value from a list's valid values and from valid types.
+ * The planner removes repeats before it compares and sends (`wantedEntry`), so the read-back,
+ * which is the planner's own comparison, does not fail on one.
  *
  * A re-trash is read back too: the row says whether the field is in the trash or still live.
  *
@@ -55,11 +55,9 @@
  * the run stops there (RUN-17). After such a write the site may or may not have changed; a retry
  * re-plans from the site and finds out.
  */
-import { cleanEntry } from './clean';
-import { hasEntityType } from './live-entity-types';
 import type { LiveFieldRead } from './live-field';
-import { diffEntry } from './plan-diff';
-import { planEntry, type PlanEntry, type PlanItem, type PlanSite, type PropertyWrite } from './plan';
+import { diffEntry, wantedEntry, withoutRepeats } from './plan-diff';
+import { planEntry, unknownValidTypes, type PlanEntry, type PlanItem, type PlanSite, type PropertyWrite } from './plan';
 import {
 	asRefusal,
 	errorMessage,
@@ -119,9 +117,9 @@ function plan(ctx: ItemContext, entry: PlanEntry, read: LiveFieldRead): PlanItem
 	return item;
 }
 
-/** The valid types among them that are no entity type of the site, matched exactly. */
+/** The valid types among them that are no entity type of the site: the planner's own rule (`unknownValidTypes`). */
 function strays(ctx: ItemContext, types: readonly string[]): string[] {
-	return [...new Set(types.filter((name) => !hasEntityType(ctx.site.entityTypes, name)))];
+	return withoutRepeats(unknownValidTypes(types, ctx.site.entityTypes).map((type) => type.name));
 }
 
 /** The valid types a payload carries. */
@@ -131,17 +129,11 @@ function carriedTypes(properties: readonly PropertyWrite[]): string[] {
 	);
 }
 
-/**
- * The entry as the site stores it: a repeated value is dropped from a list's valid values and
- * from valid types, and kept on a status list (corpus finding 121).
- */
-export function asStored(entry: PlanEntry): PlanEntry {
-	const cleaned = cleanEntry(entry);
-	return {
-		...cleaned,
-		validTypes: [...new Set(cleaned.validTypes)],
-		validValues: cleaned.dataType === 'list' ? [...new Set(cleaned.validValues)] : cleaned.validValues
-	};
+/** The effect of a write, with the reverse fields it made when it carried valid types. */
+function effectOf(kind: 'created' | 'updated', name: string, fresh: PlanItem, properties: readonly PropertyWrite[]): FieldEffect {
+	const effect: FieldEffect = { kind, name };
+	if (carriedTypes(properties).length > 0 && fresh.reverseFieldTypes.length > 0) effect.reverseFieldTypes = [...fresh.reverseFieldTypes];
+	return effect;
 }
 
 /**
@@ -156,11 +148,10 @@ async function verify(ctx: ItemContext, entry: PlanEntry, item: PlanItem, after:
 		return failed({ code: 'unreadable', after, message }, refusal ? null : message);
 	}
 	if (read.kind === 'absent') return failed({ code: 'unreadable', after, message: null });
-	const stored = asStored(entry);
-	const fresh = plan(ctx, stored, read);
+	const fresh = plan(ctx, entry, read);
 	if (fresh.class === 'already-matches') return null;
 	if (fresh.class === 'type-conflict') return failed({ code: 'plan', reasons: fresh.reasons });
-	return failed({ code: 'not-applied', after, differences: diffEntry(stored, read.field) });
+	return failed({ code: 'not-applied', after, differences: diffEntry(entry, read.field) });
 }
 
 /** Sends an update's requests in order, then reads back. Null when the field then matches. */
@@ -176,9 +167,7 @@ async function writeAndVerify(ctx: ItemContext, entry: PlanEntry, fresh: PlanIte
 		} catch (error) {
 			return threw('update', error, written > 0);
 		}
-		const effect: FieldEffect = { kind: 'updated', name: fresh.programmaticName };
-		if (carriedTypes(request.properties).length > 0) effect.validTypes = true;
-		ctx.onEffect(effect);
+		ctx.onEffect(effectOf('updated', fresh.programmaticName, fresh, request.properties));
 		written += 1;
 	}
 	return verify(ctx, entry, fresh, after);
@@ -267,9 +256,7 @@ async function plainCreate(ctx: ItemContext, entry: PlanEntry, fresh: PlanItem):
 		// A field was made and its name is unknown. Nothing can be retired by a name nobody has.
 		return failed({ code: 'wrong-name', assigned: '', retired: false, retireError: null });
 	}
-	const effect: FieldEffect = { kind: 'created', name: assigned };
-	if (types.length > 0) effect.validTypes = true;
-	ctx.onEffect(effect);
+	ctx.onEffect(effectOf('created', assigned, fresh, fresh.create.properties));
 	if (assigned !== wanted) {
 		// The last guard (RUN-12). The field under the wrong name is retired: that name is spent.
 		const { abort, ...back } = await retrash(ctx, fresh.entityType, assigned);
@@ -328,7 +315,7 @@ export async function applyItem(ctx: ItemContext, entry: PlanEntry, item: PlanIt
 			case 'update':
 			case 'create': {
 				// Before the first call: a revive followed by a refused write would leave a field live.
-				const unknown = strays(ctx, cleanEntry(entry).validTypes);
+				const unknown = strays(ctx, wantedEntry(entry).validTypes);
 				if (unknown.length > 0) return failed({ code: 'unknown-valid-types', names: unknown });
 				return item.class === 'update' ? await applyUpdate(ctx, entry, item) : await applyCreate(ctx, entry, item);
 			}

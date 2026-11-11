@@ -6,6 +6,7 @@
  * It lists what the site was told and answered, whether or not the row then passed its read-back:
  * a field that was created and failed verification is on the site and is in the report.
  */
+import { reverseFieldsText } from './plan-reason';
 import type { RunRow, RunState } from './run';
 
 /** One field the run changed. */
@@ -16,8 +17,8 @@ export interface ReportField {
 	displayName: string;
 	/** How the row ended, or `pending` and `in_progress` when the report is made mid-run. */
 	rowState: RunRow['state'];
-	/** True when valid types were written: reverse fields changed on those types (corpus finding 121). */
-	validTypes: boolean;
+	/** The entity types the run made a reverse field on for this field (corpus findings 116 and 121). */
+	reverseFieldTypes: string[];
 }
 
 export interface RunReport {
@@ -50,7 +51,7 @@ export function runReport(state: Pick<RunState, 'rows'>): RunReport {
 				name,
 				displayName: row.displayName,
 				rowState: row.state,
-				validTypes: effects.some((effect) => effect.validTypes === true)
+				reverseFieldTypes: [...new Set(effects.flatMap((effect) => effect.reverseFieldTypes ?? []))]
 			};
 			// The last word on whether it is live: the latest of created, revived and retired.
 			const last = effects.findLast((effect) => effect.kind !== 'updated')?.kind;
@@ -105,14 +106,16 @@ export function reportText(report: RunReport, head: { siteUrl?: string; at?: str
 			'Install made or restored these fields and could not use them. Their names stay taken until they are deleted for good from the trash page for fields.'
 		)
 	);
-	const linked = [...report.created, ...report.updated].filter((field) => field.validTypes);
-	const names = [...new Set(linked.map((field) => `${field.entityType}.${field.name}`))];
-	if (names.length > 0) {
-		lines.push(
-			`Valid types were written on ${names.join(', ')}.`,
-			'The site keeps a reverse field on each valid type. A type that was added got a new field there. A type that was removed had its field retired, and that name is spent.',
-			''
-		);
+	// A link keeps a reverse field on each of its valid types. The planner's words say where.
+	const linked = new Map<string, string>();
+	for (const field of [...report.created, ...report.updated]) {
+		const note = reverseFieldsText(field.reverseFieldTypes);
+		if (note !== null) linked.set(`${field.entityType}.${field.name}`, note);
+	}
+	if (linked.size > 0) {
+		lines.push(`Reverse fields (${linked.size})`);
+		for (const [name, note] of linked) lines.push(`  ${name}: ${note}`);
+		lines.push('');
 	}
 	lines.push('Install has no undo. To remove a field, delete it in FPT.', '');
 	return lines.join('\n');

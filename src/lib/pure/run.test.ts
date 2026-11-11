@@ -16,7 +16,8 @@ function item(entryId: string, planClass: PlanItem['class'] = 'create'): PlanIte
 		blocked: [],
 		reasons: [],
 		create: null,
-		update: null
+		update: null,
+		reverseFieldTypes: []
 	};
 }
 

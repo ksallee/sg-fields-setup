@@ -20,7 +20,7 @@ function row(name: string, effects: FieldEffect[], more: Partial<RunRow> = {}): 
 
 const rows = [
 	row('sg_made', [{ kind: 'created', name: 'sg_made' }]),
-	row('sg_link', [{ kind: 'updated', name: 'sg_link', validTypes: true }], { entityType: 'Shot' }),
+	row('sg_link', [{ kind: 'updated', name: 'sg_link', reverseFieldTypes: ['Asset'] }], { entityType: 'Shot' }),
 	row('sg_back', [{ kind: 'revived', name: 'sg_back' }, { kind: 'updated', name: 'sg_back' }]),
 	row('sg_bad', [{ kind: 'revived', name: 'sg_bad' }, { kind: 'retired', name: 'sg_bad' }], { state: 'failed' }),
 	row('sg_dup', [{ kind: 'created', name: 'sg_dup_1' }, { kind: 'retired', name: 'sg_dup_1' }], { state: 'failed' }),
@@ -35,7 +35,7 @@ describe('runReport (RUN-20)', () => {
 		expect(report.revived.map((field) => field.name)).toEqual(['sg_back']);
 		expect(report.updated.map((field) => `${field.entityType}.${field.name}`)).toEqual(['Shot.sg_link', 'Version.sg_back']);
 		expect(report.retired.map((field) => field.name)).toEqual(['sg_bad', 'sg_dup_1']);
-		expect(report.created[0]).toEqual({ entityType: 'Version', name: 'sg_half', displayName: 'half', rowState: 'failed', validTypes: false });
+		expect(report.created[0]).toEqual({ entityType: 'Version', name: 'sg_half', displayName: 'half', rowState: 'failed', reverseFieldTypes: [] });
 	});
 
 	it('is empty for a run that changed nothing', () => {
@@ -66,8 +66,8 @@ describe('runReport (RUN-20)', () => {
 				'  Version.sg_bad  "bad"',
 				'  Version.sg_dup_1  "dup"',
 				'',
-				'Valid types were written on Shot.sg_link.',
-				'The site keeps a reverse field on each valid type. A type that was added got a new field there. A type that was removed had its field retired, and that name is spent.',
+				'Reverse fields (1)',
+				'  Shot.sg_link: Also makes a reverse field on Asset. It takes a field name there for good.',
 				'',
 				'Install has no undo. To remove a field, delete it in FPT.',
 				''

@@ -49,10 +49,10 @@ export interface FieldEffect {
 	kind: 'created' | 'revived' | 'updated' | 'retired';
 	name: string;
 	/**
-	 * True when the write carried valid types. The site keeps a reverse field on each valid type:
-	 * an added type creates one there, a removed type retires one (corpus finding 121).
+	 * The entity types the write made a reverse field on (`PlanItem.reverseFieldTypes`, corpus
+	 * findings 116 and 121). Each took a field name there for good. Left out when it made none.
 	 */
-	validTypes?: true;
+	reverseFieldTypes?: string[];
 }
 
 /** How a re-trash went (RUN-10, RUN-12). */

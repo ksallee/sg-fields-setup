@@ -173,9 +173,9 @@ describe('an update at its turn (RUN-7, RUN-15, RUN-27)', () => {
 		onRead(site, 2, () => site.seed('Version', 'sg_lens', { displayName: 'Lense', description: 'Old.' }));
 		const state = await engine(site).start([wanted]);
 		expect(row(state).state).toBe('done');
-		expect(site.writes().map((call) => call.body)).toEqual([
-			[{ property_name: 'name', value: 'Lens' }],
-			[{ property_name: 'description', value: 'New.' }]
+		expect(site.writes().flatMap((call) => call.body)).toEqual([
+			{ property_name: 'name', value: 'Lens' },
+			{ property_name: 'description', value: 'New.' }
 		]);
 	});
 
@@ -187,7 +187,7 @@ describe('an update at its turn (RUN-7, RUN-15, RUN-27)', () => {
 			defaultValue: 'na'
 		});
 		const wantedState = entry({ programmaticName: 'sg_state', displayName: 'State', dataType: 'status_list', validValues: ['vwd', 'apr'], defaultValue: 'vwd' });
-		// What the planner asks for: today three requests, since neither the values nor the default can go first alone.
+		// What the planner asks for: the values and the default together, which the site checks as a whole (finding 121).
 		const requests = (await replan(deps(site), [wantedState])).items[0].update?.requests ?? [];
 		expect(requests.length).toBeGreaterThan(0);
 
@@ -197,14 +197,6 @@ describe('an update at its turn (RUN-7, RUN-15, RUN-27)', () => {
 			requests.map((request) => ['updateField', 'ok', request.properties])
 		);
 		expect(site.get('Version', 'sg_state')).toMatchObject({ validValues: ['vwd', 'apr'], defaultValue: 'vwd' });
-	});
-
-	it('RUN-27: a refusal part-way through an update says that earlier requests were written', async () => {
-		const site = createFakeSite().seed('Version', 'sg_lens', { displayName: 'Lense', description: 'Old.' });
-		site.beforeNext('updateField', () => site.beforeNext('updateField', () => site.failNext('updateField', { status: 400, message: 'No.' })));
-		const state = await engine(site).start([wanted]);
-		expect(row(state)).toMatchObject({ state: 'failed', note: { code: 'refused', action: 'update', partial: true }, effects: [{ kind: 'updated' }] });
-		expect(site.get('Version', 'sg_lens')).toMatchObject({ displayName: 'Lens', description: 'Old.' });
 	});
 
 	it('RUN-15: a write the site answered and did not apply is a failure that names the setting', async () => {
@@ -278,8 +270,8 @@ describe('a create at its turn (RUN-8 to RUN-12)', () => {
 	it('RUN-10: writes the differences of a revived field and reads back', async () => {
 		const site = createFakeSite().seedRetired('Version', 'sg_lens', { displayName: 'Old lens', description: 'Old.' });
 		const state = await engine(site).start([entry({ description: 'New.' })]);
-		expect(row(state)).toMatchObject({ state: 'done', effects: [{ kind: 'revived' }, { kind: 'updated' }, { kind: 'updated' }] });
-		expect(site.writeLog()).toEqual(['reviveField Version.sg_lens', 'updateField Version.sg_lens', 'updateField Version.sg_lens']);
+		expect(row(state)).toMatchObject({ state: 'done', effects: [{ kind: 'revived' }, { kind: 'updated' }] });
+		expect(site.writeLog()).toEqual(['reviveField Version.sg_lens', 'updateField Version.sg_lens']);
 		expect(site.get('Version', 'sg_lens')).toMatchObject({ displayName: 'Lens', description: 'New.', retired: false });
 	});
 
@@ -421,7 +413,7 @@ describe('a create at its turn (RUN-8 to RUN-12)', () => {
 		const state = await engine(site).start([entry({ description: 'Ours.' })]);
 		expect(row(state)).toMatchObject({ state: 'failed', note: { code: 'not-applied', after: 'create', differences: [{ setting: 'description' }] } });
 		expect(runReport(state).created).toEqual([
-			{ entityType: 'Version', name: 'sg_lens', displayName: 'Lens', rowState: 'failed', validTypes: false }
+			{ entityType: 'Version', name: 'sg_lens', displayName: 'Lens', rowState: 'failed', reverseFieldTypes: [] }
 		]);
 	});
 

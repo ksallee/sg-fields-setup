@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createFakeSite, type FakeSite } from './fixtures/fake-site';
 import { planEntry, type PlanEntry, type PlanItem, type PlanSite } from './plan';
-import { applyItem, asStored, type ItemContext } from './run-item';
+import { applyItem, type ItemContext } from './run-item';
 import type { FieldEffect } from './run';
 
 function entry(overrides: Partial<PlanEntry> = {}): PlanEntry {
@@ -48,6 +48,7 @@ function item(wanted: PlanEntry, more: Partial<PlanItem>): PlanItem {
 		reasons: [],
 		create: null,
 		update: null,
+		reverseFieldTypes: [],
 		...more
 	};
 }
@@ -93,16 +94,17 @@ describe('the valid types guard (corpus finding 121)', () => {
 		expect(site.get('Version', 'sg_link')).toMatchObject({ retired: false, broken: false, validTypes: ['Asset'] });
 	});
 
-	it('checks a payload again even when the entry is clean, before the first request of an update', async () => {
-		const site = createFakeSite().seed('Version', 'sg_link', { displayName: 'Old', dataType: 'entity', validTypes: ['Asset'] });
-		const wanted = entry({ validTypes: ['Shot'] });
+	it('matches against the entity types the run read: a type the site has lost fails the update before any call', async () => {
+		const site = createFakeSite().seed('Version', 'sg_link', { displayName: 'Link', dataType: 'entity', validTypes: ['Shot'] });
+		const wanted = entry({ validTypes: ['Shot', 'Asset'] });
 		const { ctx, planSite } = await context(site);
-		const planned = planEntry(wanted, await ctx.reader.field('Version', 'sg_link'), planSite);
-		// A site that lost the Shot entity between the plan and the write.
-		const narrowed: ItemContext = { ...ctx, site: { ...planSite, entityTypes: planSite.entityTypes.filter((type) => type.name !== 'Shot') } };
-		const result = await applyItem(narrowed, wanted, planned as PlanItem);
-		expect(result.note).toMatchObject({ code: 'unknown-valid-types', names: ['Shot'] });
-		expect(site.writes()).toEqual([]);
+		const planned = planEntry(wanted, await ctx.reader.field('Version', 'sg_link'), planSite) as PlanItem;
+		expect(planned.class).toBe('update');
+		const narrowed: ItemContext = { ...ctx, site: { ...planSite, entityTypes: planSite.entityTypes.filter((type) => type.name !== 'Asset') } };
+		const before = site.calls.length;
+		const result = await applyItem(narrowed, wanted, planned);
+		expect(result.note).toEqual({ code: 'unknown-valid-types', names: ['Asset'] });
+		expect(site.calls).toHaveLength(before);
 	});
 
 	it('marks the effect of a write that carried valid types', async () => {
@@ -111,15 +113,7 @@ describe('the valid types guard (corpus finding 121)', () => {
 		const { ctx, planSite, effects } = await context(site);
 		const planned = planEntry(wanted, await ctx.reader.field('Version', 'sg_link'), planSite) as PlanItem;
 		expect((await applyItem(ctx, wanted, planned)).state).toBe('done');
-		expect(effects).toEqual([{ kind: 'created', name: 'sg_link', validTypes: true }]);
-	});
-});
-
-describe('asStored (corpus finding 121)', () => {
-	it('drops repeats from valid types and from a list, and keeps them on a status list', () => {
-		expect(asStored(entry({ validTypes: ['Shot', 'Shot', 'Asset'] })).validTypes).toEqual(['Shot', 'Asset']);
-		expect(asStored(entry({ dataType: 'list', validTypes: [], validValues: ['a', 'a', 'b'] })).validValues).toEqual(['a', 'b']);
-		expect(asStored(entry({ dataType: 'status_list', validTypes: [], validValues: ['na', 'rev', 'na'] })).validValues).toEqual(['na', 'rev', 'na']);
+		expect(effects).toEqual([{ kind: 'created', name: 'sg_link', reverseFieldTypes: ['Shot', 'Asset'] }]);
 	});
 });
 
