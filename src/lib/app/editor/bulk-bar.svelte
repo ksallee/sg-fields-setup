@@ -43,12 +43,14 @@
 </script>
 
 <div
-	class="border-border bg-background sticky bottom-0 z-20 flex flex-wrap items-center gap-2 border-t px-6 py-2 shadow-[0_-4px_12px_-8px_rgb(0_0_0/0.25)]"
+	class="border-primary bg-background motion-safe:animate-in motion-safe:slide-in-from-bottom-4 motion-safe:fade-in-0 sticky bottom-0 z-20 flex flex-wrap items-center gap-2 border-t-2 px-6 py-3 shadow-[0_-10px_24px_-10px_rgb(0_0_0/0.45)] duration-200"
 	role="toolbar"
 	aria-label="Selected fields"
 	data-slot="bulk-bar"
 >
-	<p class="mr-2 text-sm font-medium tabular-nums" aria-live="polite" data-slot="selection-count">{selectionText(summary)}</p>
+	<p class="bg-primary text-primary-foreground mr-2 rounded-full px-3 py-1 text-sm font-medium tabular-nums" aria-live="polite" data-slot="selection-count">
+		{selectionText(summary)}
+	</p>
 
 	<div class="w-64 max-w-full">
 		{#key assignKey}

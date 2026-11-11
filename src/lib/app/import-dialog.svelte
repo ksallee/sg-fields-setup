@@ -70,6 +70,16 @@
 	}: { open?: boolean; oncreated?: (setId: string) => void } = $props();
 
 	let dialog = $state.raw(initialImportDialog());
+
+	/** Files that came with the opening: a drop on the set list. Read once the site is known. */
+	let dropped: File[] = [];
+
+	/** Opens the dialog with these files already in. */
+	export function openWith(files: File[]): void {
+		if (open) return;
+		dropped = files;
+		open = true;
+	}
 	/** The site's URL when it can be read, else null: no matching, no inference, typed fallbacks (IMP-52). */
 	let site = $state<string | null>(null);
 
@@ -95,14 +105,20 @@
 		untrack(() => {
 			dialog = initialImportDialog(dialog.session + 1);
 			choosing = false;
+			const first = dropped;
+			dropped = [];
 			if (!opened) return;
 			const session = dialog.session;
-			void prepareLive().then((live) => {
-				if (dialog.session !== session) return;
-				site = isConnected(live) ? live.siteUrl : null;
-				// Ahead of the confirm, which needs the type list. A failure waits for the confirm to say so.
-				if (site !== null) void liveSchema().entityTypes().catch(() => {});
-			});
+			void prepareLive()
+				.then((live) => {
+					if (dialog.session !== session) return;
+					site = isConnected(live) ? live.siteUrl : null;
+					// Ahead of the confirm, which needs the type list. A failure waits for the confirm to say so.
+					if (site !== null) void liveSchema().entityTypes().catch(() => {});
+				})
+				.finally(() => {
+					if (dialog.session === session && first.length > 0) void addFiles(first);
+				});
 		});
 	});
 
@@ -198,6 +214,7 @@
 					hint="One set from all of them. Only the headers and a few rows are read."
 					accept={IMPORT_ACCEPT}
 					compact={buckets.length > 0}
+					anywhere
 					busy={dialog.reading > 0}
 					disabled={saving}
 					onfiles={(files) => void addFiles(files)}
