@@ -19,6 +19,9 @@ screen follow it.
 | `/sets/<id>/install?selection=1` | The install of the editor's selection. `installPath(id, { selection: true })`. The editor first calls `writeInstallSelection(id, entryIds)` from `$lib/io/install-selection`; the install screen calls `readInstallSelection(id)` and takes the whole set when it answers null. |
 | `/connect` | The site and the sign-in. |
 
+Under `vite dev` only, `?fake` on the install path swaps the site for one held in memory
+(`docs/development.md`). A production build has no such flag.
+
 A set that is gone is a `PageState`: "Set not found", one line, a button back to the list.
 
 ## Shell and page
@@ -141,12 +144,41 @@ filler. Sentence case everywhere, no capitals for labels.
 - Words that a screen shows live in a pure module with tests, not in markup, once they take an
   argument.
 
+## The install screen
+
+`app/install/`, held to everything above, with these rules of its own.
+
+- **Thin.** `install-screen.svelte` and its components render what `session.svelte.ts` holds.
+  The session calls `$lib/pure` and decides nothing. The site comes from
+  `$lib/io/install-site` alone.
+- **Footer bar.** The one screen with a footer: its actions change with the run and sit beside
+  the run's counter, in reach while the plan scrolls. Progress on the left, actions on the
+  right, the primary last. One primary at a time: Install, then Resume, Retry or Close.
+  `$lib/pure/install-footer` says which.
+- **Toasts.** Top right on this screen, so they never cover the footer's actions.
+- **Order.** Summary, then "Visible on", then the plan. The first two keep the one column,
+  `max-w-3xl`. The plan is full width.
+- **Groups.** A bordered block per group, the header a row that folds it: chevron, title, count.
+  A group with no row is not shown.
+- **Rows.** The two lines of a list row, then one line per difference (`text-xs`, values in
+  mono, an empty value as `∅`), then the reason or the run's note. A failure is
+  `text-destructive`. A visibility warning carries the warning icon and its retry, `outline`,
+  `xs`. No row is a link.
+- **State.** A `Badge variant="outline"` with an icon, on the right: Pending, In progress, Done,
+  Skipped, Failed, Not selected. Colour is on the icon and the word, never a fill.
+- **Counters.** Small dotted-underline words on the right of a row, each a tooltip trigger.
+- **First write.** Install asks first, in a dialog that names the site, what is created and
+  updated, that a name is taken for good, and the visibility scope. Leaving while a run is in
+  progress asks too.
+- **No HTML.** Reasons and errors are rendered from parts, text and links. Never `{@html}`.
+
 ## Shared pieces
 
 `src/lib/app/`: `app-shell`, `page-header`, `page-state`, `notice`, `confirm-dialog`,
 `icon-button`, `relative-time`, `toast.ts`, `create-set-dialog`, `import-dialog`, `file-drop`,
 `set-list/`, `editor/` (toolbar, group, row, entry form, bulk bar, reference panel, the fields of
-the form).
+the form), `install/` (screen, session, plan group, plan row, summary, picker panel, footer,
+confirm).
 
 `src/lib/components/ui/` (shadcn-svelte, added with its CLI): alert-dialog, badge, button,
 checkbox, collapsible, dialog, dropdown-menu, input, label, progress, scroll-area, select,

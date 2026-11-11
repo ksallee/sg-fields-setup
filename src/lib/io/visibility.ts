@@ -11,10 +11,9 @@
  * All of it is measured in corpus `findings/115_field_visibility_per_project` and
  * `findings/018_project_listing`.
  *
- * The write is not wired. sg-widgets-core 0.3.1 has no schema write. It arrives with core's
- * `SchemaClient.updateField(entityType, field, properties, projectId)`, and `visibilityPort`
- * takes that client as its writer as it is. Until one is given, a write rejects, which the
- * executor turns into a failed step.
+ * The write is core's `SchemaClient.updateField(entityType, field, properties, projectId)`,
+ * wrapped by `schema-client.visibilityWriter` and handed to `visibilityPort` by
+ * `install-site`. Without a writer a write rejects, which the executor turns into a failed step.
  *
  * The listing read leans on 0.3.1 the way `core-schema-source` does: core's `fields(type,
  * projectId)` does the HTTP and answers a normalised field without `visible`, so the body is
