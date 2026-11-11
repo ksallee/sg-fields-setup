@@ -197,6 +197,19 @@ describe('buildEntries (IMP-30 to IMP-32, IMP-48, IMP-52)', () => {
 		]);
 	});
 
+	it('IMP-20: the field name loses its prefix in every mode, also where the prefix is not used for the type', () => {
+		const sheet = bucket(['Shot::Lens Height', 'Lens::Focal'], [], { worksheet: 'Assets', fallback: 'Shot' });
+		for (const mode of ['automatic', 'prefix', 'worksheet', 'fallback'] as const) {
+			const { entries } = buildEntries({ buckets: [sheet], mode, delimiter: '::', site, importedAt: NOW });
+			expect(entries.map((entry) => [entry.displayName, entry.programmaticName]), mode).toEqual([
+				['Lens Height', 'sg_lens_height'],
+				['Focal', 'sg_focal']
+			]);
+		}
+		const { entries } = buildEntries({ buckets: [sheet], mode: 'worksheet', delimiter: '::', site, importedAt: NOW });
+		expect(entries.map((entry) => entry.targetEntityType)).toEqual(['Asset', 'Asset']);
+	});
+
 	it('IMP-31: guesses from its own column, values read by position', () => {
 		const { entries } = buildEntries({
 			buckets: [bucket(['', 'Done', 'When'], [['x', 'yes', '2026-01-02'], ['y', 'no']], { fallback: 'Shot' })],

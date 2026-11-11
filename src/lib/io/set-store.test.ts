@@ -648,6 +648,25 @@ describe('preferences', () => {
 		await again.setPreference('skipDeleteSetConfirm', false);
 		expect(await again.getPreferences()).toEqual({ skipDeleteSetConfirm: false });
 	});
+
+	it('SET-22: a stored value that is not a boolean reads as "ask"', async () => {
+		const { store, idb } = await open();
+		store.close();
+		// Written behind the store's back, as an older or a broken build might have.
+		const db = await new Promise<IDBDatabase>((resolve, reject) => {
+			const req = idb.open(DB_NAME);
+			req.onsuccess = () => resolve(req.result);
+			req.onerror = () => reject(req.error);
+		});
+		await new Promise<void>((resolve, reject) => {
+			const tx = db.transaction('preferences', 'readwrite');
+			tx.objectStore('preferences').put({ key: 'skipDeleteSetConfirm', value: 'yes' });
+			tx.oncomplete = () => resolve();
+			tx.onabort = () => reject(tx.error);
+		});
+		db.close();
+		expect(await store.getPreferences()).toEqual({ skipDeleteSetConfirm: false });
+	});
 });
 
 describe('storage faults', () => {
@@ -683,6 +702,28 @@ describe('storage faults', () => {
 		const failed = openSetStore({ idb, version: DB_VERSION + 1 });
 		await expect(failed).rejects.toMatchObject({ kind: 'blocked', message: storageMessage('blocked') });
 		old.close();
+	});
+
+	it('a database that opens after the blocked open gave up is let go: a later upgrade is not blocked by it', async () => {
+		const idb = new IDBFactory();
+		const old = await new Promise<IDBDatabase>((resolve) => {
+			const req = idb.open(DB_NAME, DB_VERSION);
+			req.onsuccess = () => resolve(req.result);
+		});
+		await expect(openSetStore({ idb, version: DB_VERSION + 1 })).rejects.toMatchObject({ kind: 'blocked' });
+		// The other tab lets go. The open that was given up on now succeeds, with nobody holding it.
+		old.close();
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		const later = await new Promise<'opened' | 'blocked'>((resolve, reject) => {
+			const req = idb.open(DB_NAME, DB_VERSION + 2);
+			req.onblocked = () => resolve('blocked');
+			req.onerror = () => reject(req.error);
+			req.onsuccess = () => {
+				req.result.close();
+				resolve('opened');
+			};
+		});
+		expect(later).toBe('opened');
 	});
 
 	it('the store lets a newer tab upgrade, then says this tab is out of date', async () => {

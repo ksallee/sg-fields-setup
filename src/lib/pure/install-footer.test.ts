@@ -48,6 +48,11 @@ describe('footer actions (the table under RUN-5)', () => {
 		expect(footer({ run: run('running', ['in_progress']) }).apply.visible).toBe(false);
 		expect(footer({ run: run('finished', ['done']) }).apply.visible).toBe(false);
 		expect(footer({ run: run('cancelled', ['done', 'pending']) }).apply.visible).toBe(false);
+		// Not finished: the session's apply() has no other guard against a second run.
+		for (const ended of [run('finished', ['done']), run('finished', ['failed']), run('cancelled', ['done', 'pending'])]) {
+			expect(footer({ run: ended, selected: 2 }).apply.enabled).toBe(false);
+		}
+		expect(footer({ run: run('running', ['in_progress']), selected: 2 }).apply.enabled).toBe(false);
 	});
 
 	it('cancel: while running, once (RUN-18)', () => {
