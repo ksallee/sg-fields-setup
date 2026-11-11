@@ -39,6 +39,11 @@ yourself. A production build answers that route 404 and always signs in.
 Every schema write spends a field name for good. Write to the sandbox only, with the corpus's
 throwaway naming.
 
+The browser calls the site itself, writes included. The site answers the preflight for `POST`,
+`PUT` and `DELETE` on `/api/v1/schema/...` with the page's origin and
+`authorization,content-type`. Measured from `localhost` in the drive below. No server route sits
+between the page and the site.
+
 ## The fake site
 
 The install screen is the only one that writes to a site. To drive its run with no network and
@@ -57,6 +62,68 @@ A production build cannot reach it: the flag is read behind `import.meta.env.DEV
 build drops the branch and the module. `src/lib/io/install-site.test.ts` holds the source to
 that. To check a build: `pnpm build`, then
 `grep -rl "fake.shotgrid.autodesk.com" .svelte-kit/output .vercel/output` finds nothing.
+
+## The sandbox
+
+The sandbox is the site `.env.local` names. It is the one sg-groundtruth probes
+(`../sg-groundtruth/.env.local`). `FPT_PROBE_SANDBOX_PROJECT` there names the one project a drive
+may pick for visibility. Fields are site-wide all the same: a created field exists for every
+project.
+
+Rules for anything that writes:
+
+- Name new fields `zzprobe <n> ...`, so they derive `sg_zzprobe_<n>_...`. `<n>` is the next number
+  free in `../sg-groundtruth/probes`. The prefix tells whoever empties the trash what is litter.
+- Reuse before you spend. A retired `sg_zzprobe_*` field is revived by an entry of the same name
+  and type, and that costs no name.
+- No link fields. An entity or multi-entity link also makes a field on each valid type, and each
+  of those names is spent too (corpus finding 121).
+- Never name `sg_zzprobe_116_entity` or `sg_currency` in a set. Both sit in the trash in a state
+  the owner has to clear.
+- Retire what you made when you finish, and check each with a read.
+
+## A live write drive
+
+Unit tests and the fake site cover the run. A live drive is for what they cannot: real requests
+from a real browser. It costs names, so it is done once per need, planned before the first write.
+
+The drive of issue #22, 2026-11-10, as a recipe:
+
+1. Preflight by script, reads only. Each name to create answers 404. Each retired field to revive
+   answers 404. List the eligible projects. Save the type's field listing and each eligible
+   project's `visible` values. Check the preflight `OPTIONS` for the write methods.
+2. Write the plan of writes down: names spent, names revived, visibility writes per project.
+3. Build the set through the app: a CSV through the import dialog, edits in the editor, save.
+4. Install screen. Pick the sandbox project. Read the plan and the confirmation against the plan
+   of writes. Install.
+5. Read the site by script and compare: settings, the trash, visibility on the sandbox and on two
+   other projects, and the listing against the one saved.
+6. Retry, download the report, open the trash link, Refresh.
+7. Retire by script every field made or revived. Read each: 404. Compare the listing again.
+
+What it cost and did:
+
+| entry | what the run did | names spent |
+|---|---|---|
+| three new fields (text, list, checkbox) | revive 404, create 201, read back, 13 hides each | 3 |
+| a retired text field, same type | revive 204, one update, read back, 13 hides | 0 |
+| a retired checkbox field, wanted as text | revive 204, read, retire 204, row failed with the trash link | 0 |
+| a live field that matches | nothing: already visible on the picked project | 0 |
+
+Spent: `Version.sg_zzprobe_122_fs_text`, `sg_zzprobe_122_fs_list`, `sg_zzprobe_122_fs_checkbox`.
+All three are retired and can be revived by a later drive at no cost.
+
+Cancel, resume and "Retry visibility" were driven on the same fields with no new name: Refresh,
+clear the picker, install the four matching fields for all eligible projects, cancel during the
+first field's visibility. That run writes `visible` only.
+
+A retired field comes back as it was. `sg_zzprobe_116_text` was created unique, so its entry must
+be unique too. With unique off the run retires it again and fails the row: unique cannot be
+changed.
+
+Not driven live: link fields, a blocked update, a type conflict on a live field, a visibility
+write that fails, a write as a person below Admin (G7), and the trash page itself, which needs a
+web session. The fake site covers the first four.
 
 ## Deploy
 

@@ -72,3 +72,16 @@ export function selectAllState(selection: PlanSelection, rows: readonly TickRow[
 	const state = selected === 0 ? 'none' : selected === total ? 'all' : 'some';
 	return { selected, total, state, text: `${selected} of ${total} selected` };
 }
+
+/**
+ * The same once a run has started (RUN-25). The checkboxes are locked then, and a row the run
+ * finished may have nothing left to do, which would drop it from the count. So the rows that ran
+ * are counted as they were ticked, and the rest by whether their checkbox could have been used.
+ */
+export function ranSelectAllState(rows: readonly TickRow[], ran: ReadonlySet<string>): SelectAllState {
+	const withCheckbox = rows.filter((row) => row.selectable);
+	const selected = withCheckbox.filter((row) => ran.has(row.entryId)).length;
+	const total = withCheckbox.filter((row) => ran.has(row.entryId) || !row.disabled).length;
+	const state = selected === 0 ? 'none' : selected === total ? 'all' : 'some';
+	return { selected, total, state, text: `${selected} of ${total} selected` };
+}
