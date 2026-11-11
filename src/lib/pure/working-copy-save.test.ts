@@ -10,7 +10,7 @@ import {
 	setDescription,
 	setName
 } from './working-copy';
-import { afterSave, draftsOf, installEntries, saveRequest } from './working-copy-save';
+import { draftsOf, installEntries, saveRequest } from './working-copy-save';
 import { keysAfterSave } from './editor-session';
 
 const SET: FieldSet = {
@@ -164,10 +164,10 @@ describe('saveRequest', () => {
 	});
 });
 
-describe('afterSave', () => {
+describe('after a save: `openWorkingCopy` on what the store answered', () => {
 	it('EDT-46: returns a clean working copy on the reloaded state', () => {
 		const stored = [storedEntry('a', { displayName: 'Lens A' }), storedEntry('n1', { programmaticName: 'sg_lens' })];
-		const wc = afterSave(open(), { ...SET, name: 'Lens data' }, stored);
+		const wc = openWorkingCopy({ ...SET, name: 'Lens data' }, stored);
 		expect(isDirty(wc)).toBe(false);
 		expect(wc.name).toBe('Lens data');
 		expect(wc.rows.map((row) => [row.key, row.nameMode])).toEqual([

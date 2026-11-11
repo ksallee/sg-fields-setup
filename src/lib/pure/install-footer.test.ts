@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { footerActions, type FooterInput } from './install-footer';
+import { footerActions, footerLoad, type FooterInput } from './install-footer';
 import { INITIAL_RUN_STATE, type RunRow, type RunState } from './run';
 
 function row(entryId: string, state: RunRow['state']): RunRow {
@@ -109,5 +109,27 @@ describe('footer actions (the table under RUN-5)', () => {
 		expect(footer({ run: run('cancelled', ['failed', 'pending']) }).primary).toBe('resume');
 		expect(footer({ run: run('finished', ['failed']) }).primary).toBe('retry');
 		expect(footer({ run: run('finished', ['done']) }).primary).toBe('close');
+	});
+});
+
+describe('footerLoad: what the footer makes of where the screen stands (audit finding 6)', () => {
+	it('RUN-5: loading while the set, the site or the plan is read, and while a refresh re-plans', () => {
+		expect(footerLoad({ refreshing: false, status: 'loading', items: 0 })).toBe('loading');
+		expect(footerLoad({ refreshing: true, status: 'loaded', items: 3 })).toBe('loading');
+	});
+
+	it('RUN-5: loaded only with a plan that has rows; a loaded plan with no items reads failed', () => {
+		expect(footerLoad({ refreshing: false, status: 'loaded', items: 3 })).toBe('loaded');
+		expect(footerLoad({ refreshing: false, status: 'loaded', items: 0 })).toBe('failed');
+	});
+
+	it('RUN-1: every other state reads failed: Install is not offered, Refresh is', () => {
+		for (const status of ['not-found', 'selection-lost', 'set-failed', 'disconnected', 'plan-failed'] as const) {
+			expect(footerLoad({ refreshing: false, status, items: 0 })).toBe('failed');
+		}
+		expect(footer({ load: footerLoad({ refreshing: false, status: 'plan-failed', items: 0 }) })).toMatchObject({
+			apply: { enabled: false },
+			refresh: { enabled: true }
+		});
 	});
 });

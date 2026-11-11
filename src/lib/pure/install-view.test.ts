@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { planSet, type CreatePayload, type PlanEntry, type PlanItem, type PropertyName } from './plan';
 import type { PlanReason } from './plan-reason';
 import { INITIAL_RUN_STATE, type RunRow, type RunState } from './run';
+import type { VisibilityForecast } from './visibility-analysis';
 import {
 	CREATE_LIST_SHOWN,
 	CREATE_TEXT_SHOWN,
@@ -11,6 +12,12 @@ import {
 	differenceLine,
 	groupOf,
 	groupRows,
+	installCheckLabel,
+	rowEnded,
+	rowWarned,
+	showMoreLabel,
+	summaryRows,
+	tickRowsOf,
 	rowStatus,
 	showValue,
 	statusLabel,
@@ -390,5 +397,82 @@ describe('what a create writes (RUN-3, A5 of the security audit)', () => {
 		}
 		// Every property a create can carry was sent by one of them, so none goes unchecked.
 		expect([...names].sort()).toEqual(['default_value', 'description', 'name', 'unique', 'valid_types', 'valid_values']);
+	});
+});
+
+describe('what the session hands the ticks and the summary (audit finding 6)', () => {
+	const P = { id: 70, name: 'Demo' };
+	function visibility(entryId: string, more: Partial<VisibilityForecast> = {}): VisibilityForecast {
+		return { entryId, class: 'already-matches', applies: true, visible: [], toAdd: [], analysing: [], locked: [], outside: [], toHide: [], ...more };
+	}
+
+	it('RUN-4: a row with nothing left to do is disabled; one with visibility to add, or still analysed, is not', () => {
+		const rows = viewRows([item('done', 'already-matches'), item('add', 'already-matches'), item('wait', 'already-matches'), item('new', 'create')], INITIAL_RUN_STATE);
+		const ticks = tickRowsOf(
+			rows,
+			new Map([
+				['done', visibility('done', { visible: [P] })],
+				['add', visibility('add', { toAdd: [P] })],
+				['wait', visibility('wait', { analysing: [P] })],
+				['new', visibility('new', { class: 'create', toAdd: [P] })]
+			])
+		);
+		expect(ticks).toEqual([
+			{ entryId: 'done', selectable: true, disabled: true },
+			{ entryId: 'add', selectable: true, disabled: false },
+			{ entryId: 'wait', selectable: true, disabled: false },
+			{ entryId: 'new', selectable: true, disabled: false }
+		]);
+	});
+
+	it('RUN-4: a row the analysis says nothing about is not disabled, and a conflict row stays unselectable', () => {
+		const rows = viewRows([item('match', 'already-matches'), item('clash', 'type-conflict')], INITIAL_RUN_STATE);
+		expect(tickRowsOf(rows, new Map())).toEqual([
+			{ entryId: 'match', selectable: true, disabled: false },
+			{ entryId: 'clash', selectable: false, disabled: false }
+		]);
+	});
+
+	it('RUN-5: the summary\'s rows carry each row\'s class, its tick and the reverse field types of its plan item', () => {
+		const items = [item('link', 'create', { reverseFieldTypes: ['Asset', 'Task'] }), item('plain', 'update'), item('clash', 'type-conflict')];
+		const rows = viewRows(items, INITIAL_RUN_STATE);
+		expect(summaryRows(rows, new Set(['link']), items)).toEqual([
+			{ class: 'create', ticked: true, reverseFieldTypes: ['Asset', 'Task'] },
+			{ class: 'update', ticked: false, reverseFieldTypes: [] },
+			{ class: 'type-conflict', ticked: false, reverseFieldTypes: [] }
+		]);
+	});
+
+	it('RUN-19: the summary reads the class a run\'s re-plan gave a row', () => {
+		const items = [item('a', 'create')];
+		const rows = viewRows(items, { rows: [runRow('a', { class: 'update', state: 'done' })] });
+		expect(summaryRows(rows, new Set(['a']), items)).toEqual([{ class: 'update', ticked: true, reverseFieldTypes: [] }]);
+	});
+});
+
+describe('what a plan row says of its run (audit finding 6)', () => {
+	const applied = { origin: 'new' as const, status: 'applied' as const, done: 2, total: 2, written: 2, failures: [], error: null };
+
+	it('RUN-21: a row has ended once its run row is done, skipped or failed', () => {
+		expect(rowEnded({ run: null })).toBe(false);
+		expect(rowEnded({ run: runRow('a', { state: 'pending' }) })).toBe(false);
+		expect(rowEnded({ run: runRow('a', { state: 'in_progress' }) })).toBe(false);
+		for (const state of ['done', 'skipped', 'failed'] as const) expect(rowEnded({ run: runRow('a', { state }) })).toBe(true);
+	});
+
+	it('VIS-7: an ended row is warned when its visibility needs another go, and only then', () => {
+		const failed = { ...applied, failures: [{ projectId: 71, projectName: 'Demo', message: 'No.' }] };
+		expect(rowWarned({ run: runRow('a', { state: 'done', visibility: failed }) })).toBe(true);
+		expect(rowWarned({ run: runRow('a', { state: 'done', visibility: { ...applied, status: 'cancelled' } }) })).toBe(true);
+		expect(rowWarned({ run: runRow('a', { state: 'done', visibility: applied }) })).toBe(false);
+		expect(rowWarned({ run: runRow('a', { state: 'done' }) })).toBe(false);
+		expect(rowWarned({ run: runRow('a', { state: 'in_progress', visibility: failed }) })).toBe(false);
+		expect(rowWarned({ run: null })).toBe(false);
+	});
+
+	it('RUN-4, RUN-3: the checkbox and the "show all" button are named after their field and setting', () => {
+		expect(installCheckLabel('Lens')).toBe('Install Lens');
+		expect(showMoreLabel(false, 'Valid values')).toBe('Show all of valid values');
+		expect(showMoreLabel(true, 'Valid values')).toBe('Show less of valid values');
 	});
 });

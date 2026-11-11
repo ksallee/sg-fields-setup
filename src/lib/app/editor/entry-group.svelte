@@ -13,6 +13,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { explanationText, type RowComparison } from '$lib/pure/compare';
+	import { selectGroupLabel } from '$lib/pure/editor-text';
 	import { groupCountText, type EditorGroup } from '$lib/pure/editor-view';
 	import type { LiveField } from '$lib/pure/live-field';
 	import type { EntryDefinition } from '$lib/pure/model';
@@ -75,11 +76,10 @@
 <section class="flex flex-col" data-slot="entry-group" data-type={group.type}>
 	<header class="bg-background border-border sticky top-0 z-10 flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 border-b px-2 py-1.5">
 		<Checkbox
-			bind:checked={() => checkState === 'all', () => {}}
+			bind:checked={() => checkState === 'all', () => ontogglegroup(group.keys)}
 			indeterminate={checkState === 'some'}
-			onclick={() => ontogglegroup(group.keys)}
 			disabled={group.keys.length === 0}
-			aria-label="Select the fields of {group.label}"
+			aria-label={selectGroupLabel(group.label)}
 			data-slot="group-check"
 		/>
 		<Glyph class="text-muted-foreground ml-0.5 size-4 shrink-0" aria-hidden="true" />

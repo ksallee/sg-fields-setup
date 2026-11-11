@@ -91,3 +91,36 @@ export const MIRROR_TEXT =
 
 /** The note under unique per project (EDT-30). */
 export const UNIQUE_NOTE = 'Fixed when the field is created. The API cannot change it later.';
+
+/** The page's title (EDT-1): the name as typed, a blank one named, and a word before the set loads. */
+export function editorTitle(name: string | null): string {
+	if (name === null) return 'Set';
+	return name.trim() || 'Untitled set';
+}
+
+/**
+ * A re-sync whose answer arrived after the set had moved on: an edit, or a save that re-keyed the
+ * rows (EDT-42). Its values are for rows as they were, so none is applied.
+ */
+export const RESYNC_DROPPED_TEXT = 'The set changed while the site was read. Nothing was re-synced. Try again.';
+
+/** The toast title of a re-sync whose read failed (EDT-42). */
+export const RESYNC_FAILED_TITLE = 'Could not re-sync from the site';
+
+/** The toast of a re-check whose read failed (CMP-10). */
+export const RECHECK_FAILED = { title: 'Could not re-check the entity types', message: 'The site did not answer. Try again.' } as const;
+
+/** A failed save, in the notice over the list (EDT-47): why, then that nothing typed is lost. */
+export function notSavedText(reason: string): string {
+	return `${reason} Your changes are kept. Save again when ready.`;
+}
+
+/** The name of a row's checkbox (EDT-39). */
+export function selectRowLabel(displayName: string): string {
+	return `Select ${displayName.trim() || 'this field'}`;
+}
+
+/** The name of a group's checkbox (EDT-40). */
+export function selectGroupLabel(groupLabel: string): string {
+	return `Select the fields of ${groupLabel}`;
+}

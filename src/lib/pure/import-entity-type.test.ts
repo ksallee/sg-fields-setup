@@ -162,3 +162,10 @@ describe('importModeHint (IMP-26)', () => {
 		for (const mode of IMPORT_MODES) expect(importModeHint(mode)).not.toMatch(/\n/);
 	});
 });
+
+describe('IMPORT_MODE_LABELS (IMP-17)', () => {
+	it('IMP-17: every mode has its tab label', async () => {
+		const { IMPORT_MODE_LABELS, IMPORT_MODES } = await import('./import-entity-type');
+		expect(IMPORT_MODES.map((mode) => IMPORT_MODE_LABELS[mode])).toEqual(['Automatic', 'Worksheet', 'Header prefix']);
+	});
+});

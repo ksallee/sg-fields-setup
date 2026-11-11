@@ -149,6 +149,37 @@ it in a scratch copy of the repo and bring the changed files over.
 core (`v0.4.0`): the same file with `$lib/registry/components/` read as `$lib/components/`. It
 runs where `../sg-widgets` (or `../../sg-widgets`, from a worktree) is checked out with its tags,
 and is skipped elsewhere, as in CI.
+## Browser tests
+
+    pnpm exec playwright install chromium
+    pnpm e2e
+
+The first line once per machine. `pnpm e2e` starts its own `vite dev` on port 5299 and drives
+Chromium through the screens: a spreadsheet import, an edit and a save, the leave prompt, a set
+file out and back in, and the install screen on the fake site. Well under half a minute. Another
+checkout running at the same time takes another port:
+
+    E2E_PORT=5300 pnpm e2e
+
+They never reach a site. `playwright.config.ts` blanks the three `FPT_API_*` variables and
+`PUBLIC_FPT_SITE_URL` for that server. A variable already set wins over `.env.local`, so the dev
+token route answers 404 and nothing connects. `e2e/fixtures.ts` aborts any request to a host but
+this machine and fails the test with its address. A Content Security Policy violation fails the
+test too, and so does an uncaught error on the page. The install tests run on `?fake` and read the
+fake's state through `window.__installFake`.
+
+One exception: the install test that picks a project lets `picsum.photos` through the failure
+check, still aborted. The fake's picker runs on the widgets' mock client, whose projects carry
+thumbnails from there.
+
+To add a scenario: a `test` in `e2e/*.spec.ts`, with the requirement IDs in its name. Import
+`test` and `expect` from `./fixtures`, never from `@playwright/test`. Seed through the screens with
+the helpers there (`importSetFile`, `importSpreadsheet`). Each test has a fresh browser context, so
+an empty IndexedDB. Find elements by `data-slot`, `data-action`, `data-status` and accessible names.
+Wait on state, never on time: for a run, a row's `data-status`.
+
+The `e2e` job of `.github/workflows/gates.yml` runs them beside the gates, with one retry. A
+failure uploads the HTML report, with the trace of the retry, as the `playwright-report` artifact.
 
 ## The sandbox
 

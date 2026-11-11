@@ -117,3 +117,19 @@ describe('nonAsciiNameWarning (EDT-25, G11): where the planner has no say', () =
 		expect(nonAsciiNameWarning({ ...row, dataType: 'calculated' })).toBeNull();
 	});
 });
+
+describe('nameWarningFor: when the form says it (audit finding 6)', () => {
+	const row = { ...complete, displayName: 'Durée', programmaticName: 'sg_text', nameMode: 'derived' as const };
+
+	it('G11: where the planner has not judged the row, the form warns', async () => {
+		const { nameWarningFor } = await import('./editor-row');
+		expect(nameWarningFor(row, null)).toBe(nonAsciiNameWarning(row));
+		expect(nameWarningFor(row, undefined)).toBe(nonAsciiNameWarning(row));
+	});
+
+	it('PLN-15: where the planner has judged it, its reason is among the notes and the form adds nothing', async () => {
+		const { nameWarningFor } = await import('./editor-row');
+		expect(nameWarningFor(row, 'refused')).toBeNull();
+		expect(nameWarningFor(row, 'create')).toBeNull();
+	});
+});

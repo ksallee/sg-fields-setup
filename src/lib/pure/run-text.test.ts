@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { INITIAL_RUN_STATE, type RowNote, type RunRow, type RunState } from './run';
-import { noteParts, progressLabel, progressText, rowText, summaryText, visibilityNote } from './run-text';
+import { noteParts, progressLabel, progressText, rowText, summaryText, summaryTone, visibilityNote, visibilityProgressText } from './run-text';
 
 function row(more: Partial<RunRow> = {}): RunRow {
 	return {
@@ -128,5 +128,32 @@ describe('progress and summary (RUN-23, RUN-24)', () => {
 		expect(summaryText(state({ status: 'finished', error: 'Failed to fetch' }, ['failed', 'pending']))).toBe(
 			'Install stopped. Failed to fetch 0 applied, 0 skipped, 1 failed, 1 not started.'
 		);
+	});
+});
+
+describe('summaryTone: how the closing notification reads (RUN-24, audit finding 6)', () => {
+	const warned = { origin: 'existing' as const, status: 'applied' as const, done: 1, total: 2, written: 1, failures: [{ projectId: 71, projectName: 'Demo', message: 'No.' }], error: null };
+
+	it('RUN-24: a failed row or a run-level error is an error', () => {
+		expect(summaryTone(state({ status: 'finished' }, ['done', 'failed']))).toBe('error');
+		expect(summaryTone(state({ status: 'finished', error: 'Failed to fetch' }, ['done']))).toBe('error');
+		expect(summaryTone(state({ status: 'cancelled' }, ['failed', 'pending']))).toBe('error');
+	});
+
+	it('RUN-24, VIS-7: a cancel or a visibility warning is a warning', () => {
+		expect(summaryTone(state({ status: 'cancelled' }, ['done', 'pending']))).toBe('warning');
+		expect(summaryTone({ ...INITIAL_RUN_STATE, status: 'finished', rows: [row({ state: 'done', visibility: warned })] })).toBe('warning');
+	});
+
+	it('RUN-24: everything else is a success', () => {
+		expect(summaryTone(state({ status: 'finished' }, ['done', 'skipped']))).toBe('success');
+	});
+});
+
+describe('visibilityProgressText (RUN-22)', () => {
+	it('RUN-22: names what the counter counts; nothing for a row with no visibility', () => {
+		const visibility = { origin: 'new' as const, status: 'applying' as const, done: 1, total: 3, written: 1, failures: [], error: null };
+		expect(visibilityProgressText(row({ visibility }))).toBe('Visibility 1 of 3 projects');
+		expect(visibilityProgressText(row())).toBeNull();
 	});
 });

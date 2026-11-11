@@ -1,13 +1,14 @@
 /**
  * Why Save, Install or Duplicate is disabled (EDT-9 to EDT-11): one typed reason, the first that
  * matches, and the text shown on hover. Null means the button is enabled. Whether a save is
- * already running is the view's to add.
+ * already running is the session's to add.
  */
 import { isDirty, validity, type WorkingCopy } from './working-copy';
 
 /** One reason a button is disabled. */
 export type Block =
 	| { reason: 'nothing_to_save' }
+	| { reason: 'resyncing' }
 	| { reason: 'name_missing' }
 	| { reason: 'incomplete'; count: number }
 	| { reason: 'duplicated' }
@@ -16,11 +17,15 @@ export type Block =
 	| { reason: 'no_site' };
 
 /**
- * Save (EDT-11), first match of: nothing to save; set name missing; N fields missing required
- * values; two or more fields share an entity type and programmatic name.
+ * Save (EDT-11), first match of: nothing to save; a re-sync is on its way; set name missing; N
+ * fields missing required values; two or more fields share an entity type and programmatic name.
+ *
+ * A re-sync reads the site, then writes its answer into the rows as they stand (EDT-42). A save
+ * in between would store the rows without it and re-key them under it, so Save waits.
  */
-export function saveBlock(workingCopy: WorkingCopy): Block | null {
+export function saveBlock(workingCopy: WorkingCopy, busy: { resyncing?: boolean } = {}): Block | null {
 	if (!isDirty(workingCopy)) return { reason: 'nothing_to_save' };
+	if (busy.resyncing) return { reason: 'resyncing' };
 	const result = validity(workingCopy);
 	if (result.nameMissing) return { reason: 'name_missing' };
 	if (result.incompleteIds.length > 0) return { reason: 'incomplete', count: result.incompleteIds.length };
@@ -60,6 +65,8 @@ export function blockText(block: Block): string {
 	switch (block.reason) {
 		case 'nothing_to_save':
 			return 'No changes to save.';
+		case 'resyncing':
+			return 'Wait for the re-sync to finish.';
 		case 'name_missing':
 			return 'The set needs a name.';
 		case 'incomplete':

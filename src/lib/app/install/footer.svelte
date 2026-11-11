@@ -2,6 +2,10 @@
 	The install screen's footer (the table under RUN-5, RUN-23): the run's counter and label on the
 	left, the actions on the right. Which action shows and which can be used is
 	`install-footer.footerActions`; the label and the counter are `run-text`.
+
+	The left side is the screen's one live region for a run, polite: its progress as it moves, then
+	how it ended (`run-text.summaryText`, the closing toast's words, for a screen reader only). The
+	rows are plain content, so twelve failures are not twelve interruptions.
 -->
 <script lang="ts">
 	import Download from '@lucide/svelte/icons/download';
@@ -10,7 +14,7 @@
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import type { Footer, FooterActionName } from '$lib/pure/install-footer';
 	import { runCounters, type RunState } from '$lib/pure/run';
-	import { progressLabel, progressText } from '$lib/pure/run-text';
+	import { progressLabel, progressText, summaryText } from '$lib/pure/run-text';
 
 	let {
 		footer,
@@ -31,6 +35,7 @@
 
 	const label = $derived(progressLabel(run));
 	const counters = $derived(runCounters(run));
+	const result = $derived(summaryText(run));
 	const variant = (name: FooterActionName) => (footer.primary === name ? 'default' : 'outline');
 </script>
 
@@ -42,6 +47,7 @@
 				<span class="text-muted-foreground tabular-nums" data-slot="run-counter">{progressText(run)}</span>
 				<Progress value={counters.finished} max={Math.max(counters.total, 1)} class="max-w-40 min-w-16 flex-1" aria-label="Fields finished" />
 			{/if}
+			{#if result}<span class="sr-only" data-slot="run-result">{result}</span>{/if}
 		{:else}
 			<span class="text-muted-foreground tabular-nums">{selected}</span>
 		{/if}

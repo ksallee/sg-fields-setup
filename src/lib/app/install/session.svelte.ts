@@ -1,6 +1,6 @@
 /**
  * The install screen's wiring (issues #18, #19): one object that holds what the screen shows and
- * calls the modules that decide it. No rule lives here.
+ * calls the modules that decide it. No rule lives here: each derived value below is one call.
  *
  * | what                         | decided by                                              |
  * |------------------------------|---------------------------------------------------------|
@@ -30,21 +30,21 @@ import { installSite, type InstallSite } from '$lib/io/install-site';
 import { sharedSetStore } from '$lib/io/set-store';
 import { CONFIRM_CHANGED_TEXT, mintConfirmation, redeemConfirmation, type Confirmation, type ConfirmSubject } from '$lib/pure/install-confirm';
 import { installEntries } from '$lib/pure/install-entries';
-import { footerActions, type Footer } from '$lib/pure/install-footer';
+import { footerActions, footerLoad, type Footer } from '$lib/pure/install-footer';
 import { confirmText, installSummary, planContext, reportFileName, screenSummary, type ConfirmText, type SummaryItem } from '$lib/pure/install-text';
-import { analysisRows, groupRows, viewRows, type InstallGroup, type InstallRow } from '$lib/pure/install-view';
+import { analysisRows, groupRows, summaryRows, tickRowsOf, viewRows, type InstallGroup, type InstallRow } from '$lib/pure/install-view';
 import type { LiveEntityType } from '$lib/pure/live-entity-types';
 import { emptyPlanText, type PlanEntry, type PlanItem } from '$lib/pure/plan';
 import { ALL_TICKED, ranSelectAllState, selectAllState, setAllTicked, tickedIds, toggleTick, type PlanSelection, type SelectAllState, type TickRow } from '$lib/pure/plan-selection';
-import { INITIAL_RUN_STATE, runCounters, type RunState } from '$lib/pure/run';
+import { INITIAL_RUN_STATE, type RunState } from '$lib/pure/run';
 import { createRun, replan, type Run } from '$lib/pure/run-driver';
 import { reportIsEmpty, reportText, runReport } from '$lib/pure/run-report';
-import { summaryText } from '$lib/pure/run-text';
+import { summaryText, summaryTone } from '$lib/pure/run-text';
 import { siteErrorMessage } from '$lib/pure/site-error';
 import { analysisStatus, rowVisibility, type VisibilityForecast, type VisibilityAnalysis } from '$lib/pure/visibility-analysis';
 import { createApplyVisibility, retryVisibility } from '$lib/pure/visibility-run';
 import { analysisProjects, resolveScope, scopeNotes, scopeSummary, type ProjectsRead, type VisibilityScope } from '$lib/pure/visibility-scope';
-import { nothingLeftToDo, visibilityCount, type VisibilityCount } from '$lib/pure/visibility-text';
+import { visibilityCount, type VisibilityCount } from '$lib/pure/visibility-text';
 
 /** Where the screen stands before it has a plan to show. */
 export type LoadState =
@@ -101,12 +101,7 @@ export class InstallSession {
 	readonly visibility: ReadonlyMap<string, VisibilityForecast> = $derived(
 		new Map(analysisRows(this.items, this.run).map((row) => [row.entryId, rowVisibility(row, this.resolved, this.analysis)]))
 	);
-	readonly tickRows: TickRow[] = $derived(
-		this.rows.map((row) => {
-			const visibility = this.visibility.get(row.entryId);
-			return { entryId: row.entryId, selectable: row.selectable, disabled: visibility !== undefined && nothingLeftToDo(visibility) };
-		})
-	);
+	readonly tickRows: TickRow[] = $derived(tickRowsOf(this.rows, this.visibility));
 	/** The rows of the run once there is one; until then the ticked rows (RUN-25). */
 	readonly ticked: ReadonlySet<string> = $derived(
 		new Set(this.run.status === 'idle' ? tickedIds(this.selection, this.tickRows) : this.run.rows.map((row) => row.entryId))
@@ -120,7 +115,8 @@ export class InstallSession {
 	readonly locked: boolean = $derived(this.run.status !== 'idle' || this.refreshing);
 	readonly running: boolean = $derived(this.run.status === 'running');
 	/** The plan's counts, then the run's once there is one (`install-text.screenSummary`). */
-	readonly summary: SummaryItem[] = $derived(screenSummary(this.#summary(), this.run));
+	readonly #planSummary = $derived(installSummary(summaryRows(this.rows, this.ticked, this.items)));
+	readonly summary: SummaryItem[] = $derived(screenSummary(this.#planSummary, this.run));
 	readonly scopeText: string = $derived(scopeSummary(this.resolved));
 	readonly scopeNotes: string[] = $derived(scopeNotes(this.resolved));
 	readonly visibilityCount: VisibilityCount = $derived(
@@ -133,7 +129,7 @@ export class InstallSession {
 	readonly reportEmpty: boolean = $derived(reportIsEmpty(runReport(this.run)));
 	readonly footer: Footer = $derived(
 		footerActions({
-			load: this.refreshing || this.load.status === 'loading' ? 'loading' : this.load.status === 'loaded' && this.items.length > 0 ? 'loaded' : 'failed',
+			load: footerLoad({ refreshing: this.refreshing, status: this.load.status, items: this.items.length }),
 			run: this.run,
 			selected: this.ticked.size,
 			reportEmpty: this.reportEmpty
@@ -141,15 +137,8 @@ export class InstallSession {
 	);
 	readonly context: string = $derived(planContext({ whole: this.whole, entries: this.entries.length, siteUrl: this.site?.siteUrl ?? '' }));
 	readonly confirm: ConfirmText = $derived(
-		confirmText({ summary: this.#summary(), siteUrl: this.site?.siteUrl ?? '', scope: this.scopeText, visibility: this.visibilityCount.text })
+		confirmText({ summary: this.#planSummary, siteUrl: this.site?.siteUrl ?? '', scope: this.scopeText, visibility: this.visibilityCount.text })
 	);
-
-	#summary() {
-		const byId = new Map(this.items.map((item) => [item.entryId, item]));
-		return installSummary(
-			this.rows.map((row) => ({ class: row.class, ticked: this.ticked.has(row.entryId), reverseFieldTypes: byId.get(row.entryId)?.reverseFieldTypes ?? [] }))
-		);
-	}
 
 	/* Opening. */
 
@@ -354,12 +343,9 @@ export class InstallSession {
 			const state = await operation();
 			if (this.#disposed) return;
 			const text = summaryText(state);
-			const counters = runCounters(state);
 			if (text === null) return;
 			// Top right: the footer's actions stay clear (docs/design.md).
-			if (state.error !== null || counters.failed > 0) notify.error(text, undefined, ABOVE_FOOTER);
-			else if (state.status === 'cancelled' || counters.visibilityWarnings > 0) notify.warning(text, undefined, ABOVE_FOOTER);
-			else notify.success(text, undefined, ABOVE_FOOTER);
+			notify[summaryTone(state)](text, undefined, ABOVE_FOOTER);
 		} catch (error) {
 			if (!this.#disposed) notify.error(siteErrorMessage(error), undefined, ABOVE_FOOTER);
 		} finally {
