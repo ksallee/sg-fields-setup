@@ -4,7 +4,7 @@
  * import never fails for its name. Throws only what the store throws (`SetStoreError`).
  */
 import { copyName } from '$lib/pure/copy-name';
-import { decodeSetFile, refusalMessage as fileRefusalMessage } from '$lib/pure/set-file';
+import { decodeSetFile, exceedsSetFileCap, refusalMessage as fileRefusalMessage, setFileTooLargeText } from '$lib/pure/set-file';
 import { refusalMessage } from '$lib/pure/set-plan';
 import type { ImportedSummary } from '$lib/pure/set-text';
 import type { SetStore } from './set-store';
@@ -32,4 +32,13 @@ export async function importSetFile(store: SetStore, text: string): Promise<Impo
 		taken.push(result.clashing.name);
 		name = copyName(askedName, taken);
 	}
+}
+
+/** The part of a `File` this reads. */
+export type SetFileSource = Pick<File, 'name' | 'size' | 'text'>;
+
+/** A picked file into the store. A file over the size cap is refused before a byte is read. */
+export async function importSetFileFrom(store: SetStore, file: SetFileSource): Promise<ImportSetFileResult> {
+	if (exceedsSetFileCap(file.size)) return { ok: false, message: setFileTooLargeText(file.name) };
+	return importSetFile(store, await file.text());
 }
