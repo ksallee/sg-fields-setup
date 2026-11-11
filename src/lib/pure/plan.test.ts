@@ -3,6 +3,7 @@ import { CREATABLE_DATA_TYPES } from './data-types';
 import { predictFieldName } from './field-name';
 import listing from './fixtures/live-version-fields.json';
 import schema from './fixtures/live-schema.json';
+import { indexLiveFields, matchLiveField } from './import-match';
 import { readEntityTypes, type LiveEntityType } from './live-entity-types';
 import { readField, readFieldReply, readFields, type LiveField, type LiveFieldRead } from './live-field';
 import {
@@ -380,6 +381,19 @@ describe('planEntry: refusals', () => {
 		});
 		expect(refusal(item)).toEqual(['label-taken']);
 		expect(item.reasons[0].other).toBe('sg_ai_seed_1');
+	});
+
+	it('PLN-16 beside IMP-27, on record: "Shot-Code" matches a live "Shot Code" at import and is no label clash at plan', () => {
+		// Two rules for two questions, each left as it is. Import asks "is this column that field?" and
+		// folds punctuation (`normaliseName`). The plan asks "does a live field have this very label?" and
+		// only trims and lowercases. So a column the import would have matched, typed by hand as a new
+		// field, plans as a create.
+		const live = liveField({ dataType: 'text', name: 'Shot Code' }, 'code');
+		const at = { ...site, fieldsByType: new Map([['Version', [live]]]) };
+		expect(matchLiveField(indexLiveFields([live]), 'Shot-Code')).toBe(live);
+		expect(plan(entry({ displayName: 'Shot-Code', programmaticName: 'sg_shot_code' }), ABSENT, at).class).toBe('create');
+		// The same label, case and padding aside, is the clash.
+		expect(refusal(plan(entry({ displayName: ' shot code ', programmaticName: 'sg_shot_code' }), ABSENT, at))).toEqual(['label-taken']);
 	});
 
 	it('PLN-16: a create with a free label is not refused', () => {
