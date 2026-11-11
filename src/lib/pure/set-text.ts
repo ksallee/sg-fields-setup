@@ -1,0 +1,63 @@
+/** The words of the set list and of the actions on a set: counts, labels, confirmations. Pure. */
+import type { Origin } from './model';
+import type { SetSort } from './set-query';
+
+/** "1 field", "2 fields", "1,234 fields": the number, then the singular or the plural. */
+export function countText(count: number, singular: string, plural = `${singular}s`): string {
+	return `${count.toLocaleString('en-US')} ${count === 1 ? singular : plural}`;
+}
+
+/** A set's entry count as the list shows it (SET-3). The app calls entries fields. */
+export function fieldCount(count: number): string {
+	return count === 0 ? 'No fields' : countText(count, 'field');
+}
+
+/** The origins as the filter and the rows name them (SET-2, SET-3). */
+export const ORIGIN_LABELS: Record<Origin, string> = {
+	import: 'Import',
+	manual: 'Manual',
+	site_capture: 'Site capture'
+};
+
+/** The sorts as the sort choice names them (SET-2, SET-4). */
+export const SORT_LABELS: Record<SetSort, string> = {
+	changed: 'Recently changed',
+	created: 'Recently created',
+	name: 'Name A to Z'
+};
+
+/** The line over the list: how many sets, or how many match the search and the filter. */
+export function totalText(total: number, filtered: boolean): string {
+	const sets = countText(total, 'set');
+	if (!filtered) return sets;
+	return `${sets} ${total === 1 ? 'matches' : 'match'}`;
+}
+
+/** The confirmation after a duplicate (SET-21). */
+export function duplicatedText(copyName: string): string {
+	return `Duplicated as "${copyName}".`;
+}
+
+/** The body of the delete confirmation (SET-22): the set by name and what goes with it (MOD-3). */
+export function deleteQuestion(name: string, entryCount: number): string {
+	const what = entryCount === 0 ? `"${name}"` : `"${name}" and its ${countText(entryCount, 'field')}`;
+	return `${what} will be deleted. This cannot be undone.`;
+}
+
+/** What an import of a set file stored (D1). `askedName` is the name in the file. */
+export interface ImportedSummary {
+	name: string;
+	askedName: string;
+	entryCount: number;
+	duplicatesDropped: number;
+}
+
+/** The confirmation after a set file came in: the fields, the duplicates dropped, a changed name. */
+export function importedText(done: ImportedSummary): string {
+	const renamed = done.name !== done.askedName.trim();
+	const fields = done.entryCount === 0 ? 'no fields' : countText(done.entryCount, 'field');
+	const parts = [`Imported ${renamed ? 'as ' : ''}"${done.name}" with ${fields}.`];
+	if (done.duplicatesDropped > 0) parts.push(`${countText(done.duplicatesDropped, 'duplicate')} dropped.`);
+	if (renamed) parts.push(`The name "${done.askedName.trim()}" was taken.`);
+	return parts.join(' ');
+}
