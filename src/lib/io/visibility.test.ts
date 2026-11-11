@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SchemaApiError } from 'sg-widgets-core';
 import type { EntityRow, SearchOptions } from 'sg-widgets-core';
 import typeNotFound from '../pure/fixtures/live-type-not-found.json';
 import versionFields from '../pure/fixtures/live-version-fields.json';
@@ -140,9 +141,11 @@ describe('coreVisibilitySource', () => {
 		expect(seen).toEqual([]);
 	});
 
-	it('rejects with the site\'s own words', async () => {
+	it('rejects with the site\'s own words, as core\'s SchemaApiError', async () => {
 		const { source } = site({ '/api/v1/schema/CustomEntity08/fields': { status: 404, body: typeNotFound } });
-		await expect(source.readRawFields('CustomEntity08', 70)).rejects.toThrow("Entity type 'CustomEntity08' does not exist.");
+		const failure = await source.readRawFields('CustomEntity08', 70).catch((error: unknown) => error);
+		expect(failure).toBeInstanceOf(SchemaApiError);
+		expect(failure).toMatchObject({ status: 404, message: "Entity type 'CustomEntity08' does not exist." });
 	});
 
 	it('keeps two reads at once apart', async () => {

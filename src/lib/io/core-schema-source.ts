@@ -1,27 +1,23 @@
 /**
- * The schema reads, through sg-widgets-core 0.3.1.
+ * The schema reads, through sg-widgets-core.
  *
- * The core client does the HTTP: the address, the bearer, the refusal. Its schema methods answer
- * a normalised field, though, and drop the wrapped record the snapshots need (gap W2). They also
- * look for the description among the properties, where the site does not put it. So each read
- * here runs through a core client whose `fetch` keeps a copy of the body, and answers that body.
- * No request is built here.
+ * Core does the HTTP: the address, the bearer, the refusal. The fields of a type and the one
+ * field come from its `RestSchemaClient` (`readRawFields`, `readField`), which answers the
+ * wrapped records the snapshots need. No request is built here.
  *
- * Two things lean on how 0.3.1 behaves and not on what it promises:
+ * The type list has no raw read in core 0.4.0. `RestClient.entityTypes()` answers display names
+ * only, so that one read runs through a core client whose `fetch` keeps a copy of the body, and
+ * answers that body.
  *
- * - The one-field read without a project. `fieldWithProject` asks for a project. It leaves a
- *   parameter out of the address when it is undefined, so it is called with none. A test here
- *   holds that.
- * - The body is listened to, not handed over.
- *
- * Both go when core ships its schema client (sg-widgets #357): its `readRawFields` and
- * `readField` answer what `SchemaSource` asks for.
+ * "Does not exist" is core's `missing` result: a 404 whose detail reads `Field '<Type>.<field>'
+ * does not exist.`, which is what `isFieldMissing` holds. A type the site does not have is a 404
+ * too, saying `Entity type`, and stays a rejection (PLN-3).
  */
-import { RestClient, SgApiError, type RestClientOptions } from 'sg-widgets-core';
+import { RestClient, RestSchemaClient, SchemaApiError, SgApiError, type RestClientOptions } from 'sg-widgets-core';
 import { isFieldMissing, type FieldReply } from '$lib/pure/live-field';
 import type { SchemaSource } from './schema';
 
-/** A name that is one path segment. Core puts it into the address as it is. */
+/** A name that is one path segment. Refused before asking, so a bad name never reaches the site. */
 const NAME = /^[A-Za-z0-9_]+$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -36,61 +32,48 @@ function detailOf(body: unknown): string | null {
 	return typeof detail === 'string' && detail !== '' ? detail : null;
 }
 
-/** The same refusal, saying what the site said. Core's own message is the title, "Not Found". */
+/** The same refusal, saying what the site said. `RestClient`'s own message is the title, "Not Found". */
 function withDetail(error: unknown): unknown {
 	if (!(error instanceof SgApiError)) return error;
 	const detail = detailOf(error.body);
-	return detail ? new SgApiError(error.status, error.body, detail) : error;
+	return detail ? new SchemaApiError(error.status, error.body, detail) : error;
 }
 
 export function coreSchemaSource(options: RestClientOptions): SchemaSource {
 	const send = options.fetch ?? globalThis.fetch.bind(globalThis);
-
-	/** Runs one core read and answers the `data` the site sent for it. A client per read keeps two reads apart. */
-	async function dataOf(read: (client: RestClient) => Promise<unknown>): Promise<unknown> {
-		let body: unknown = null;
-		const listen: typeof fetch = async (input, init) => {
-			const response = await send(input, init);
-			if (response.ok) body = await response.clone().json();
-			return response;
-		};
-		await read(new RestClient({ ...options, fetch: listen }));
-		return isRecord(body) ? (body['data'] ?? null) : null;
-	}
+	const schema = new RestSchemaClient(options);
 
 	return {
 		async readRawEntityTypes() {
+			let body: unknown = null;
+			const listen: typeof fetch = async (input, init) => {
+				const response = await send(input, init);
+				if (response.ok) body = await response.clone().json();
+				return response;
+			};
 			try {
-				return await dataOf((client) => client.entityTypes());
+				// A client per read keeps two reads apart.
+				await new RestClient({ ...options, fetch: listen }).entityTypes();
 			} catch (error) {
 				throw withDetail(error);
 			}
+			return isRecord(body) ? (body['data'] ?? null) : null;
 		},
 
 		async readRawFields(entityType) {
 			if (!NAME.test(entityType)) throw new Error(`'${entityType}' is not an entity type name.`);
-			try {
-				return await dataOf((client) => client.fields(entityType));
-			} catch (error) {
-				throw withDetail(error);
-			}
+			return schema.readRawFields(entityType);
 		},
 
 		async readField(entityType, field, projectId): Promise<FieldReply> {
 			if (!NAME.test(entityType)) throw new Error(`'${entityType}' is not an entity type name.`);
 			if (!NAME.test(field)) throw new Error(`'${field}' is not a field name.`);
-			try {
-				// Undefined leaves `project_id` out of the address in 0.3.1; the type asks for a number.
-				const raw = await dataOf((client) => client.fieldWithProject(entityType, field, projectId as number));
-				return raw === null ? { status: 'undeclared' } : { status: 'found', raw };
-			} catch (error) {
-				if (!(error instanceof SgApiError)) throw error;
-				// Core throws a 200 for `data: null` on a field it has no override for.
-				if (error.status === 200) return { status: 'undeclared' };
-				const detail = detailOf(error.body);
-				if (isFieldMissing(error.status, detail)) return { status: 'missing', message: detail ?? '' };
-				throw withDetail(error);
-			}
+			const read = await schema.readField(entityType, field, projectId);
+			if (read.status === 'found') return { status: 'found', raw: read.raw };
+			if (read.status === 'undeclared') return { status: 'undeclared' };
+			// Core's message is the site's detail. Held to this app's rule all the same, so the two never drift.
+			if (isFieldMissing(404, read.message)) return { status: 'missing', message: read.message };
+			throw new SchemaApiError(404, null, read.message);
 		}
 	};
 }

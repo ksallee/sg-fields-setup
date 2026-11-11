@@ -1,4 +1,4 @@
-import { SgApiError } from 'sg-widgets-core';
+import { SchemaApiError, SgApiError } from 'sg-widgets-core';
 import { describe, expect, it } from 'vitest';
 import notFound from '../pure/fixtures/live-field-not-found.json';
 import statusList from '../pure/fixtures/live-field-status-list.json';
@@ -91,6 +91,35 @@ describe('coreSchemaSource', () => {
 		await expect(source.readField('Version', 'broken')).rejects.toThrow();
 		await expect(source.readField('Version', 'odd')).rejects.toMatchObject({ status: 404 });
 		await expect(source.readField('Version', 'offline')).rejects.toThrow('Failed to fetch');
+	});
+
+	it('rejects with core\'s SchemaApiError, the status and the site\'s body kept (PLN-3)', async () => {
+		const { source } = site({
+			'/api/v1/schema/CustomEntity08/fields': { status: 404, body: typeNotFound },
+			'/api/v1/schema/CustomEntity08/fields/code': { status: 404, body: typeNotFound }
+		});
+		for (const failure of [
+			await source.readRawFields('CustomEntity08').catch((error: unknown) => error),
+			await source.readField('CustomEntity08', 'code').catch((error: unknown) => error)
+		]) {
+			expect(failure).toBeInstanceOf(SchemaApiError);
+			expect(failure).toMatchObject({ status: 404, body: typeNotFound, detail: "Entity type 'CustomEntity08' does not exist." });
+		}
+	});
+
+	it('asks once per read, with the bearer, and the one-field read never carries a project it was not given', async () => {
+		const { seen, source } = site({
+			'/api/v1/schema/Version/fields': { body: versionFields },
+			'/api/v1/schema/Version/fields/sg_status_list': { body: statusList }
+		});
+		await source.readRawFields('Version');
+		await source.readField('Version', 'sg_status_list');
+		await source.readField('Version', 'sg_status_list', undefined);
+		expect(seen).toEqual([
+			{ url: '/api/v1/schema/Version/fields', method: 'GET', authorization: 'Bearer bearer-1' },
+			{ url: '/api/v1/schema/Version/fields/sg_status_list', method: 'GET', authorization: 'Bearer bearer-1' },
+			{ url: '/api/v1/schema/Version/fields/sg_status_list', method: 'GET', authorization: 'Bearer bearer-1' }
+		]);
 	});
 
 	it('refuses a name that is not one before asking, since it would change the path', async () => {
