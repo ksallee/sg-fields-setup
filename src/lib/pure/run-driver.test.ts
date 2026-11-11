@@ -634,6 +634,39 @@ describe('cancel (RUN-18)', () => {
 		expect(runCounters(state).visibilityWarnings).toBe(1);
 	});
 
+	it('RUN-18, VIS-7: a visibility retry after a cancel adds its writes to the ones made before the cancel (issue #22)', async () => {
+		const site = createFakeSite();
+		// As the site behaves: a project already in the wanted state is read and not written again.
+		const shown = new Set<number>();
+		const apply: ApplyVisibility = async (_field, _origin, hooks) => {
+			let done = 0;
+			let written = 0;
+			let cancelled = false;
+			for (const project of PROJECTS) {
+				if (hooks.isCancelled()) {
+					cancelled = true;
+					break;
+				}
+				if (!shown.has(project.id)) {
+					shown.add(project.id);
+					written += 1;
+				}
+				done += 1;
+				hooks.onProgress(done, PROJECTS.length);
+			}
+			return { total: PROJECTS.length, done, written, failures: [], cancelled };
+		};
+		const run = engine(site, { applyVisibility: apply });
+		const stop = run.subscribe((state) => {
+			if (state.rows[0]?.visibility?.done === 1) run.cancel();
+		});
+		await run.start([two[0]]);
+		stop();
+		const state = await run.retryVisibility('a');
+		expect(row(state, 'a').visibility).toMatchObject({ status: 'applied', done: 3, total: 3, written: 3 });
+		expect(rowText(row(state, 'a'))).toBe('Visibility changed on 3 projects.');
+	});
+
 	it('RUN-18: a cancel during the schema work of an item keeps its visibility from starting', async () => {
 		const site = createFakeSite();
 		const visibility = scriptedVisibility();

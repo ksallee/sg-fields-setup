@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_TICKED, isTicked, selectAllState, setAllTicked, tickedIds, toggleTick, type TickRow } from './plan-selection';
+import { ALL_TICKED, isTicked, ranSelectAllState, selectAllState, setAllTicked, tickedIds, toggleTick, type TickRow } from './plan-selection';
 
 const ROWS: TickRow[] = [
 	{ entryId: 'conflict', selectable: false, disabled: false },
@@ -63,5 +63,23 @@ describe('select all (RUN-4)', () => {
 
 	it('has nothing to select in a plan of conflicts alone', () => {
 		expect(selectAllState(ALL_TICKED, [ROWS[0]!])).toEqual({ selected: 0, total: 0, state: 'none', text: '0 of 0 selected' });
+	});
+});
+
+describe('select all once a run has started (RUN-25, issue #22)', () => {
+	it('keeps the count the run started with when a finished row has nothing left to do', () => {
+		// After the run the three rows that ran match the site: each is disabled, as "nothing" was before.
+		const after: TickRow[] = ROWS.map((row) => ({ ...row, disabled: row.selectable }));
+		expect(selectAllState(ALL_TICKED, after).text).toBe('0 of 0 selected');
+		expect(ranSelectAllState(after, new Set(['create', 'update', 'matches']))).toEqual({ selected: 3, total: 3, state: 'all', text: '3 of 3 selected' });
+	});
+
+	it('counts a row left unticked for the run, and is mixed then', () => {
+		expect(ranSelectAllState(ROWS, new Set(['create', 'update']))).toEqual({ selected: 2, total: 3, state: 'some', text: '2 of 3 selected' });
+	});
+
+	it('leaves out a row that never had a usable checkbox', () => {
+		expect(ranSelectAllState(ROWS, new Set(['create']))).toMatchObject({ selected: 1, total: 3 });
+		expect(ranSelectAllState([ROWS[0]!, ROWS[4]!], new Set())).toEqual({ selected: 0, total: 0, state: 'none', text: '0 of 0 selected' });
 	});
 });

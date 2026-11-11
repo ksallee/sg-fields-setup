@@ -123,7 +123,7 @@ export interface RowVisibility {
 	/** Projects finished, of `total` (RUN-22). */
 	done: number;
 	total: number;
-	/** Steps that changed the site. */
+	/** Steps that changed the site, a retry's added to the ones before it. */
 	written: number;
 	/** The projects where it failed (VIS-7). */
 	failures: VisibilityFailure[];
@@ -266,7 +266,8 @@ export function reduceRun(state: RunState, event: RunEvent): RunState {
 			return withRow(state, event.entryId, (row) => ({ ...row, effects: [...row.effects, event.effect] }));
 
 		case 'visibility-started':
-			return withRow(state, event.entryId, (row) => ({ ...row, visibility: visibilityOf(event.origin) }));
+			// A row that holds a visibility already is being retried: what was written before stays counted.
+			return withRow(state, event.entryId, (row) => ({ ...row, visibility: { ...visibilityOf(event.origin), written: row.visibility?.written ?? 0 } }));
 
 		case 'visibility-progress':
 			return withRow(state, event.entryId, (row) =>
@@ -285,7 +286,7 @@ export function reduceRun(state: RunState, event: RunEvent): RunState {
 						status: outcome.cancelled ? 'cancelled' : 'applied',
 						done: outcome.done,
 						total: outcome.total,
-						written: outcome.written,
+						written: row.visibility.written + outcome.written,
 						failures: [...outcome.failures],
 						error: event.error
 					}
