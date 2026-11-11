@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createFakeSite, type FakeSite } from './fixtures/fake-site';
 import type { PlanEntry } from './plan';
 import { createRun, replan, type Run, type RunDeps } from './run-driver';
-import { runReport } from './run-report';
+import { reportText, runReport } from './run-report';
 import { rowParts, rowText, summaryText, visibilityProgress } from './run-text';
 import { runCounters, type RunRow, type RunState } from './run';
 import { createApplyVisibility, retryVisibility } from './visibility-run';
@@ -654,6 +654,78 @@ describe('the run as a whole (RUN-6, RUN-16, RUN-17)', () => {
 		const second = await engine(site).start(entries);
 		expect(second.rows.every((item) => item.state === 'skipped' && item.note?.code === 'nothing-to-change')).toBe(true);
 		expect(site.writes()).toHaveLength(writes);
+	});
+});
+
+/* Reverse fields. */
+
+describe('reverse fields in a run (H2 of specs/10, corpus findings 116 and 121)', () => {
+	const link = (overrides: Partial<PlanEntry> = {}) =>
+		entry({ programmaticName: 'sg_plate', displayName: 'Plate', dataType: 'entity', validTypes: ['Shot', 'Asset'], ...overrides });
+	const spent = (site: FakeSite) => ['Shot', 'Asset', 'Task'].flatMap((type) => site.retiredNames(type).map((name) => `${type}.${name}`));
+	const live = (site: FakeSite) => ['Shot', 'Asset', 'Task'].flatMap((type) => site.liveNames(type).map((name) => `${type}.${name}`));
+
+	it('H2, PLN-8: an update that would remove a valid type sends nothing, and no reverse field is retired', async () => {
+		const site = createFakeSite().seed('Version', 'sg_plate', { displayName: 'Plate', dataType: 'entity', validTypes: ['Shot', 'Asset'], description: 'Old.' });
+		const state = await engine(site).start([link({ validTypes: ['Shot'], description: 'New.' })]);
+		expect(row(state)).toMatchObject({ class: 'blocked', state: 'skipped', note: { code: 'plan', reasons: [{ code: 'valid-type-removed' }] }, effects: [] });
+		expect(site.writes()).toEqual([]);
+		expect(live(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1']);
+		expect(spent(site)).toEqual([]);
+		expect(site.get('Version', 'sg_plate')).toMatchObject({ validTypes: ['Shot', 'Asset'], description: 'Old.' });
+	});
+
+	it('H2, RUN-7: a type added on the site between the plan and the item turns the update into a removal: the item fails and sends nothing', async () => {
+		const site = createFakeSite().seed('Version', 'sg_plate', { displayName: 'Plate', dataType: 'entity', validTypes: ['Shot'], description: 'Old.' });
+		// Someone adds Asset to the link after the plan: writing the entry's types would now retire Asset's field.
+		onRead(site, 2, () => site.seed('Version', 'sg_plate', { displayName: 'Plate', dataType: 'entity', validTypes: ['Shot', 'Asset'], description: 'Old.' }));
+		const state = await engine(site).start([link({ validTypes: ['Shot'], description: 'New.' })]);
+		expect(row(state)).toMatchObject({ class: 'update', state: 'failed', note: { code: 'plan', reasons: [{ code: 'valid-type-removed' }] }, effects: [] });
+		expect(site.writes()).toEqual([]);
+		expect(spent(site)).toEqual([]);
+	});
+
+	it('RUN-20, H2: a link create makes a field on each valid type, and the report says where', async () => {
+		const site = createFakeSite();
+		const state = await engine(site).start([link()]);
+		expect(row(state)).toMatchObject({ state: 'done', effects: [{ kind: 'created', name: 'sg_plate', reverseFieldTypes: ['Shot', 'Asset'] }] });
+		const report = runReport(state);
+		expect(report.created).toEqual([{ entityType: 'Version', name: 'sg_plate', displayName: 'Plate', rowState: 'done', reverseFieldTypes: ['Shot', 'Asset'] }]);
+		// The report names exactly the types the site made a field on.
+		expect(site.reverseFields('Version', 'sg_plate').map((field) => field.entityType)).toEqual(report.created[0].reverseFieldTypes);
+		expect(live(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1']);
+		expect(reportText(report)).toContain(
+			'Reverse fields (1)\n  Version.sg_plate: Also makes a reverse field on Shot and Asset. Each takes a field name there for good.'
+		);
+	});
+
+	it('RUN-20, H2: an update that adds a valid type makes one field, on the type added, and the report says so', async () => {
+		const site = createFakeSite().seed('Version', 'sg_plate', { displayName: 'Plate', dataType: 'entity', validTypes: ['Shot'] });
+		const state = await engine(site).start([link({ validTypes: ['Shot', 'Asset', 'Task'] })]);
+		expect(row(state)).toMatchObject({ class: 'update', state: 'done', effects: [{ kind: 'updated', reverseFieldTypes: ['Asset', 'Task'] }] });
+		expect(live(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1', 'Task.sg_versions_1']);
+		expect(spent(site)).toEqual([]);
+		expect(runReport(state).updated[0].reverseFieldTypes).toEqual(['Asset', 'Task']);
+	});
+
+	it('PLN-8, finding 121: a reorder alone is written and makes or retires no field', async () => {
+		const site = createFakeSite().seed('Version', 'sg_plate', { displayName: 'Plate', dataType: 'entity', validTypes: ['Asset', 'Shot'] });
+		const state = await engine(site).start([link()]);
+		expect(row(state)).toMatchObject({ class: 'update', state: 'done', effects: [{ kind: 'updated', name: 'sg_plate' }] });
+		expect(row(state).effects[0].reverseFieldTypes).toBeUndefined();
+		expect(live(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1']);
+		expect(site.get('Version', 'sg_plate')?.validTypes).toEqual(['Shot', 'Asset']);
+		expect(spent(site)).toEqual([]);
+	});
+
+	it('RUN-12, H2: a link created under another name and put back in the trash spends a name on each valid type too', async () => {
+		const site = createFakeSite();
+		site.beforeNext('createField', () => site.seed('Version', 'sg_plate', { displayName: 'Plate' }));
+		const state = await engine(site).start([link()]);
+		expect(row(state)).toMatchObject({ state: 'failed', note: { code: 'wrong-name', assigned: 'sg_plate_1', retired: true } });
+		expect(spent(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1']);
+		// The report's data holds the types. Its text does not say so yet.
+		expect(runReport(state).retired).toMatchObject([{ name: 'sg_plate_1', reverseFieldTypes: ['Shot', 'Asset'] }]);
 	});
 });
 

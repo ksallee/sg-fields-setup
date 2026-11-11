@@ -164,6 +164,35 @@ describe('the valid types guard (corpus finding 121)', () => {
 		expect(site.get('Version', 'sg_link')).toBeNull();
 	});
 
+	it('H2: an item handed over as an update that removes a valid type is planned again and fails: nothing is sent', async () => {
+		const site = createFakeSite().seed('Version', 'sg_link', { displayName: 'Link', dataType: 'entity', validTypes: ['Shot', 'Asset'] });
+		const wanted = entry({ validTypes: ['Shot'] });
+		const { ctx, effects } = await context(site);
+		// What a planner that had lost its block would hand over.
+		const unblocked = item(wanted, { class: 'update', update: { properties: [{ property_name: 'valid_types', value: ['Shot'] }] } });
+		const before = site.calls.length;
+		const result = await applyItem(ctx, wanted, unblocked);
+		expect(result).toMatchObject({ state: 'failed', note: { code: 'plan', reasons: [{ code: 'valid-type-removed', types: [{ name: 'Asset' }] }] } });
+		expect(site.calls.slice(before).map((call) => call.op)).toEqual(['readField']);
+		expect(effects).toEqual([]);
+		expect(site.retiredNames('Asset')).toEqual([]);
+	});
+
+	it('H2: what the block is for: the same request, sent, retires the reverse field and its name stays taken', async () => {
+		const site = createFakeSite().seed('Version', 'sg_link', { displayName: 'Link', dataType: 'entity', validTypes: ['Shot', 'Asset'] });
+		const wanted = entry({ validTypes: ['Shot'] });
+		const { ctx } = await context(site);
+		const unblocked = item(wanted, { class: 'update', update: { properties: [{ property_name: 'valid_types', value: ['Shot'] }] } });
+		// The update step has no check of its own against a removal: the re-plan above is the engine's line.
+		expect(await writeAndVerify(ctx, wanted, unblocked, 'update')).toBeNull();
+		expect(site.get('Asset', 'sg_versions_1')).toMatchObject({ retired: true, reverseOf: { entityType: 'Version', name: 'sg_link' } });
+		expect(site.retiredNames('Asset')).toEqual(['sg_versions_1']);
+		// Adding the type back does not bring the field back: it spends the next name.
+		await site.updateField('Version', 'sg_link', [{ property_name: 'valid_types', value: ['Shot', 'Asset'] }]);
+		expect(site.liveNames('Asset')).toEqual(['sg_versions_2']);
+		expect(site.retiredNames('Asset')).toEqual(['sg_versions_1']);
+	});
+
 	it('marks the effect of a write that carried valid types', async () => {
 		const site = createFakeSite();
 		const wanted = entry({ validTypes: ['Shot', 'Asset'] });
