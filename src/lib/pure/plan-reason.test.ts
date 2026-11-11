@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { formatValue, reasonParts, reasonText, settingLabel, trashParts, type PlanReason, type ReasonCode } from './plan-reason';
+import {
+	formatValue,
+	reasonParts,
+	reasonText,
+	reverseFieldsText,
+	settingLabel,
+	trashParts,
+	type PlanReason,
+	type ReasonCode
+} from './plan-reason';
 
 function reason(code: ReasonCode, more: Partial<PlanReason> = {}): PlanReason {
 	return {
@@ -12,6 +21,7 @@ function reason(code: ReasonCode, more: Partial<PlanReason> = {}): PlanReason {
 		live: null,
 		wanted: null,
 		other: null,
+		types: [],
 		needsTrash: false,
 		trashPageUrl: null,
 		...more
@@ -35,7 +45,21 @@ const ALL: PlanReason[] = [
 	reason('multi-entity-valid-types', { dataType: 'multi_entity', setting: 'validTypes', live: ['Shot'], wanted: ['Asset'], needsTrash: true }),
 	reason('default-cannot-be-cleared', { dataType: 'list', setting: 'defaultValue', live: 'a', wanted: null }),
 	reason('cannot-be-emptied', { setting: 'description', live: 'Old.', wanted: null }),
-	reason('status-values-need-default', { dataType: 'status_list', setting: 'validValues', live: ['na', 'rev'], wanted: ['rev'], other: 'na' })
+	reason('status-values-need-default', { dataType: 'status_list', setting: 'validValues', live: ['na', 'rev'], wanted: ['rev'], other: 'na' }),
+	reason('valid-type-not-on-site', {
+		dataType: 'entity',
+		setting: 'validTypes',
+		live: ['Shot'],
+		wanted: ['Shot', 'asset'],
+		types: [{ name: 'asset', meant: 'Asset' }]
+	}),
+	reason('valid-type-removed', {
+		dataType: 'entity',
+		setting: 'validTypes',
+		live: ['Shot', 'Asset'],
+		wanted: ['Shot'],
+		types: [{ name: 'Asset', meant: null }]
+	})
 ];
 
 describe('formatValue', () => {
@@ -102,12 +126,69 @@ describe('reasonText', () => {
 		expect(reasonText(reason('multi-entity-needs-one-valid-type', { setting: 'validTypes', wanted: [] }))).toContain('The entry has none. Add one.');
 	});
 
+	it('finding 121: a valid type the site lacks, on an update, names the value, the API name meant and the hazard', () => {
+		expect(reasonText(ALL.find((one) => one.code === 'valid-type-not-on-site')!)).toBe(
+			'"Lens" (Shot.sg_lens), valid types: [Shot] on the site, [Shot, asset] in the set. This site has no entity type named "asset". "asset" is probably Asset. A valid type is the API name of an entity type, case included. On a field that exists, the site answers a name in the wrong case with a server error and retires the field. Install sends nothing. Correct the entry.'
+		);
+	});
+
+	it('finding 121: a valid type the site lacks, on a create, names every value and guesses only where it can', () => {
+		const text = reasonText(
+			reason('valid-type-not-on-site', {
+				dataType: 'entity',
+				setting: 'validTypes',
+				wanted: ['shot', 'Camera Rig', 'ZzNoSuchType'],
+				types: [
+					{ name: 'shot', meant: 'Shot' },
+					{ name: 'Camera Rig', meant: 'CustomEntity66' },
+					{ name: 'ZzNoSuchType', meant: null }
+				]
+			})
+		);
+		expect(text).toBe(
+			'"Lens" (Shot.sg_lens) cannot be created. Its valid types are [shot, Camera Rig, ZzNoSuchType]. This site has no entity type named "shot", "Camera Rig" or "ZzNoSuchType". "shot" is probably Shot. "Camera Rig" is probably CustomEntity66. A valid type is the API name of an entity type, case included. Correct the entry.'
+		);
+		// The retirement was measured on an update only.
+		expect(text).not.toContain('retires');
+	});
+
+	it('finding 121: a removed valid type says what the removal does, and only what was measured', () => {
+		const removed = ALL.find((one) => one.code === 'valid-type-removed')!;
+		expect(reasonText(removed)).toBe(
+			'"Lens" (Shot.sg_lens), valid types: [Shot, Asset] on the site, [Shot] in the set. Removing Asset retires the reverse field of this link on Asset. A retired field keeps its name, so the name is spent, and adding the type back makes a new field under a new name. Install skips the field. Keep Asset in the entry, or remove it by hand in FPT.'
+		);
+		expect(
+			reasonText({
+				...removed,
+				wanted: ['Task'],
+				types: [
+					{ name: 'Shot', meant: null },
+					{ name: 'Asset', meant: null }
+				]
+			})
+		).toMatch(/Removing Shot and Asset retires the reverse field of this link on each of them\..* Keep Shot and Asset in the entry, or remove them by hand in FPT\.$/);
+	});
+
 	it('Copy: no HTML, no dash used as punctuation, in any reason', () => {
 		for (const one of ALL) {
 			const text = reasonText({ ...one, trashPageUrl: one.needsTrash ? 'https://studio.example/page/1234' : null });
 			expect(text, one.code).not.toMatch(/[<>]/);
 			expect(text, one.code).not.toMatch(/[—–]| - /);
 		}
+	});
+});
+
+describe('reverseFieldsText', () => {
+	it('finding 121: says which types gain a reverse field', () => {
+		expect(reverseFieldsText(['Shot'])).toBe('Also makes a reverse field on Shot. It takes a field name there for good.');
+		expect(reverseFieldsText(['Shot', 'Asset'])).toBe('Also makes a reverse field on Shot and Asset. Each takes a field name there for good.');
+		expect(reverseFieldsText(['Shot', 'Asset', 'Sequence'])).toBe(
+			'Also makes a reverse field on Shot, Asset and Sequence. Each takes a field name there for good.'
+		);
+	});
+
+	it('nothing to say when no reverse field is made', () => {
+		expect(reverseFieldsText([])).toBeNull();
 	});
 });
 

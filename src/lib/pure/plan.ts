@@ -17,20 +17,31 @@
  * | 7     | `blocked`         | present, same type, a difference the API cannot write              |
  * | 8     | `update`          | present, same type, every difference can be written                |
  *
- * Where the measured API (corpus findings 116, 117, 119, 120) goes further than the spec:
+ * Where the measured API (corpus findings 116, 117, 119, 120, 121) goes further than the spec:
  *
  * - A create is one request with every setting (finding 116). No update follows it.
  * - A create the server would refuse is refused here: a status list with no valid values, an
  *   entity link with no valid type, a multi-entity link with any number but one.
  * - A display name with a non-ASCII character makes the server name the field `sg_<data_type>`
  *   (finding 117). Such a create is refused, even when the entry asks for exactly that name.
- * - An update writes one property per request, the form every measured update had. The order is
- *   the order they must be sent in.
- * - No write can clear a value: null, "" and [] are refused (finding 116 and the update card).
+ * - An update is one request with every property that differs (finding 121). The site applies a
+ *   request whole or not at all, and checks it against the state it would leave, in any order. The
+ *   properties go in a fixed order all the same: `UPDATE_ORDER`.
+ * - No write can clear a value: null, "", spaces alone and [] are refused (findings 116 and 121).
  *   A difference that would need one is blocked: a default, a description, valid values or valid
  *   types that the entry leaves empty and the site holds.
- * - A default must be among the valid values when it is written, and a status list's valid
- *   values must include the default in force. What cannot be ordered around that is blocked.
+ * - A default that is written must be among the valid values the request leaves, and a status
+ *   list's valid values must include the default the field would then hold. A wanted state that
+ *   breaks either is blocked.
+ * - Every valid type that would be sent must be an entity type of the site, by exact name. On an
+ *   update a name in the wrong case is a 500 that retires the field (finding 121). Such an entry is
+ *   refused or blocked, and nothing is sent. A connection type passes: the site lists it among the
+ *   types it takes.
+ * - An entity link holds a reverse field on each of its valid types (finding 121). Removing a type
+ *   retires that field, and its name stays taken: an update that removes one is blocked. Adding a
+ *   type, or creating a link, makes one: the item says on which types (`reverseFieldTypes`). A
+ *   write that only reorders spent no name in the probe's run and is a plain update.
+ * - Repeated valid values and valid types are sent once (`wantedEntry`, finding 121).
  * - A read that came back as `undeclared` or `no-data-type` means the server answers for the
  *   name. A create over it would get a suffixed name (finding 019). It is refused, not created.
  *   This is stricter than PLN-4, which calls such a read absent.
@@ -41,8 +52,8 @@ import { predictFieldName } from './field-name';
 import { hasEntityType, type LiveEntityType } from './live-entity-types';
 import type { LiveField, LiveFieldRead } from './live-field';
 import type { EntryDefinition } from './model';
-import { diffEntry, wantedDefault, type Difference, type DiffSetting, type WantedValue } from './plan-diff';
-import type { PlanReason, ReasonCode } from './plan-reason';
+import { diffEntry, wantedDefault, wantedEntry, type Difference, type DiffSetting, type WantedValue } from './plan-diff';
+import type { PlanReason, ReasonCode, ReasonType } from './plan-reason';
 import { isIncomplete } from './validity';
 
 /* What goes in. */
@@ -59,7 +70,7 @@ export interface PlanSite {
 	 * has no such page (corpus `findings/120_field_trash_page`).
 	 */
 	trashPageUrl: string | null;
-	/** The site's entity types (PLN-14). */
+	/** The site's entity types (PLN-14). Also what every valid type that is sent is checked against. */
 	entityTypes: readonly LiveEntityType[];
 	/**
 	 * The live fields of each target entity type, keyed by the type's API name (PLN-16). Needed
@@ -117,15 +128,24 @@ export interface CreatePayload {
 	properties: PropertyWrite[];
 }
 
-/** The body of one `PUT /schema/<Type>/fields/<field>`. Always exactly one property. */
+/**
+ * The body of one `PUT /schema/<Type>/fields/<field>`: every property that differs, in the order of
+ * `UPDATE_ORDER`. Never empty. The site applies it whole or not at all (corpus finding 121).
+ */
 export interface UpdateRequest {
-	properties: [PropertyWrite];
+	properties: PropertyWrite[];
 }
 
-/** What an update sends: each request on its own, in this order. */
+/** What an update sends. Always exactly one request: a list, so a caller sends `requests` in order. */
 export interface UpdatePayload {
 	requests: UpdateRequest[];
 }
+
+/**
+ * The order of the properties in an update's request. The site does not care (finding 121). It is
+ * fixed so that the same differences always give the same request.
+ */
+export const UPDATE_ORDER = ['name', 'description', 'valid_values', 'default_value', 'valid_types'] as const;
 
 /** A difference the API cannot write, and why. */
 export interface BlockedDifference extends Difference {
@@ -155,8 +175,15 @@ export interface PlanItem {
 	reasons: PlanReason[];
 	/** `create`: the request to send. Null for every other class. */
 	create: CreatePayload | null;
-	/** `update`: the requests to send, in order. Null for every other class. */
+	/** `update`: the one request to send. Null for every other class. */
 	update: UpdatePayload | null;
+	/**
+	 * The entity types on which applying this item makes a reverse field, each one a field name
+	 * taken on that type for good (corpus findings 116 and 121). `create` of an entity or a
+	 * multi-entity link: its valid types. `update` of an entity link: the valid types it adds.
+	 * Empty for everything else. Information only: `reverseFieldsText` renders it.
+	 */
+	reverseFieldTypes: string[];
 }
 
 export interface Plan {
@@ -214,17 +241,47 @@ function isEmpty(value: WantedValue): boolean {
 }
 
 /**
- * Why a difference cannot be written, or null when it can. `other` is the default that stays,
- * for a status list's valid values that leave it out.
+ * The API name a valid type that is no entity type probably stands for: the one type whose API name
+ * differs only by case, else the one type that has it as display name, trimmed and without case.
+ * Null when the site has no such type, or more than one.
  */
+function meantType(name: string, entityTypes: readonly LiveEntityType[]): string | null {
+	const lower = name.trim().toLowerCase();
+	const one = (matches: LiveEntityType[]) => (matches.length === 1 ? matches[0].name : null);
+	return (
+		one(entityTypes.filter((type) => type.name.toLowerCase() === lower)) ??
+		one(entityTypes.filter((type) => type.displayName.trim().toLowerCase() === lower))
+	);
+}
+
+/**
+ * The valid types that are no entity type of the site, by exact name (corpus finding 121), each
+ * with the API name probably meant. Empty when every one can be sent.
+ */
+export function unknownValidTypes(validTypes: readonly string[], entityTypes: readonly LiveEntityType[]): ReasonType[] {
+	return validTypes
+		.filter((name) => !hasEntityType(entityTypes, name))
+		.map((name) => ({ name, meant: meantType(name, entityTypes) }));
+}
+
+interface Block {
+	why: ReasonCode;
+	/** `status-values-need-default`: the default the field would hold. */
+	other: string | null;
+	/** The entity types the block is about (`PlanReason.types`). */
+	types: ReasonType[];
+}
+
+/** Why a difference cannot be written, or null when it can. */
 function blockOf(
 	difference: Difference,
 	entry: EntryDefinition,
 	live: LiveField,
-	differences: readonly Difference[]
-): { why: ReasonCode; other: string | null } | null {
+	differences: readonly Difference[],
+	site: PlanSite
+): Block | null {
 	const listType = entry.dataType === 'list' || entry.dataType === 'status_list';
-	const blocked = (why: ReasonCode, other: string | null = null) => ({ why, other });
+	const blocked = (why: ReasonCode, more: Partial<Block> = {}): Block => ({ why, other: null, types: [], ...more });
 	switch (difference.setting) {
 		case 'displayName':
 			return null;
@@ -232,9 +289,15 @@ function blockOf(
 			return isEmpty(difference.wanted) ? blocked('cannot-be-emptied') : null;
 		case 'unique':
 			return blocked('unique-cannot-change');
-		case 'validTypes':
+		case 'validTypes': {
 			if (entry.dataType === 'multi_entity') return blocked('multi-entity-valid-types');
-			return isEmpty(difference.wanted) ? blocked('cannot-be-emptied') : null;
+			if (isEmpty(difference.wanted)) return blocked('cannot-be-emptied');
+			// The name first: a wrong name must never be sent, and "shot" over "Shot" is no removal.
+			const unknown = unknownValidTypes(entry.validTypes, site.entityTypes);
+			if (unknown.length > 0) return blocked('valid-type-not-on-site', { types: unknown });
+			const removed = live.validTypes.filter((type) => !entry.validTypes.includes(type));
+			return removed.length > 0 ? blocked('valid-type-removed', { types: removed.map((name) => ({ name, meant: null })) }) : null;
+		}
 		case 'defaultValue':
 			if (!listType) return null;
 			if (difference.wanted === null) return blocked('default-cannot-be-cleared');
@@ -242,12 +305,14 @@ function blockOf(
 		case 'validValues': {
 			if (isEmpty(difference.wanted)) return blocked('cannot-be-emptied');
 			if (entry.dataType !== 'status_list') return null;
-			// The default in force once the plan is applied: the wanted one if it is written, else the live one.
-			const defaultDifference = differences.find((other) => other.setting === 'defaultValue');
-			const written = defaultDifference !== undefined && blockOf(defaultDifference, entry, live, differences) === null;
-			const stays = written || defaultDifference === undefined ? wantedDefault(entry) : liveDefaultText(live);
+			// The default the field would hold: the wanted one, or the live one when the entry has
+			// none, since a default cannot be cleared.
+			const wantedValue = wantedDefault(entry);
+			const stays = wantedValue ?? liveDefaultText(live);
 			if (typeof stays !== 'string' || entry.validValues.includes(stays)) return null;
-			return blocked('status-values-need-default', stays);
+			// A wanted default that differs from the live one has its own block: `default-not-in-values`.
+			const defaultDiffers = differences.some((other) => other.setting === 'defaultValue');
+			return wantedValue !== null && defaultDiffers ? null : blocked('status-values-need-default', { other: stays });
 		}
 	}
 }
@@ -256,30 +321,21 @@ function write(property_name: PropertyName, value: PropertyWrite['value']): Prop
 	return { property_name, value };
 }
 
-/** The writes of an update, in the order they must be sent. Every difference given is writable. */
-function updateWrites(entry: EntryDefinition, live: LiveField, differences: readonly Difference[]): PropertyWrite[] {
+/**
+ * The one request of an update: a property per difference, in the order of `UPDATE_ORDER`. Every
+ * difference given is writable. The site checks the request as a whole (finding 121), so no order
+ * is needed between valid values and a default.
+ */
+function updateRequest(entry: EntryDefinition, differences: readonly Difference[]): UpdateRequest {
 	const has = (setting: DiffSetting) => differences.some((difference) => difference.setting === setting);
-	const writes: PropertyWrite[] = [];
-	if (has('displayName')) writes.push(write('name', entry.displayName));
-	if (has('description')) writes.push(write('description', entry.description ?? ''));
-
 	const wanted = wantedDefault(entry);
-	const defaultWrite = has('defaultValue') && wanted !== null ? write('default_value', wanted) : null;
-	const valuesWrite = has('validValues') ? write('valid_values', [...entry.validValues]) : null;
-	if (defaultWrite && valuesWrite && entry.dataType === 'status_list' && typeof wanted === 'string') {
-		// A default must be a valid value when written, and the values must include the default in force.
-		const liveDefault = liveDefaultText(live);
-		if (live.validValues.includes(wanted)) writes.push(defaultWrite, valuesWrite);
-		else if (liveDefault === null || entry.validValues.includes(liveDefault)) writes.push(valuesWrite, defaultWrite);
-		else writes.push(write('valid_values', [...entry.validValues, liveDefault]), defaultWrite, valuesWrite);
-	} else {
-		// A list takes its values first: the new default may be one of the new values.
-		if (valuesWrite) writes.push(valuesWrite);
-		if (defaultWrite) writes.push(defaultWrite);
-	}
-
-	if (has('validTypes')) writes.push(write('valid_types', [...entry.validTypes]));
-	return writes;
+	const properties: PropertyWrite[] = [];
+	if (has('displayName')) properties.push(write('name', entry.displayName));
+	if (has('description') && entry.description !== null) properties.push(write('description', entry.description));
+	if (has('validValues')) properties.push(write('valid_values', [...entry.validValues]));
+	if (has('defaultValue') && wanted !== null) properties.push(write('default_value', wanted));
+	if (has('validTypes')) properties.push(write('valid_types', [...entry.validTypes]));
+	return { properties };
 }
 
 /** What a create sends (PLN-13): every setting in one request (corpus finding 116). */
@@ -306,7 +362,8 @@ function createPayload(entry: EntryDefinition): CreatePayload {
  * gives `update`, `blocked`, `already-matches` or `type-conflict`.
  */
 export function planEntry(entry: PlanEntry, read: LiveFieldRead | null, site: PlanSite): PlanItem | null {
-	const wanted = cleanEntry(entry);
+	// Cleaned, and with no repeated valid value or valid type: what is compared is what is sent.
+	const wanted = wantedEntry(entry);
 	if (isMirror(wanted)) return null;
 
 	const item: PlanItem = {
@@ -322,7 +379,8 @@ export function planEntry(entry: PlanEntry, read: LiveFieldRead | null, site: Pl
 		blocked: [],
 		reasons: [],
 		create: null,
-		update: null
+		update: null,
+		reverseFieldTypes: []
 	};
 	const reason = (code: ReasonCode, more: Partial<PlanReason> = {}): PlanReason => ({
 		code,
@@ -334,6 +392,7 @@ export function planEntry(entry: PlanEntry, read: LiveFieldRead | null, site: Pl
 		live: null,
 		wanted: null,
 		other: null,
+		types: [],
 		needsTrash: false,
 		trashPageUrl: null,
 		...more
@@ -374,13 +433,18 @@ export function planEntry(entry: PlanEntry, read: LiveFieldRead | null, site: Pl
 		if (wanted.dataType === 'multi_entity' && wanted.validTypes.length !== 1) {
 			reasons.push(reason('multi-entity-needs-one-valid-type', { setting: 'validTypes', wanted: wanted.validTypes }));
 		}
+		const unknown = unknownValidTypes(wanted.validTypes, site.entityTypes);
+		if (unknown.length > 0) {
+			reasons.push(reason('valid-type-not-on-site', { setting: 'validTypes', wanted: wanted.validTypes, types: unknown }));
+		}
 		const wantedValue = wantedDefault(wanted);
 		if (typeof wantedValue === 'string' && !wanted.validValues.includes(wantedValue)) {
 			reasons.push(reason('default-not-in-values', { setting: 'defaultValue', wanted: wantedValue }));
 		}
 
 		if (reasons.length > 0) return refused(reasons);
-		return { ...item, class: 'create', create: createPayload(wanted) };
+		// A link makes a field on each of its valid types (findings 116 and 121).
+		return { ...item, class: 'create', create: createPayload(wanted), reverseFieldTypes: [...wanted.validTypes] };
 	}
 
 	const live = read.field;
@@ -396,7 +460,7 @@ export function planEntry(entry: PlanEntry, read: LiveFieldRead | null, site: Pl
 	const blocked: BlockedDifference[] = [];
 	const reasons: PlanReason[] = [];
 	for (const difference of differences) {
-		const block = blockOf(difference, wanted, live, differences);
+		const block = blockOf(difference, wanted, live, differences, site);
 		if (block === null) {
 			fine.push(difference);
 			continue;
@@ -409,6 +473,7 @@ export function planEntry(entry: PlanEntry, read: LiveFieldRead | null, site: Pl
 				live: difference.live,
 				wanted: difference.wanted,
 				other: block.other,
+				types: block.types,
 				needsTrash,
 				trashPageUrl: needsTrash ? site.trashPageUrl : null
 			})
@@ -416,8 +481,11 @@ export function planEntry(entry: PlanEntry, read: LiveFieldRead | null, site: Pl
 	}
 	if (blocked.length > 0) return { ...item, class: 'blocked', differences: fine, blocked, reasons };
 
-	const requests = updateWrites(wanted, live, differences).map((property): UpdateRequest => ({ properties: [property] }));
-	return { ...item, class: 'update', differences, update: { requests } };
+	// An entity link gains a field on each type added. No type is removed: that is blocked above.
+	const added = differences.some((difference) => difference.setting === 'validTypes')
+		? wanted.validTypes.filter((type) => !live.validTypes.includes(type))
+		: [];
+	return { ...item, class: 'update', differences, update: { requests: [updateRequest(wanted, differences)] }, reverseFieldTypes: added };
 }
 
 /**

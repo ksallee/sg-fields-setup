@@ -33,6 +33,8 @@ import type { DiffSetting, WantedValue } from './plan-diff';
  * | `default-cannot-be-cleared`         | blocked       | the live field has a default and the entry has none                  |
  * | `cannot-be-emptied`                 | blocked       | a description, valid values or valid types would be written as empty |
  * | `status-values-need-default`        | blocked       | the wanted status values leave out the default that stays            |
+ * | `valid-type-not-on-site`            | refused, blocked | a valid type that would be sent is no entity type of the site, by exact name (finding 121) |
+ * | `valid-type-removed`                | blocked       | an entity link's wanted valid types leave out a live one (finding 121) |
  */
 export type ReasonCode =
 	| 'type-conflict'
@@ -51,7 +53,17 @@ export type ReasonCode =
 	| 'multi-entity-valid-types'
 	| 'default-cannot-be-cleared'
 	| 'cannot-be-emptied'
-	| 'status-values-need-default';
+	| 'status-values-need-default'
+	| 'valid-type-not-on-site'
+	| 'valid-type-removed';
+
+/** An entity type a reason is about. */
+export interface ReasonType {
+	/** The name as the entry or the site holds it. */
+	name: string;
+	/** `valid-type-not-on-site`: the API name probably meant, when the site has exactly one candidate. Else null. */
+	meant: string | null;
+}
 
 export interface PlanReason {
 	code: ReasonCode;
@@ -69,9 +81,16 @@ export interface PlanReason {
 	/**
 	 * One more fact, by code. `type-conflict`: the live data type. `non-ascii-name` and
 	 * `unreachable-name`: the name the site would give. `label-taken`: the programmatic name of the
-	 * live field that has the label. `status-values-need-default`: the default that stays. Else null.
+	 * live field that has the label. `status-values-need-default`: the default the field would hold.
+	 * Else null.
 	 */
 	other: string | null;
+	/**
+	 * The entity types the reason is about, in the order of the list they come from.
+	 * `valid-type-not-on-site`: the wanted valid types the site lacks, each with the API name
+	 * probably meant. `valid-type-removed`: the live valid types the entry leaves out. Else empty.
+	 */
+	types: ReasonType[];
 	/** Whether the manual fix goes through the site's trash page for fields. */
 	needsTrash: boolean;
 	/** The trash page's address when the fix needs it and the site has one. Null otherwise. */
@@ -135,6 +154,22 @@ export function trashParts(trashPageUrl: string | null): ReasonPart[] {
 		{ kind: 'link', text: 'the trash page for fields', href: trashPageUrl },
 		{ kind: 'text', text: '.' }
 	];
+}
+
+/** "A", "A and B", "A, B and C". */
+function listed(items: readonly string[], last = 'and'): string {
+	if (items.length <= 1) return items.join('');
+	return `${items.slice(0, -1).join(', ')} ${last} ${items.at(-1)}`;
+}
+
+/**
+ * The note for an item that makes reverse fields (`PlanItem.reverseFieldTypes`): a create of a
+ * link, or an update that adds valid types to an entity link (corpus findings 116 and 121). Null
+ * when it makes none. Information only: it stops nothing.
+ */
+export function reverseFieldsText(types: readonly string[]): string | null {
+	if (types.length === 0) return null;
+	return `Also makes a reverse field on ${listed(types)}. ${types.length === 1 ? 'It takes' : 'Each takes'} a field name there for good.`;
 }
 
 function text(value: string): ReasonPart[] {
@@ -211,6 +246,29 @@ function body(reason: PlanReason): ReasonPart[] {
 			return text(
 				`${settingLead(reason)} The API refuses an empty value. Clear it by hand in FPT, or fill it in the entry.`
 			);
+		case 'valid-type-not-on-site': {
+			const names = reason.types.map((type) => `"${type.name}"`);
+			const guesses = reason.types
+				.filter((type) => type.meant !== null)
+				.map((type) => ` "${type.name}" is probably ${type.meant}.`)
+				.join('');
+			const rule = `This site has no entity type named ${listed(names, 'or')}.${guesses} A valid type is the API name of an entity type, case included.`;
+			// No live value: the field is absent and this is a create. The retirement was measured on an update only.
+			if (reason.live === null) {
+				return text(`${field} cannot be created. Its valid types are ${formatValue(reason.wanted)}. ${rule} Correct the entry.`);
+			}
+			return text(
+				`${settingLead(reason)} ${rule} On a field that exists, the site answers a name in the wrong case with a server error and retires the field. Install sends nothing. Correct the entry.`
+			);
+		}
+		case 'valid-type-removed': {
+			const removed = listed(reason.types.map((type) => type.name));
+			const one = reason.types.length === 1;
+			const where = one ? removed : 'each of them';
+			return text(
+				`${settingLead(reason)} Removing ${removed} retires the reverse field of this link on ${where}. A retired field keeps its name, so the name is spent, and adding the type back makes a new field under a new name. Install skips the field. Keep ${removed} in the entry, or remove ${one ? 'it' : 'them'} by hand in FPT.`
+			);
+		}
 		case 'status-values-need-default':
 			return text(
 				`${settingLead(reason)} A status list's valid values must include its default, ${formatValue(reason.other)}. Add it to the entry's valid values, or change the default.`
