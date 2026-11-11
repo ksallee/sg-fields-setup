@@ -28,7 +28,7 @@ import { env } from '$env/dynamic/public';
 import { coreSchemaSource } from '$lib/io/core-schema-source';
 import { createLiveSchema, type LiveSchema } from '$lib/io/schema';
 import { connectedSite } from '$lib/pure/site';
-import { createSessionTokenAuth, createSgContext, RestClient, type EntityRow, type SgContext } from 'sg-widgets-core';
+import { createSessionTokenAuth, createSgContext, RestClient, type EntityRow, type RestClientOptions, type SgContext } from 'sg-widgets-core';
 
 const KEYS = {
 	site: 'sg-fields-setup:site',
@@ -154,6 +154,7 @@ let state: LiveState = { siteUrl: '', session: null, devToken: false, problem: n
 let context: SgContext | null = null;
 let writer: RestClient | null = null;
 let schema: LiveSchema | null = null;
+let clientOptions: RestClientOptions | null = null;
 let ready: Promise<LiveState> | null = null;
 
 async function resolve(): Promise<LiveState> {
@@ -172,9 +173,10 @@ async function resolve(): Promise<LiveState> {
 	// and the widgets show the error state they show for any refusal.
 	const problem = !site ? 'Name the site.' : token ? null : 'Sign in to read Flow PT.';
 	const refuse = (): Promise<string> => Promise.reject(new Error(problem ?? 'Not connected to Flow PT.'));
-	writer = new RestClient({ siteUrl: site, token: token ?? refuse });
+	clientOptions = { siteUrl: site, token: token ?? refuse };
+	writer = new RestClient(clientOptions);
 	// One schema cache per connected site, for the life of the page (D6).
-	schema = createLiveSchema(coreSchemaSource({ siteUrl: site, token: token ?? refuse }));
+	schema = createLiveSchema(coreSchemaSource(clientOptions));
 	context = createSgContext({ client: writer, siteUrl: site });
 	return { siteUrl: site, session: stored, devToken: devToken !== null, problem };
 }
@@ -208,6 +210,16 @@ export function liveWriter(): RestClient {
 export function liveSchema(): LiveSchema {
 	if (!schema) throw new Error('Not connected to Flow PT. Await prepareLive() first.');
 	return schema;
+}
+
+/**
+ * The site's address and the bearer, for a client built outside this module: the schema writes
+ * and the visibility reads of the install screen (`$lib/io/install-site`). The token is asked for
+ * per request and stays in this browser.
+ */
+export function liveClientOptions(): RestClientOptions {
+	if (!clientOptions) throw new Error('Not connected to Flow PT. Await prepareLive() first.');
+	return clientOptions;
 }
 
 /** The person behind the session: their HumanUser row, by login, read once. */
