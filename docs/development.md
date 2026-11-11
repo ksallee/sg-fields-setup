@@ -9,10 +9,16 @@ Open the URL Vite prints. Name the site on the connect page and sign in through 
 Launcher. One site at a time. The navbar shows it; click it to change site or sign out.
 
     pnpm check
+    pnpm lint
     pnpm test
     pnpm build
 
-`.github/workflows/gates.yml` runs those three on every pull request and on pushes to `dev` and
+`pnpm lint` is oxlint (`.oxlintrc.json`). Beside its default rules it holds the layers: `pure`
+imports no `io`, `app`, `$lib/live`, `$app`, `$env`, svelte, node or `$lib/testing`, and uses no
+node global; `io` imports no `app`, node or `$lib/testing`; nothing outside tests and the dev-only
+fake imports `$lib/testing`.
+
+`.github/workflows/gates.yml` runs those four on every pull request and on pushes to `dev` and
 `main`, then `pnpm check:build`: it fails when the built output holds dev-only code (the dev token
 route, the script key's variable names, the fake site). Run it after a `pnpm build`.
 
@@ -96,8 +102,8 @@ nothing written anywhere, under `vite dev` only:
 1. On the list, "Import set file": `fixtures/install-drive/install-drive.fieldset.json`.
 2. Open its install screen and add `?fake` to the address.
 
-The screen then works on a site held in memory (`src/lib/io/install-site-fake.ts`, on
-`src/lib/pure/fixtures/fake-site.ts`), seeded for that set: every class of the plan, a revive, a
+The screen then works on a site held in memory (`src/lib/testing/install-site-fake.ts`, on
+`src/lib/testing/fake-site.ts`), seeded for that set: every class of the plan, a revive, a
 retired field of another type, a create refused once, a visibility write that fails once. The
 header of `install-site-fake.ts` lists them. `?fake&delay=400` slows each call so a cancel can
 land mid-run. `?fake&faults=0` turns the two faults off. `window.__installFake` is the fake.
@@ -105,6 +111,44 @@ land mid-run. `?fake&faults=0` turns the two faults off. `window.__installFake` 
 A production build cannot reach it: the flag is read behind `import.meta.env.DEV`, and the
 build drops the branch and the module. `src/lib/io/install-site.test.ts` holds the source to
 that. To check a build: `pnpm build`, then `pnpm check:build`.
+
+Code that exists for tests and the fake site lives in `src/lib/testing/`: the fake site, the
+install screen's fake provider, `makeLiveField`. Only tests and the dev-only branch of
+`src/lib/io/install-site.ts` import it (`pnpm lint` holds that). JSON samples shaped like the
+corpus stay in `src/lib/pure/fixtures/`.
+
+## Refreshing registry copies
+
+`src/lib/components/` holds copies of sg-widgets' registry widgets, and `src/lib/components/ui/`
+the shadcn-svelte components. Neither is edited here. Refresh them on every `sg-widgets-core`
+bump, so the widgets match the core they run on.
+
+The items the app adds (each brings what it needs with it):
+
+    R=https://sg-widgets.vercel.app/r/svelte
+    pnpm exec shadcn-svelte add $R/data-type-picker.json $R/entity-glyphs.json \
+      $R/entity-type-multi-picker.json $R/entity-type-picker.json $R/project-multi-picker.json \
+      $R/state-line.json $R/valid-values-editor.json -o -y --no-deps-install
+
+and the shadcn ones:
+
+    pnpm exec shadcn-svelte add alert-dialog badge button collapsible dialog dropdown-menu \
+      hover-card input label progress scroll-area select separator skeleton switch tabs \
+      textarea tooltip -o -y --no-deps-install
+
+The CLI asks before it overwrites unless given `-o -y`, and wants a terminal. From an agent, run
+it in a scratch copy of the repo and bring the changed files over.
+
+- Never re-add `sonner`: `ui/sonner/` follows `$lib/theme` in place of mode-watcher, by hand
+  (`docs/design.md`). sg-widgets has no sonner item.
+- `ui/checkbox/` is sg-widgets' checkbox, which draws the mixed state. A shadcn `checkbox` would
+  replace it; the registry widgets bring theirs back.
+- Leave `package.json` as it is unless a widget needs a newer dependency than the one installed.
+
+`src/lib/registry-copies.test.ts` checks every copy against sg-widgets at the tag of the installed
+core (`v0.4.0`): the same file with `$lib/registry/components/` read as `$lib/components/`. It
+runs where `../sg-widgets` (or `../../sg-widgets`, from a worktree) is checked out with its tags,
+and is skipped elsewhere, as in CI.
 
 ## The sandbox
 

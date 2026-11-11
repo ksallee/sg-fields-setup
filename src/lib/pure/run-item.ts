@@ -113,7 +113,7 @@ async function readNow(ctx: ItemContext, entry: PlanItem): Promise<Read> {
 /** The plan for an entry against a read. Never null here: a mirror entry has no item to apply. */
 function plan(ctx: ItemContext, entry: PlanEntry, read: LiveFieldRead): PlanItem {
 	const item = planEntry(entry, read, ctx.site);
-	if (item === null) throw new Error('A mirror entry cannot be installed.');
+	if (item === null) throw new Error('A mirror field cannot be installed.');
 	return item;
 }
 

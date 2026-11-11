@@ -56,6 +56,7 @@ import type { EntryDefinition } from './model';
 import { diffEntry, wantedDefault, wantedEntry, type Difference, type DiffSetting, type WantedValue } from './plan-diff';
 import type { PlanReason, ReasonCode, ReasonType } from './plan-reason';
 import { isIncomplete } from './validity';
+import { trimFold } from './fold';
 
 /* What goes in. */
 
@@ -217,7 +218,7 @@ export function needsRead(entry: EntryDefinition, entityTypes: readonly LiveEnti
  * that rule: the planner compares with it, and a caller that indexes a listing by label keys by it.
  */
 export function labelKey(displayName: string): string {
-	return displayName.trim().toLowerCase();
+	return trimFold(displayName);
 }
 
 function liveDefaultText(live: LiveField): string | null {
@@ -234,11 +235,11 @@ function isEmpty(value: WantedValue): boolean {
  * Null when the site has no such type, or more than one.
  */
 function meantType(name: string, entityTypes: readonly LiveEntityType[]): string | null {
-	const lower = name.trim().toLowerCase();
+	const lower = trimFold(name);
 	const one = (matches: LiveEntityType[]) => (matches.length === 1 ? matches[0].name : null);
 	return (
 		one(entityTypes.filter((type) => type.name.toLowerCase() === lower)) ??
-		one(entityTypes.filter((type) => type.displayName.trim().toLowerCase() === lower))
+		one(entityTypes.filter((type) => trimFold(type.displayName) === lower))
 	);
 }
 

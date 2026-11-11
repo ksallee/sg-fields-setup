@@ -472,7 +472,7 @@ describe('set file edge cases (B6 of the security audit)', () => {
 	it('refuses a snapshot nested one deeper, naming the entry', () => {
 		const found = refusal(withSnapshot(nested(SNAPSHOT_MAX_DEPTH + 1)));
 		expect(found).toEqual({ kind: 'snapshotTooDeep', entry: 1, programmaticName: 'sg_lens', max: SNAPSHOT_MAX_DEPTH });
-		expect(refusalMessage(found)).toBe('Entry 1 (sg_lens): "snapshot" is nested more than 32 deep.');
+		expect(refusalMessage(found)).toBe('Field 1 (sg_lens): "snapshot" is nested more than 32 deep.');
 	});
 
 	it('counts lists as depth too', () => {
@@ -543,16 +543,16 @@ describe('refusalMessage', () => {
 		],
 		[
 			{ kind: 'badEntryValue', entry: 5, programmaticName: 'sg_x', key: 'uniquePerProject', expected: 'boolean', found: 'none' },
-			'Entry 5 (sg_x): "uniquePerProject" is null. It should be true or false.'
+			'Field 5 (sg_x): "uniquePerProject" is null. It should be true or false.'
 		],
-		[{ kind: 'entryNotObject', entry: 4, found: 'text' }, 'Entry 4 is text. It should be an object.'],
+		[{ kind: 'entryNotObject', entry: 4, found: 'text' }, 'Field 4 is text. It should be an object.'],
 		[
 			{ kind: 'entryKeyMissing', entry: 2, programmaticName: 'sg_lens', key: 'displayName' },
-			'Entry 2 (sg_lens) has no "displayName".'
+			'Field 2 (sg_lens) has no "displayName".'
 		],
 		[
 			{ kind: 'entryKeyMissing', entry: 2, programmaticName: null, key: 'programmaticName' },
-			'Entry 2 has no "programmaticName".'
+			'Field 2 has no "programmaticName".'
 		],
 		[
 			{
@@ -563,7 +563,7 @@ describe('refusalMessage', () => {
 				expected: 'text',
 				found: 'number'
 			},
-			'Entry 3 (sg_lens): "displayName" is a number. It should be text.'
+			'Field 3 (sg_lens): "displayName" is a number. It should be text.'
 		],
 		[
 			{
@@ -574,7 +574,7 @@ describe('refusalMessage', () => {
 				expected: 'defaultValue',
 				found: 'list'
 			},
-			'Entry 1: "defaultValue" is a list. It should be true, false, text or null.'
+			'Field 1: "defaultValue" is a list. It should be true, false, text or null.'
 		],
 		[
 			{
@@ -585,7 +585,7 @@ describe('refusalMessage', () => {
 				expected: 'timeOrNone',
 				found: 'text'
 			},
-			'Entry 1: "snapshotTime" should be a time like 2026-11-10T09:00:00.000Z, or null.'
+			'Field 1: "snapshotTime" should be a time like 2026-11-10T09:00:00.000Z, or null.'
 		]
 	])('%j', (refused, message) => {
 		expect(refusalMessage(refused)).toBe(message);

@@ -4,18 +4,17 @@ import {
 	UNASSIGNED_LABEL,
 	buildEditorView,
 	groupCountText,
-	matchesSearch,
 	type EditorViewInput,
-	type ViewRow
+	type EditorRow
 } from './editor-view';
 
-function row(key: string, targetEntityType = 'Shot', displayName = key, programmaticName = `sg_${key}`): ViewRow {
+function row(key: string, targetEntityType = 'Shot', displayName = key, programmaticName = `sg_${key}`): EditorRow {
 	return { key, targetEntityType, programmaticName, displayName };
 }
 
 const SITE_NAMES: Record<string, string> = { Shot: 'Shot', CustomEntity01: 'Vendor', Asset: 'Asset' };
 
-function input(rows: ViewRow[], over: Partial<EditorViewInput> = {}, categories: Record<string, EntryCategory> = {}): EditorViewInput {
+function input(rows: EditorRow[], over: Partial<EditorViewInput> = {}, categories: Record<string, EntryCategory> = {}): EditorViewInput {
 	return {
 		rows,
 		categoryOf: (key) => categories[key] ?? 'new',
@@ -104,12 +103,15 @@ describe('grouping', () => {
 	});
 });
 
-describe('matchesSearch', () => {
+describe('the search on one row', () => {
 	const shot = row('a', 'CustomEntity01', 'Lens Serial', 'sg_lens_serial');
+	/** Whether the row stays in the view under the search. Its type shows on the site as "Vendor". */
+	const matchesSearch = (one: EditorRow, search: string) =>
+		buildEditorView(input([one], { search })).groups.some((group) => group.keys.includes(one.key));
 
 	it('EDT-34: a blank search matches everything', () => {
-		expect(matchesSearch(shot, '', undefined)).toBe(true);
-		expect(matchesSearch(shot, '   ', undefined)).toBe(true);
+		expect(matchesSearch(shot, '')).toBe(true);
+		expect(matchesSearch(shot, '   ')).toBe(true);
 	});
 
 	it.each([
@@ -118,15 +120,15 @@ describe('matchesSearch', () => {
 		['target entity type', 'customentity'],
 		['the type display name shown on the header', 'vend']
 	])('EDT-34: matches on %s, case-insensitive substring', (_what, query) => {
-		expect(matchesSearch(shot, query, 'Vendor')).toBe(true);
+		expect(matchesSearch(shot, query)).toBe(true);
 	});
 
 	it('EDT-34: the query is trimmed', () => {
-		expect(matchesSearch(shot, '  lens ', undefined)).toBe(true);
+		expect(matchesSearch(shot, '  lens ')).toBe(true);
 	});
 
 	it('EDT-34: no field containing the query is no match', () => {
-		expect(matchesSearch(shot, 'focus', 'Vendor')).toBe(false);
+		expect(matchesSearch(shot, 'focus')).toBe(false);
 	});
 });
 
@@ -297,7 +299,7 @@ describe('purity and speed', () => {
 	it('does not mutate its input', () => {
 		const rows = [row('b', 'Shot'), row('a', 'Asset')];
 		const added = ['CustomEntity01'];
-		const frozen = input(Object.freeze(rows.map((r) => Object.freeze(r))) as ViewRow[], {
+		const frozen = input(Object.freeze(rows.map((r) => Object.freeze(r))) as EditorRow[], {
 			addedGroups: Object.freeze(added) as string[],
 			onSiteFirst: true
 		});

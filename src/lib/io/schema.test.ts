@@ -79,13 +79,6 @@ describe('entity types', () => {
 		expect((await schema.entityTypes()).length).toBe(8);
 		expect(source.calls).toEqual(['types', 'types']);
 	});
-
-	it('answers the list it holds without a read, and null before one', async () => {
-		const schema = createLiveSchema(fake());
-		expect(schema.cachedEntityTypes()).toBeNull();
-		const types = await schema.entityTypes();
-		expect(schema.cachedEntityTypes()).toBe(types);
-	});
 });
 
 describe('fields of a type', () => {
@@ -231,7 +224,6 @@ describe('refresh', () => {
 		await schema.entityTypes();
 		await schema.fields('Version');
 		schema.clear();
-		expect(schema.cachedEntityTypes()).toBeNull();
 		expect(schema.cachedFields('Version')).toBeNull();
 		await schema.entityTypes();
 		await schema.fields('Version');

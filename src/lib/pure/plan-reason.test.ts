@@ -88,10 +88,10 @@ describe('reasonText', () => {
 
 	it('RUN-21: a reason about a setting names the setting, the live value and the wanted value', () => {
 		expect(reasonText(ALL.find((one) => one.code === 'unique-cannot-change')!)).toBe(
-			'"Lens" (Shot.sg_lens), unique: off on the site, on in the set. The API cannot change it. Change it by hand in FPT: open a Shot page, configure the field\'s column and turn the unique option on. Or turn it off in the entry.'
+			'"Lens" (Shot.sg_lens), unique: off on the site, on in the set. The API cannot change it. Change it by hand in Flow PT: open a Shot page, configure the field\'s column and turn the unique option on. Or turn it off in the set.'
 		);
 		expect(reasonText(ALL.find((one) => one.code === 'default-cannot-be-cleared')!)).toBe(
-			'"Lens" (Shot.sg_lens), default value: "a" on the site, none in the set. The API cannot clear a default. It can only change it to another value. Clear it by hand in FPT, or give the entry a default.'
+			'"Lens" (Shot.sg_lens), default value: "a" on the site, none in the set. The API cannot clear a default. It can only change it to another value. Clear it by hand in Flow PT, or give the field a default.'
 		);
 		expect(reasonText(ALL.find((one) => one.code === 'status-values-need-default')!)).toContain(
 			'valid values: [na, rev] on the site, [rev] in the set. A status list\'s valid values must include its default, "na".'
@@ -100,13 +100,13 @@ describe('reasonText', () => {
 
 	it('RUN-3: a type conflict shows both data types by their labels', () => {
 		expect(reasonText(ALL[0])).toBe(
-			'"Lens" (Shot.sg_lens) is a Number field on the site. The set wants Text. A field\'s data type cannot be changed. Install skips it. Change the entry\'s data type to Number, or give the entry another name.'
+			'"Lens" (Shot.sg_lens) is a Number field on the site. The set wants Text. A field\'s data type cannot be changed. Install skips it. Change the field\'s data type to Number, or give the field another name.'
 		);
 	});
 
 	it('PLN-14: a missing entity type says how to enable it', () => {
 		expect(reasonText(ALL[2])).toBe(
-			'"Lens" (CustomEntity19.sg_lens) is skipped. This site has no CustomEntity19 entity. Enable it in FPT\'s admin screens, then refresh.'
+			'"Lens" (CustomEntity19.sg_lens) is skipped. This site has no CustomEntity19 entity. Enable it in Flow PT\'s admin screens, then refresh.'
 		);
 	});
 
@@ -122,13 +122,13 @@ describe('reasonText', () => {
 	});
 
 	it('a multi-entity link says how many valid types the entry has', () => {
-		expect(reasonText(ALL.find((one) => one.code === 'multi-entity-needs-one-valid-type')!)).toContain('The entry has 2. Keep one.');
-		expect(reasonText(reason('multi-entity-needs-one-valid-type', { setting: 'validTypes', wanted: [] }))).toContain('The entry has none. Add one.');
+		expect(reasonText(ALL.find((one) => one.code === 'multi-entity-needs-one-valid-type')!)).toContain('The field has 2. Keep one.');
+		expect(reasonText(reason('multi-entity-needs-one-valid-type', { setting: 'validTypes', wanted: [] }))).toContain('The field has none. Add one.');
 	});
 
 	it('finding 121: a valid type the site lacks, on an update, names the value, the API name meant and the hazard', () => {
 		expect(reasonText(ALL.find((one) => one.code === 'valid-type-not-on-site')!)).toBe(
-			'"Lens" (Shot.sg_lens), valid types: [Shot] on the site, [Shot, asset] in the set. This site has no entity type named "asset". "asset" is probably Asset. A valid type is the API name of an entity type, case included. On a field that exists, the site answers a name in the wrong case with a server error and retires the field. Install sends nothing. Correct the entry.'
+			'"Lens" (Shot.sg_lens), valid types: [Shot] on the site, [Shot, asset] in the set. This site has no entity type named "asset". "asset" is probably Asset. A valid type is the API name of an entity type, case included. On a field that exists, the site answers a name in the wrong case with a server error and retires the field. Install sends nothing. Correct the field.'
 		);
 	});
 
@@ -146,7 +146,7 @@ describe('reasonText', () => {
 			})
 		);
 		expect(text).toBe(
-			'"Lens" (Shot.sg_lens) cannot be created. Its valid types are [shot, Camera Rig, ZzNoSuchType]. This site has no entity type named "shot", "Camera Rig" or "ZzNoSuchType". "shot" is probably Shot. "Camera Rig" is probably CustomEntity66. A valid type is the API name of an entity type, case included. Correct the entry.'
+			'"Lens" (Shot.sg_lens) cannot be created. Its valid types are [shot, Camera Rig, ZzNoSuchType]. This site has no entity type named "shot", "Camera Rig" or "ZzNoSuchType". "shot" is probably Shot. "Camera Rig" is probably CustomEntity66. A valid type is the API name of an entity type, case included. Correct the field.'
 		);
 		// The retirement was measured on an update only.
 		expect(text).not.toContain('retires');
@@ -155,7 +155,7 @@ describe('reasonText', () => {
 	it('finding 121: a removed valid type says what the removal does, and only what was measured', () => {
 		const removed = ALL.find((one) => one.code === 'valid-type-removed')!;
 		expect(reasonText(removed)).toBe(
-			'"Lens" (Shot.sg_lens), valid types: [Shot, Asset] on the site, [Shot] in the set. Removing Asset retires the reverse field of this link on Asset. A retired field keeps its name, so the name is spent, and adding the type back makes a new field under a new name. Install skips the field. Keep Asset in the entry, or remove it by hand in FPT.'
+			'"Lens" (Shot.sg_lens), valid types: [Shot, Asset] on the site, [Shot] in the set. Removing Asset retires the reverse field of this link on Asset. A retired field keeps its name, so the name stays taken, and adding the type back makes a new field under a new name. Install skips the field. Keep Asset in the field, or remove it by hand in Flow PT.'
 		);
 		expect(
 			reasonText({
@@ -166,7 +166,7 @@ describe('reasonText', () => {
 					{ name: 'Asset', meant: null }
 				]
 			})
-		).toMatch(/Removing Shot and Asset retires the reverse field of this link on each of them\..* Keep Shot and Asset in the entry, or remove them by hand in FPT\.$/);
+		).toMatch(/Removing Shot and Asset retires the reverse field of this link on each of them\..* Keep Shot and Asset in the field, or remove them by hand in Flow PT\.$/);
 	});
 
 	it('Copy: no HTML, no dash used as punctuation, in any reason', () => {
@@ -207,7 +207,7 @@ describe('trash page', () => {
 	it('G10: gives the menu path in words when the site has no such page', () => {
 		const parts = reasonParts(blocked);
 		expect(parts).toHaveLength(1);
-		expect(reasonText(blocked)).toMatch(/delete it for good from the trash for fields\. In FPT, open the admin menu, then Trash, then Fields\.$/);
+		expect(reasonText(blocked)).toMatch(/delete it for good from the trash for fields\. In Flow PT, open the admin menu, then Trash, then Fields\.$/);
 	});
 
 	it('trashParts: usable on its own by a run message', () => {

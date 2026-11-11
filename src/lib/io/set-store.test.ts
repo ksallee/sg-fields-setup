@@ -10,7 +10,6 @@ import {
 	SetStoreError,
 	openSetStore,
 	sharedSetStore,
-	storageMessage,
 	type SetStore
 } from './set-store';
 
@@ -195,7 +194,7 @@ describe('createSet', () => {
 
 		const failed = store.createSet({ name: 'Lens', origin: 'manual', entries: [draft()] });
 		await expect(failed).rejects.toBeInstanceOf(SetStoreError);
-		await expect(failed).rejects.toMatchObject({ kind: 'failed', message: storageMessage('failed') });
+		await expect(failed).rejects.toMatchObject({ kind: 'failed', message: new SetStoreError('failed').message });
 		const stored = await dump(idb);
 		expect(stored.sets).toHaveLength(1);
 		expect(stored.entries).toEqual([]);
@@ -466,7 +465,7 @@ describe('saveSet', () => {
 		await expect(failed).rejects.toMatchObject({
 			name: 'SetStoreError',
 			kind: 'quota',
-			message: storageMessage('quota')
+			message: new SetStoreError('quota').message
 		});
 		restore();
 
@@ -799,7 +798,7 @@ describe('storage faults', () => {
 		const failed = openSetStore({ idb: undefined });
 		vi.stubGlobal('indexedDB', undefined);
 		await expect(openSetStore()).rejects.toMatchObject({ name: 'SetStoreError', kind: 'unavailable' });
-		await expect(failed).rejects.toMatchObject({ kind: 'unavailable', message: storageMessage('unavailable') });
+		await expect(failed).rejects.toMatchObject({ kind: 'unavailable', message: new SetStoreError('unavailable').message });
 	});
 
 	it('an open the browser refuses, as in some private windows, is unavailable, with the cause kept', async () => {
@@ -813,7 +812,7 @@ describe('storage faults', () => {
 			}
 		} as unknown as IDBFactory;
 		const failed = openSetStore({ idb });
-		await expect(failed).rejects.toMatchObject({ kind: 'unavailable', message: storageMessage('unavailable'), cause: refused });
+		await expect(failed).rejects.toMatchObject({ kind: 'unavailable', message: new SetStoreError('unavailable').message, cause: refused });
 		await expect(failed).rejects.not.toMatchObject({ message: expect.stringContaining('mutation') });
 	});
 
@@ -825,7 +824,7 @@ describe('storage faults', () => {
 			req.onsuccess = () => resolve(req.result);
 		});
 		const failed = openSetStore({ idb, version: DB_VERSION + 1 });
-		await expect(failed).rejects.toMatchObject({ kind: 'blocked', message: storageMessage('blocked') });
+		await expect(failed).rejects.toMatchObject({ kind: 'blocked', message: new SetStoreError('blocked').message });
 		old.close();
 	});
 
@@ -862,12 +861,12 @@ describe('storage faults', () => {
 				resolve();
 			};
 		});
-		await expect(store.listSets()).rejects.toMatchObject({ kind: 'outdated', message: storageMessage('outdated') });
+		await expect(store.listSets()).rejects.toMatchObject({ kind: 'outdated', message: new SetStoreError('outdated').message });
 	});
 
 	it('every message is plain: short sentences, no error names', () => {
 		for (const kind of ['unavailable', 'blocked', 'outdated', 'quota', 'failed'] as const) {
-			const message = storageMessage(kind);
+			const message = new SetStoreError(kind).message;
 			expect(message).not.toMatch(/Error|Exception|IndexedDB|IDB/);
 			expect(message.endsWith('.')).toBe(true);
 		}

@@ -9,6 +9,12 @@ function cleanList(items: readonly string[]): string[] {
 	return items.map((item) => item.trim()).filter((item) => item !== '');
 }
 
+/** A description as it is stored: trimmed, or null when nothing is left (MOD-7). Sets and entries alike. */
+export function cleanDescription(description: string | null | undefined): string | null {
+	const text = description?.trim() ?? '';
+	return text === '' ? null : text;
+}
+
 /** Checkbox: a boolean or none. List and status list: non-blank trimmed text or none (MOD-10). */
 function cleanDefault(dataType: string, value: DefaultValue): DefaultValue {
 	if (dataType === 'checkbox') return typeof value === 'boolean' ? value : null;
@@ -30,7 +36,6 @@ function cleanDefault(dataType: string, value: DefaultValue): DefaultValue {
  */
 export function cleanEntry<T extends EntryDefinition>(entry: T): T {
 	const dataType = entry.dataType.trim();
-	const description = entry.description?.trim() ?? '';
 	return {
 		...entry,
 		targetEntityType: entry.targetEntityType.trim(),
@@ -40,7 +45,7 @@ export function cleanEntry<T extends EntryDefinition>(entry: T): T {
 		validTypes: carries(dataType, 'validTypes') ? cleanList(entry.validTypes) : [],
 		validValues: carries(dataType, 'validValues') ? cleanList(entry.validValues) : [],
 		defaultValue: carries(dataType, 'defaultValue') ? cleanDefault(dataType, entry.defaultValue) : null,
-		description: description === '' ? null : description,
+		description: cleanDescription(entry.description),
 		uniquePerProject: carries(dataType, 'uniquePerProject') && entry.uniquePerProject
 	};
 }

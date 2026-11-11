@@ -14,9 +14,11 @@
  * - When entries exist but nothing is visible, the view says so (`no_matches`).
  */
 import { ENTRY_CATEGORIES, type EntryCategory } from './category';
+import { compareCodeUnits, nameCollator } from './text-order';
+import { trimFold } from './fold';
 
 /** What the view reads from a row of the working copy. Rows keep their own other fields. */
-export interface ViewRow {
+export interface EditorRow {
 	/** Stable and unique within the working copy. */
 	key: string;
 	targetEntityType: string;
@@ -34,7 +36,7 @@ export const UNASSIGNED_LABEL = 'Unassigned';
 
 export interface EditorViewInput {
 	/** The working copy's rows, in its order. */
-	rows: readonly ViewRow[];
+	rows: readonly EditorRow[];
 	/** Each row's category against the site (CMP-8). Asked once per row. */
 	categoryOf: (key: string) => EntryCategory;
 	/** The site's display name for an entity type API name, or undefined when not known. */
@@ -59,7 +61,7 @@ export interface GroupCount {
 	partial: boolean;
 }
 
-export interface ViewGroup extends GroupCount {
+export interface EditorGroup extends GroupCount {
 	/** The trimmed stored type name; `''` for the unassigned group. Unique among the groups. */
 	type: string;
 	/** The header text: the site display name when known, else the stored name (EDT-17). */
@@ -84,7 +86,7 @@ export type EmptyState = 'no_entries' | 'no_matches' | null;
 
 export interface EditorView {
 	/** The visible groups, in order (EDT-16, EDT-37). */
-	groups: ViewGroup[];
+	groups: EditorGroup[];
 	/** Every visible row's key, in on-screen order, across groups. Selection ranges over it. */
 	visibleKeys: string[];
 	counts: FilterCounts;
@@ -99,8 +101,6 @@ export interface EditorView {
 	filterActive: boolean;
 }
 
-const collator = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
-
 const CATEGORY_RANK: Record<EntryCategory, number> = Object.fromEntries(
 	ENTRY_CATEGORIES.map((category, index) => [category, index])
 ) as Record<EntryCategory, number>;
@@ -109,7 +109,7 @@ function compareTypes(a: string, b: string): number {
 	if (a === b) return 0;
 	if (a === '') return 1;
 	if (b === '') return -1;
-	return collator.compare(a, b) || (a < b ? -1 : 1);
+	return nameCollator.compare(a, b) || compareCodeUnits(a, b);
 }
 
 function labelFor(type: string, typeDisplayName: (apiName: string) => string | undefined): string {
@@ -118,11 +118,12 @@ function labelFor(type: string, typeDisplayName: (apiName: string) => string | u
 	return name ? name : type;
 }
 
-function normalizeQuery(search: string): string {
-	return search.trim().toLowerCase();
-}
-
-function matchesQuery(row: ViewRow, query: string, typeLabel: string | undefined): boolean {
+/**
+ * Whether a row matches a search (EDT-34): case-insensitive substring of its display name,
+ * programmatic name, target entity type, or the type's site display name when given. A blank
+ * query matches every row. The query comes trimmed and lowercased (`trimFold`).
+ */
+function matchesQuery(row: EditorRow, query: string, typeLabel: string | undefined): boolean {
 	if (query === '') return true;
 	return (
 		row.displayName.toLowerCase().includes(query) ||
@@ -130,15 +131,6 @@ function matchesQuery(row: ViewRow, query: string, typeLabel: string | undefined
 		row.targetEntityType.toLowerCase().includes(query) ||
 		(typeLabel !== undefined && typeLabel.toLowerCase().includes(query))
 	);
-}
-
-/**
- * Whether a row matches a search (EDT-34): case-insensitive substring of its display name,
- * programmatic name, target entity type, or the type's site display name when given. A blank
- * search matches every row.
- */
-export function matchesSearch(row: ViewRow, search: string, typeLabel: string | undefined): boolean {
-	return matchesQuery(row, normalizeQuery(search), typeLabel);
 }
 
 /** A group header's count text (EDT-17): `3`, or `1 of 3` when a search or filter hides some. */
@@ -155,7 +147,7 @@ interface Bucket {
 
 /** The editor list's view model for one set's rows (EDT-16 to EDT-38). Reads its input, never changes it. */
 export function buildEditorView(input: EditorViewInput): EditorView {
-	const query = normalizeQuery(input.search);
+	const query = trimFold(input.search);
 	const searchActive = query !== '';
 	const filterActive = input.filter !== 'all';
 
@@ -189,7 +181,7 @@ export function buildEditorView(input: EditorViewInput): EditorView {
 		bucketFor(type);
 	}
 
-	const groups: ViewGroup[] = [];
+	const groups: EditorGroup[] = [];
 	const visibleKeys: string[] = [];
 	const ordered = [...buckets.values()].sort((a, b) => compareTypes(a.type, b.type));
 	for (const bucket of ordered) {

@@ -1,5 +1,5 @@
 /**
- * Which site the app is connected to, and how the navbar names it.
+ * Which site the app is connected to. `siteHost` in `site-host.ts` names it.
  *
  * One site at a time (OVR-7). A session is only kept for the site the person named, so the
  * session's site and the named one agree. The dev key's site stands in only while nobody is
@@ -16,13 +16,4 @@ export interface SiteSources {
 
 export function connectedSite({ named, sessionSite, devSite }: SiteSources): string {
 	return sessionSite ?? devSite ?? named;
-}
-
-/** The site as the navbar names it: the studio, without the suffix every Flow PT host carries. */
-export function shortHost(siteUrl: string): string {
-	try {
-		return new URL(siteUrl).hostname.replace(/^www\./, '').replace(/\.(?:shotgrid\.autodesk\.com|shotgunstudio\.com)$/, '');
-	} catch {
-		return siteUrl;
-	}
 }

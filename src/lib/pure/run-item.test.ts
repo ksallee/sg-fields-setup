@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createFakeSite, type FakeSite } from './fixtures/fake-site';
+import { createFakeSite, type FakeSite } from '$lib/testing/fake-site';
 import { planEntry, type PlanEntry, type PlanItem, type PlanSite } from './plan';
 import { applyItem, plainCreate, writeAndVerify, type ItemContext } from './run-item';
 import type { FieldEffect } from './run';

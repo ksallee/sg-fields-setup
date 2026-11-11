@@ -24,6 +24,7 @@
  */
 import type { PlanScope } from './plan';
 import { PROJECT_ELIGIBILITY_FIELDS, isEligibleProject, type EligibilityFlags } from './project-eligibility';
+import { countText } from './set-text';
 
 /** A project as the plan and the steps carry it. */
 export interface ScopeProject {
@@ -134,7 +135,7 @@ export const ELIGIBLE_PROJECT_FILTERS: { logical_operator: 'and'; conditions: [s
 /** The summary's scope line (RUN-5): all eligible projects with their number, or the number chosen. */
 export function scopeSummary(resolved: VisibilityScope): string {
 	const count = resolved.scope.projects.length;
-	if (resolved.scope.kind === 'chosen') return count === 1 ? '1 chosen project' : `${count} chosen projects`;
+	if (resolved.scope.kind === 'chosen') return countText(count, 'chosen project');
 	return resolved.eligibleKnown ? `All eligible projects (${count})` : 'No projects';
 }
 

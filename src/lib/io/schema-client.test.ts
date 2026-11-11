@@ -5,7 +5,7 @@ import { asRefusal, isRetiredNameRefusal, readRevive, retiredNameIn } from '$lib
 import { visibleWrite } from '$lib/pure/visibility-value';
 import { coreSchemaSource } from './core-schema-source';
 import { createLiveSchema } from './schema';
-import { createTrashPage, readTrashPageUrl, runReader, siteSchemaClient, TRASH_PAGE_FILTERS, type PageLister } from './schema-client';
+import { createTrashPage, runReader, siteSchemaClient, TRASH_PAGE_FILTERS, type PageLister } from './schema-client';
 import { visibilityPort } from './visibility';
 
 interface Seen {
@@ -434,7 +434,7 @@ describe('the trash page for fields (RUN-21, corpus finding 120)', () => {
 
 	it('searches the Page rows for the trash of DisplayColumn and builds the address', async () => {
 		const client = lister([{ id: 4321 }]);
-		expect(await readTrashPageUrl(client, 'https://example.shotgrid.autodesk.com/')).toBe('https://example.shotgrid.autodesk.com/page/4321');
+		expect(await createTrashPage(client, 'https://example.shotgrid.autodesk.com/')()).toBe('https://example.shotgrid.autodesk.com/page/4321');
 		expect(client.asked).toEqual([
 			{ entityType: 'Page', options: { filters: TRASH_PAGE_FILTERS, fields: ['name'], sort: 'id', page: { size: 1, number: 1 } } }
 		]);
@@ -448,10 +448,10 @@ describe('the trash page for fields (RUN-21, corpus finding 120)', () => {
 	});
 
 	it('answers null when the site has no such page, when the lookup fails, and for an id that is none', async () => {
-		expect(await readTrashPageUrl(lister([]), SITE)).toBeNull();
-		expect(await readTrashPageUrl(lister(new Error('Forbidden')), SITE)).toBeNull();
-		expect(await readTrashPageUrl(lister([{ id: 0 }]), SITE)).toBeNull();
-		expect(await readTrashPageUrl(lister([{ id: 12 }]), '')).toBeNull();
+		expect(await createTrashPage(lister([]), SITE)()).toBeNull();
+		expect(await createTrashPage(lister(new Error('Forbidden')), SITE)()).toBeNull();
+		expect(await createTrashPage(lister([{ id: 0 }]), SITE)()).toBeNull();
+		expect(await createTrashPage(lister([{ id: 12 }]), '')()).toBeNull();
 	});
 
 	it('is looked up once a session; a failed lookup is asked again', async () => {

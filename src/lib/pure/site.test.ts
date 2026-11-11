@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectedSite, shortHost } from './site';
+import { connectedSite } from './site';
 
 describe('connectedSite (OVR-7, B10)', () => {
 	it('is empty until a site is named', () => {
@@ -26,20 +26,5 @@ describe('connectedSite (OVR-7, B10)', () => {
 		expect(connectedSite({ named: '', sessionSite: null, devSite: 'https://dev.shotgrid.autodesk.com' })).toBe(
 			'https://dev.shotgrid.autodesk.com'
 		);
-	});
-});
-
-describe('shortHost', () => {
-	it('drops the suffix every Flow PT host carries', () => {
-		expect(shortHost('https://studio.shotgrid.autodesk.com')).toBe('studio');
-		expect(shortHost('https://www.old.shotgunstudio.com')).toBe('old');
-	});
-
-	it('keeps any other host whole', () => {
-		expect(shortHost('https://fpt.example.com')).toBe('fpt.example.com');
-	});
-
-	it('gives back what is not a URL', () => {
-		expect(shortHost('not a url')).toBe('not a url');
 	});
 });

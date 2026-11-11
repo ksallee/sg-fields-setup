@@ -2,7 +2,7 @@
  * Test helper: a live field read from a record shaped like `GET /schema/<Type>/fields` returns
  * (every value wrapped, corpus `endpoints/get_schema_type_fields`).
  */
-import { readField, type LiveField } from '../live-field';
+import { readField, type LiveField } from '$lib/pure/live-field';
 
 export interface FieldAttrs {
 	displayName?: string;

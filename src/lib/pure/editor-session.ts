@@ -10,7 +10,7 @@ import type { WorkingCopy } from './working-copy';
 /**
  * Each row's key after a successful save (EDT-46). `afterSave` keys every row by its entry id:
  * a stored row keeps that id, an added row takes the id of the entry the store made for it.
- * `added` is the save result's `added`, in the order of `addedKeys`. A row with no entry is left
+ * `added` is the save result's `added`, in the order of `saveRequest`'s `added`: the added rows in row order. A row with no entry is left
  * out.
  */
 export function keysAfterSave(before: WorkingCopy, added: readonly Pick<Entry, 'id'>[]): Map<string, string> {

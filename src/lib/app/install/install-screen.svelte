@@ -17,7 +17,8 @@
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import type { Confirmation } from '$lib/pure/install-confirm';
 	import { SELECTION_LOST } from '$lib/pure/install-entries';
-	import { leaveQuestion, siteHost } from '$lib/pure/install-text';
+	import { leaveQuestion } from '$lib/pure/install-text';
+	import { siteHost } from '$lib/pure/site-host';
 	import { CONNECT_PATH, HOME_PATH, setPath } from '$lib/pure/routes';
 	import { fieldCount } from '$lib/pure/set-text';
 	import { rowCounters } from '$lib/pure/visibility-text';

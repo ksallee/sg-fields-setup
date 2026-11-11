@@ -19,13 +19,15 @@
  */
 import { columnValues, guessDataType } from './import-guess';
 import { DEFAULT_DELIMITER, splitHeader } from './import-header';
-import { targetEntityType, type ImportMode, type SiteEntityType } from './import-entity-type';
+import { targetEntityType, type ImportMode } from './import-entity-type';
 import { createMatcher, type LiveFieldsByType } from './import-match';
 import { predictFieldName } from './field-name';
 import { draftFromLiveField } from './live-to-entry';
 import type { EntryDraft, OriginDetails, Timestamp } from './model';
 import type { ParsedTable } from './table';
 import type { WorkbookSheet } from './xlsx';
+import { countText } from './set-text';
+import type { LiveEntityType } from './live-entity-types';
 
 /* Buckets. */
 
@@ -72,14 +74,10 @@ export function importTotals(buckets: readonly ImportBucket[]): ImportTotals {
 	return { columns: buckets.reduce((sum, bucket) => sum + bucketColumnCount(bucket), 0), buckets: buckets.length };
 }
 
-function count(n: number, singular: string, plural: string): string {
-	return `${n} ${n === 1 ? singular : plural}`;
-}
-
 /** The footer line (IMP-10): "72 columns in 1 bucket." */
 export function importFooterText(buckets: readonly ImportBucket[]): string {
 	const totals = importTotals(buckets);
-	return `${count(totals.columns, 'column', 'columns')} in ${count(totals.buckets, 'bucket', 'buckets')}.`;
+	return `${countText(totals.columns, 'column')} in ${countText(totals.buckets, 'bucket')}.`;
 }
 
 /* Which types the import resolves to. */
@@ -103,7 +101,7 @@ function columnsOf(buckets: readonly ImportBucket[], delimiter: string): Column[
 	return columns;
 }
 
-function targetOf(column: Column, mode: ImportMode, types: readonly SiteEntityType[] | undefined): string {
+function targetOf(column: Column, mode: ImportMode, types: readonly Pick<LiveEntityType, 'name' | 'displayName'>[] | undefined): string {
 	return targetEntityType({
 		mode,
 		hint: column.hint,
@@ -121,7 +119,7 @@ export function resolvedEntityTypes(
 	buckets: readonly ImportBucket[],
 	mode: ImportMode,
 	delimiter: string,
-	types: readonly SiteEntityType[] | null
+	types: readonly Pick<LiveEntityType, 'name' | 'displayName'>[] | null
 ): string[] {
 	if (!types) return [];
 	const seen = new Set<string>();
@@ -165,7 +163,7 @@ export function inferFallback(
 export interface ImportSite {
 	/** The site's URL, for each snapshot. */
 	url: string;
-	entityTypes: readonly SiteEntityType[];
+	entityTypes: readonly Pick<LiveEntityType, 'name' | 'displayName'>[];
 	/** Live fields of the types `resolvedEntityTypes` named. A type missing has no fields. */
 	fieldsByType: LiveFieldsByType;
 }
@@ -276,12 +274,12 @@ export function defaultSetName(currentName: string, fileName: string): string {
 
 /** The confirmation after a successful import (IMP-50). */
 export function importSuccessText(imported: number, skipped: number): string {
-	const text = `Imported ${count(imported, 'field', 'fields')}.`;
-	return skipped > 0 ? `${text} Skipped ${count(skipped, 'duplicate column', 'duplicate columns')}.` : text;
+	const text = `Imported ${countText(imported, 'field')}.`;
+	return skipped > 0 ? `${text} Skipped ${countText(skipped, 'duplicate column')}.` : text;
 }
 
 /** The editor's banner on the new set (IMP-50). */
 export function importBannerText(imported: number): string {
 	const ask = imported === 1 ? 'Check its entity type and data type.' : 'Check each entity type and data type.';
-	return `Imported ${count(imported, 'field', 'fields')}. ${ask}`;
+	return `Imported ${countText(imported, 'field')}. ${ask}`;
 }

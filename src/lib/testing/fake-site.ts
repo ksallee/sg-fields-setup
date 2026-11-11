@@ -34,11 +34,11 @@
  * The object is a `SchemaWritePort` as it stands, and its three reads have the shape of
  * `SchemaSource` (`src/lib/io/schema.ts`). `reader()` gives the run's `RunReader`.
  */
-import { readEntityTypes } from '../live-entity-types';
-import { readFieldReply, readFields, type FieldReply } from '../live-field';
-import { predictFieldName } from '../field-name';
-import type { CreatePayload, PropertyWrite } from '../plan';
-import type { ReviveAnswer, RunReader, SchemaWritePort } from '../run-port';
+import { readEntityTypes } from '$lib/pure/live-entity-types';
+import { readFieldReply, readFields, type FieldReply } from '$lib/pure/live-field';
+import { predictFieldName } from '$lib/pure/field-name';
+import type { CreatePayload, PropertyWrite } from '$lib/pure/plan';
+import type { ReviveAnswer, RunReader, SchemaWritePort } from '$lib/pure/run-port';
 
 export const FAKE_OPS = [
 	'readRawEntityTypes',
@@ -205,10 +205,6 @@ const DEFAULT_CARRIERS = ['list', 'status_list', 'checkbox'];
 const VALUE_CARRIERS = ['list', 'status_list'];
 const TYPE_CARRIERS = ['entity', 'multi_entity'];
 const CREATE_PROPERTIES = ['name', 'description', 'valid_values', 'default_value', 'valid_types', 'unique'];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function unique(items: readonly string[]): string[] {
 	return [...new Set(items)];

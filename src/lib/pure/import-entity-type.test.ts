@@ -3,11 +3,11 @@ import {
 	IMPORT_MODES,
 	importModeHint,
 	resolveEntityType,
-	targetEntityType,
-	type SiteEntityType
+	targetEntityType
 } from './import-entity-type';
+import type { LiveEntityType } from './live-entity-types';
 
-const SITE: SiteEntityType[] = [
+const SITE: Pick<LiveEntityType, 'name' | 'displayName'>[] = [
 	{ name: 'Shot', displayName: 'Shot' },
 	{ name: 'Asset', displayName: 'Asset' },
 	{ name: 'CustomEntity07', displayName: 'Slate' },

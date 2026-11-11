@@ -13,7 +13,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { explanationText, type RowComparison } from '$lib/pure/compare';
-	import { groupCountText, type ViewGroup } from '$lib/pure/editor-view';
+	import { groupCountText, type EditorGroup } from '$lib/pure/editor-view';
 	import type { LiveField } from '$lib/pure/live-field';
 	import type { EntryDefinition } from '$lib/pure/model';
 	import type { GroupCheckState } from '$lib/pure/selection';
@@ -44,7 +44,7 @@
 		onnamemode,
 		ondelete
 	}: {
-		group: ViewGroup;
+		group: EditorGroup;
 		rowOf: ReadonlyMap<string, Row>;
 		comparisonOf: ReadonlyMap<string, RowComparison>;
 		incomplete: ReadonlySet<string>;

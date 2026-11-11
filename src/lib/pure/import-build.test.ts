@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { COMMON_ENTITY_TYPES } from '$lib/io/schema';
 import { IMPORT_MODES } from './import-entity-type';
-import { makeLiveField } from './fixtures/make-live-field';
+import { makeLiveField } from '$lib/testing/make-live-field';
 import {
 	bucketColumnCount,
 	bucketFromCsv,

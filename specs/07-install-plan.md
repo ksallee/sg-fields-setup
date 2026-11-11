@@ -68,6 +68,10 @@ valid types, unique. Each carries the live value and the wanted value.
 | valid types | same types in the same order. Order matters because it decides the reverse field's target. |
 | unique | same boolean; missing is off |
 
+Note, 2026-11-10: the app carries no structured default. A set's default is a boolean or text
+(MOD-10), so a structured live value never equals the wanted one (`plan-diff.ts`). The default
+value row above stays as written for a type that ever carries one.
+
 - PLN-11. For both valid values and valid types, an empty list and "none" are the same.
 - PLN-12. A stray default on a type that cannot carry one never produces a difference.
 

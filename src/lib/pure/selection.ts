@@ -81,11 +81,6 @@ export function deselect(selection: Selection, keys: readonly string[]): Selecti
 	return { selected, anchor: selection.anchor };
 }
 
-/** Clears the selection and the anchor (EDT-41). */
-export function clearSelection(): Selection {
-	return EMPTY_SELECTION;
-}
-
 /**
  * Drops the keys that no longer exist, after a delete or a reload (EDT-33). The rest stays
  * selected; an anchor that is gone becomes null.
