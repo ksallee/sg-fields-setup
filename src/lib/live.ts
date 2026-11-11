@@ -28,6 +28,7 @@ import { env } from '$env/dynamic/public';
 import { coreSchemaSource } from '$lib/io/core-schema-source';
 import { createLiveSchema, type LiveSchema } from '$lib/io/schema';
 import { connectedSite } from '$lib/pure/site';
+import { approvalUrl, checkSite, siteRefusalText, type SiteCheck } from '$lib/pure/site-host';
 import { createSessionTokenAuth, createSgContext, RestClient, type EntityRow, type RestClientOptions, type SgContext } from 'sg-widgets-core';
 
 const KEYS = {
@@ -82,9 +83,23 @@ function write(key: string, value: string | null): void {
 	}
 }
 
-/** The connected site: the one the person named last. Empty until they name one. */
+/**
+ * The rule for a site in this browser: https, no user name, no port, kept as its origin. Any
+ * host passes here. Which hosts are Flow PT sites is the server's list (`FPT_EXTRA_SITE_SUFFIXES`
+ * adds to it and never reaches the page), so `/live/session-request` refuses the others at
+ * sign-in, in words.
+ */
+function checked(value: unknown): SiteCheck {
+	return checkSite(value, { anyHost: true });
+}
+
+/**
+ * The connected site: the one the person named last, as an origin. Empty until they name one,
+ * and for a stored address that does not pass the rule.
+ */
 export function siteUrl(): string {
-	return raw(KEYS.site) ?? '';
+	const stored = checked(raw(KEYS.site));
+	return stored.ok ? stored.origin : '';
 }
 
 /** What the connect form offers before a site is named. Never the site by itself. */
@@ -92,16 +107,25 @@ export function suggestedSiteUrl(): string {
 	return env.PUBLIC_FPT_SITE_URL ?? '';
 }
 
-/** Name the site. A session for another site is dropped: one site at a time. */
-export function setSiteUrl(value: string): void {
-	const next = value.trim().replace(/\/+$/, '');
-	if (session()?.siteUrl !== next) setSession(null);
-	write(KEYS.site, next);
+/**
+ * Name the site. Only an address that passes the rule is stored, as its origin; a refused one
+ * changes nothing and the answer says why. A session for another site is dropped: one site at
+ * a time.
+ */
+export function setSiteUrl(value: string): SiteCheck {
+	const next = checked(value);
+	if (!next.ok) return next;
+	if (session()?.siteUrl !== next.origin) setSession(null);
+	write(KEYS.site, next.origin);
+	return next;
 }
 
 export function session(): Session | null {
 	const stored = json<Session>(KEYS.session);
-	return stored?.siteUrl && stored.token && stored.login ? stored : null;
+	if (!stored?.siteUrl || !stored.token || !stored.login) return null;
+	// The token is only ever sent to the site it was approved on, and that site is an origin.
+	const site = checked(stored.siteUrl);
+	return site.ok && site.origin === stored.siteUrl ? stored : null;
 }
 
 function setSession(value: Session | null): void {
@@ -126,7 +150,8 @@ async function mintDevToken(): Promise<DevToken | null> {
 		});
 		if (!res.ok) return null;
 		const body = (await res.json()) as DevToken;
-		return body.accessToken && body.siteUrl ? body : null;
+		const site = checked(body.siteUrl);
+		return body.accessToken && site.ok ? { ...body, siteUrl: site.origin } : null;
 	} catch {
 		return null;
 	}
@@ -250,9 +275,14 @@ async function launcher<T>(path: string, body: Record<string, unknown>): Promise
 	return { status: res.status, body: answer };
 }
 
-/** Opens the approval page and resolves when the person has approved it. */
+/**
+ * Opens the approval page and resolves when the person has approved it. The page is opened only
+ * when it is https on the site itself, whatever the endpoint answered.
+ */
 export async function signIn(site: string, open: (url: string) => void): Promise<Session> {
-	const origin = site.replace(/\/+$/, '');
+	const named = checked(site);
+	if (!named.ok) throw new Error(siteRefusalText(named.reason));
+	const origin = named.origin;
 	const created = await launcher<{ id?: string; url?: string; message?: string }>('/live/session-request', {
 		siteUrl: origin,
 		appName: 'sg-fields-setup',
@@ -261,7 +291,9 @@ export async function signIn(site: string, open: (url: string) => void): Promise
 	if (created.status !== 200 || !created.body?.id || !created.body.url) {
 		throw new Error(created.body?.message ?? 'Flow PT did not offer an approval page.');
 	}
-	open(created.body.url);
+	const approval = approvalUrl(created.body.url, origin);
+	if (approval === null) throw new Error('Flow PT offered an approval page on another address. Nothing was opened.');
+	open(approval);
 
 	// A pending request lives about five minutes, then the poll turns 404 (probe 052).
 	const deadline = Date.now() + 300_000;
