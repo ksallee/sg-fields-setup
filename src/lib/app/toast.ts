@@ -22,23 +22,28 @@ export function errorMessage(error: unknown, fallback = FALLBACK): string {
 	return fallback;
 }
 
+/** Where a toast shows when it is not the layout's bottom right: a screen with a footer bar keeps its actions clear. */
+export interface NotifyOptions {
+	position?: 'top-right';
+}
+
 export const notify = {
 	/** A thing was done. Past tense, the same verb as the button. */
-	success(message: string, description?: string): void {
-		toast.success(message, { description });
+	success(message: string, description?: string, options: NotifyOptions = {}): void {
+		toast.success(message, { description, ...options });
 	},
 	/** A thing failed. Stays longer, so it can be read. `title` goes over the message. */
-	error(error: unknown, title?: string): void {
+	error(error: unknown, title?: string, options: NotifyOptions = {}): void {
 		const message = errorMessage(error);
-		if (title) toast.error(title, { description: message, duration: 10_000 });
-		else toast.error(message, { duration: 10_000 });
+		if (title) toast.error(title, { description: message, duration: 10_000, ...options });
+		else toast.error(message, { duration: 10_000, ...options });
 	},
 	/** A thing was done and found nothing, or only part of it. Stays as long as a failure. */
-	warning(message: string, description?: string): void {
-		toast.warning(message, { description, duration: 10_000 });
+	warning(message: string, description?: string, options: NotifyOptions = {}): void {
+		toast.warning(message, { description, duration: 10_000, ...options });
 	},
 	/** Something to know that is neither. */
-	info(message: string, description?: string): void {
-		toast(message, { description });
+	info(message: string, description?: string, options: NotifyOptions = {}): void {
+		toast(message, { description, ...options });
 	}
 };

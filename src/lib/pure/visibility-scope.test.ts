@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	ELIGIBLE_PROJECT_FILTERS,
 	VISIBILITY_EXPLANATION,
 	analysisProjects,
 	placeholderName,
@@ -153,5 +154,18 @@ describe('analysisProjects', () => {
 
 	it('falls back to the chosen projects when the list could not be read', () => {
 		expect(analysisProjects(resolveScope(failed, [70])).map((project) => project.id)).toEqual([70]);
+	});
+});
+
+describe('the picker filter (VIS-2, Q4)', () => {
+	it('asks the site for the eligible projects only: no template, nothing archived, no demo project', () => {
+		expect(ELIGIBLE_PROJECT_FILTERS).toEqual({
+			logical_operator: 'and',
+			conditions: [
+				['is_template', 'is', false],
+				['archived', 'is', false],
+				['is_demo', 'is', false]
+			]
+		});
 	});
 });
