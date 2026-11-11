@@ -127,8 +127,7 @@ export function noteParts(row: Named, note: RowNote | null): ReasonPart[] {
 			);
 		case 'refused': {
 			const said = note.status === null ? `No answer came: ${note.message}` : `The site answered ${note.status}: ${note.message}`;
-			const partial = note.partial ? ' Earlier settings of this update were written.' : '';
-			return text(`Install could not ${VERBS[note.action]} ${field}. ${said}${partial}`);
+			return text(`Install could not ${VERBS[note.action]} ${field}. ${said}`);
 		}
 		case 'retired-other-type':
 			return sentence(

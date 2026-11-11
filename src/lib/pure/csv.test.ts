@@ -167,6 +167,19 @@ describe('parseCsv: separators (IMP-41, Q11)', () => {
 		expect(table('a;b\n1,2,3,4\n').rows).toEqual([['1,2,3,4']]);
 	});
 
+	it('IMP-38, IMP-41: detection and parsing agree on a blank line, whatever kind of space it holds', () => {
+		// An em space alone on the first line: blank for the parser, so blank for the detection too.
+		expect(parseCsv('\u2003\nName;Type\nx;y\n')).toEqual({ ok: true, table: { headers: ['Name', 'Type'], rows: [['x', 'y']] } });
+		for (const space of ['\u1680', '\u2000', '\u2003', '\u200a', '\u2028', '\u2029', '\u202f', '\u205f', '\u3000', '\ufeff', '\u00a0', '\u000b', '\u000c', ' ', '\t']) {
+			const label = `U+${space.charCodeAt(0).toString(16)}`;
+			expect(detectSeparator(`,${space},\nA;B\n`), label).toBe(';');
+			expect(detectSeparator(`"${space}"\nA\tB\n`), label).toBe('\t');
+			expect(parseCsv(`${space}\n"${space}",${space}\nA;B\n1;2\n`), label).toEqual({ ok: true, table: { headers: ['A', 'B'], rows: [['1', '2']] } });
+		}
+		// A character that is no space is content in both: that line is the header.
+		expect(parseCsv('\u200b\nName;Type\n')).toMatchObject({ ok: true, table: { headers: ['\u200b'], rows: [['Name;Type']] } });
+	});
+
 	it('detects from the first non-blank line', () => {
 		expect(detectSeparator('\n,,\n\na;b\n')).toBe(';');
 	});

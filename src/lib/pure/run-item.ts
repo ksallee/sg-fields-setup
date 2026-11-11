@@ -14,8 +14,8 @@
  *
  * **Update** (RUN-7, RUN-15). The field is read again and the entry planned against that read.
  * Gone: failed. Now blocked, refused or of another type: failed with the plan's reasons. Now
- * matching: skipped, nothing to change. Otherwise the requests of the fresh plan are sent in
- * order, then the field is read back and must plan as "already matches". Anything else is a
+ * matching: skipped, nothing to change. Otherwise the one request of the fresh plan is sent,
+ * then the field is read back and must plan as "already matches". Anything else is a
  * failure that names each setting still different. A success status proves nothing here.
  *
  * **Create** (RUN-8 to RUN-12).
@@ -94,10 +94,10 @@ const skipped = (note: RowNote, visibility: FieldOrigin | null = null): ItemResu
 const failed = (note: RowNote, abort: string | null = null): ItemResult => ({ state: 'failed', note, visibility: null, abort });
 
 /** A call that threw: the site's refusal, or no answer at all. */
-function threw(action: RunAction, error: unknown, partial = false): ItemResult {
+function threw(action: RunAction, error: unknown): ItemResult {
 	const refusal = asRefusal(error);
 	const message = errorMessage(error);
-	return failed({ code: 'refused', action, status: refusal?.status ?? null, message, partial }, refusal ? null : message);
+	return failed({ code: 'refused', action, status: refusal?.status ?? null, message }, refusal ? null : message);
 }
 
 type Read = { read: LiveFieldRead; failure: null } | { read: null; failure: unknown };
@@ -154,22 +154,25 @@ async function verify(ctx: ItemContext, entry: PlanEntry, item: PlanItem, after:
 	return failed({ code: 'not-applied', after, differences: diffEntry(entry, read.field) });
 }
 
-/** Sends an update's requests in order, then reads back. Null when the field then matches. */
-async function writeAndVerify(ctx: ItemContext, entry: PlanEntry, fresh: PlanItem, after: WriteKind): Promise<ItemResult | null> {
-	const requests = fresh.update?.requests ?? [];
-	// Checked for every request before the first is sent: no half-written update.
-	const unknown = strays(ctx, requests.flatMap((request) => carriedTypes(request.properties)));
+/**
+ * Sends an update's one request, then reads back. Null when the field then matches. The site
+ * applies a request whole or not at all (finding 121), so a refusal means nothing was written.
+ *
+ * Exported for its own test: `fresh` is always this module's re-plan of the entry, so the guard
+ * below cannot be reached through `applyItem` while the first guard there holds.
+ */
+export async function writeAndVerify(ctx: ItemContext, entry: PlanEntry, fresh: PlanItem, after: WriteKind): Promise<ItemResult | null> {
+	if (fresh.update === null) throw new Error('An update item has no request.');
+	const { properties } = fresh.update;
+	// The last line before the write: a wrong-case valid type sent here takes the field down (finding 121).
+	const unknown = strays(ctx, carriedTypes(properties));
 	if (unknown.length > 0) return failed({ code: 'unknown-valid-types', names: unknown });
-	let written = 0;
-	for (const request of requests) {
-		try {
-			await ctx.port.updateField(fresh.entityType, fresh.programmaticName, request.properties);
-		} catch (error) {
-			return threw('update', error, written > 0);
-		}
-		ctx.onEffect(effectOf('updated', fresh.programmaticName, fresh, request.properties));
-		written += 1;
+	try {
+		await ctx.port.updateField(fresh.entityType, fresh.programmaticName, properties);
+	} catch (error) {
+		return threw('update', error);
 	}
+	ctx.onEffect(effectOf('updated', fresh.programmaticName, fresh, properties));
 	return verify(ctx, entry, fresh, after);
 }
 
@@ -235,8 +238,13 @@ async function afterRevive(ctx: ItemContext, entry: PlanEntry, item: PlanItem): 
 	return failed({ code: 'retired-blocked', reasons: fresh.reasons, trashPageUrl, ...back }, abort);
 }
 
-/** RUN-11, RUN-12: nothing is retired under the name. */
-async function plainCreate(ctx: ItemContext, entry: PlanEntry, fresh: PlanItem): Promise<ItemResult> {
+/**
+ * RUN-11, RUN-12: nothing is retired under the name.
+ *
+ * Exported for its own test, as `writeAndVerify` is: its valid-types guard is the last line
+ * before the create.
+ */
+export async function plainCreate(ctx: ItemContext, entry: PlanEntry, fresh: PlanItem): Promise<ItemResult> {
 	if (fresh.create === null) throw new Error('A create item has no payload.');
 	const wanted = fresh.programmaticName;
 	const types = carriedTypes(fresh.create.properties);
@@ -294,7 +302,7 @@ async function applyCreate(ctx: ItemContext, entry: PlanEntry, item: PlanItem): 
 	}
 	// Not one of the answers the corpus measured, or one that contradicts the read. No create.
 	const refusal = answer as Extract<ReviveAnswer, { revived: false }>;
-	return failed({ code: 'refused', action: 'revive', status: refusal.status, message: refusal.message, partial: false });
+	return failed({ code: 'refused', action: 'revive', status: refusal.status, message: refusal.message });
 }
 
 /**

@@ -16,7 +16,7 @@ screen follow it.
 | `/` | The set list. The spreadsheet import is a dialog on it (`app/import-dialog.svelte`), not a route. |
 | `/sets/<id>` | The editor. `setPath(id)`. |
 | `/sets/<id>/install` | The install of the whole set. `installPath(id)`. |
-| `/sets/<id>/install?selection=1` | The install of the editor's selection. `installPath(id, { selection: true })`. The editor first calls `writeInstallSelection(id, entryIds)` from `$lib/io/install-selection`; the install screen calls `readInstallSelection(id)` and takes the whole set when it answers null. |
+| `/sets/<id>/install?selection=1` | The install of the editor's selection. `installPath(id, { selection: true })`. The editor first calls `writeInstallSelection(id, entryIds)` from `$lib/io/install-selection`; the install screen calls `readInstallSelection(id)`. When it answers null the screen plans nothing and says the selection was lost (`installEntries` in `$lib/pure/install-entries`): it never takes the whole set in its place. |
 | `/connect` | The site and the sign-in. |
 
 Under `vite dev` only, `?fake` on the install path swaps the site for one held in memory

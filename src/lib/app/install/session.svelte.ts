@@ -26,6 +26,7 @@ import { downloadText } from '$lib/io/download';
 import { readInstallSelection } from '$lib/io/install-selection';
 import { installSite, type InstallSite } from '$lib/io/install-site';
 import { sharedSetStore } from '$lib/io/set-store';
+import { installEntries } from '$lib/pure/install-entries';
 import { footerActions, type Footer } from '$lib/pure/install-footer';
 import { confirmText, installSummary, planContext, reportFileName, summaryItems, type ConfirmText, type SummaryItem } from '$lib/pure/install-text';
 import { analysisRows, groupRows, viewRows, type ViewGroup, type ViewRow } from '$lib/pure/install-view';
@@ -46,6 +47,8 @@ import { nothingLeftToDo, visibilityCount, type VisibilityCount } from '$lib/pur
 export type LoadState =
 	| { status: 'loading'; what: 'set' | 'site' | 'plan' }
 	| { status: 'not-found' }
+	/** The route asks for the editor's selection and none is stored: nothing is planned (`install-entries`). */
+	| { status: 'selection-lost' }
 	| { status: 'set-failed'; message: string }
 	| { status: 'disconnected'; problem: string }
 	| { status: 'plan-failed'; message: string }
@@ -153,11 +156,14 @@ export class InstallSession {
 				this.load = { status: 'not-found' };
 				return;
 			}
-			const ids = url.searchParams.get('selection') === '1' ? readInstallSelection(setId) : null;
-			const wanted = ids === null ? null : new Set(ids);
+			const taken = installEntries(found.entries, url.searchParams.get('selection') === '1', readInstallSelection(setId));
 			this.setName = found.set.name;
-			this.whole = wanted === null;
-			this.entries = wanted === null ? found.entries : found.entries.filter((entry) => wanted.has(entry.id));
+			if (taken.kind === 'selection-lost') {
+				this.load = { status: 'selection-lost' };
+				return;
+			}
+			this.whole = taken.kind === 'whole';
+			this.entries = taken.entries;
 		} catch (error) {
 			this.load = { status: 'set-failed', message: errorMessage(error) };
 			return;

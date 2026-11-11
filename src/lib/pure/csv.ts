@@ -37,8 +37,11 @@ const BOM = 0xfeff;
 /** True when a stretch of unquoted text holds something other than whitespace and separators. */
 const HAS_CONTENT = /[^\s,;]/;
 
+/** Whitespace as `HAS_CONTENT` and `trim` see it: the one rule for a blank line, in detection and in parsing. */
+const SPACE = /\s/;
+
 function isSpace(code: number): boolean {
-	return code === 32 || code === TAB || code === 0xa0 || (code >= 11 && code <= 12);
+	return code === 32 || code === TAB || SPACE.test(String.fromCharCode(code));
 }
 
 function withoutBom(text: string): string {

@@ -35,15 +35,17 @@ import type { Entry, EntryDraft, FieldSet, Timestamp } from '$lib/pure/model';
 import {
 	orderEntries,
 	planCreate,
-	planDuplicate,
+	planDuplicateOf,
 	planSave,
 	type BlankName,
 	type CreateRequest,
 	type DuplicateEntries,
+	type DuplicateSource,
 	type EntryMissing,
 	type Mint,
 	type NameTaken,
 	type SetMissing,
+	type Stale,
 	type StoredSet
 } from '$lib/pure/set-plan';
 import type { SaveRequest } from '$lib/pure/working-copy-save';
@@ -118,21 +120,10 @@ export type CreateSetResult = Stored | BlankName | NameTaken | DuplicateEntries;
 /** A saved set as reloaded, and the entries stored for the request's `added`, in the same order. */
 export type Saved = Stored & { added: Entry[] };
 
-export type SaveSetResult = Saved | BlankName | NameTaken | DuplicateEntries | SetMissing | EntryMissing;
+export type SaveSetResult = Saved | BlankName | NameTaken | DuplicateEntries | SetMissing | EntryMissing | Stale;
 export type DuplicateSetResult = Stored | SetMissing | DuplicateEntries;
 
-/** What the editor's duplicate copies instead of the stored set (EDT-9). Each part is optional. */
-export interface DuplicateSource {
-	/** The working copy's name, unsaved edits included. Blank or absent: the stored name. */
-	name?: string;
-	/** The working copy's description. Absent: the stored one. */
-	description?: string | null;
-	/**
-	 * The entries to copy: the whole working copy, or the selected rows. Absent: the stored
-	 * entries. Stored entries may be passed as they are; their ids and times are not copied.
-	 */
-	entries?: readonly EntryDraft[];
-}
+export type { DuplicateSource };
 
 /** What the app remembers for the user of this browser. */
 export interface Preferences {
@@ -165,7 +156,10 @@ export interface SetStore {
 	 * (EDT-44 to EDT-48): name and description, removals, changes, additions. On success the
 	 * result is the set as reloaded from storage (EDT-46), and `added`: the stored entries made
 	 * for `request.added`, in the same order, to pair with `addedKeys`. Refuses `blank_name`,
-	 * `name_taken`, `duplicate_entries`, `set_missing` and `entry_missing`.
+	 * `name_taken`, `duplicate_entries`, `set_missing`, `entry_missing` and `stale`: the set was
+	 * saved in another tab since the request's working copy was loaded, and this save would write
+	 * over that one. The read, the check and the write are one transaction, so no save slips
+	 * between them.
 	 *
 	 * A refusal or a thrown `SetStoreError` means nothing was written, so the same request can be
 	 * sent again as it is and an addition is never stored twice (EDT-47). The reload happens
@@ -179,6 +173,9 @@ export interface SetStore {
 	 * Copies a set under a free "copy" name (SET-18 to SET-20, Q9): the stored set from the list,
 	 * or the editor's working copy or selection when `source` is given (EDT-9; `draftsOf` builds its entries). Never refused
 	 * for its name. Refuses `set_missing` and `duplicate_entries`.
+	 *
+	 * A set deleted in another tab is still copied when `source` gives all of it: name, description
+	 * and entries, with the origin the caller loaded (`planDuplicateOf`). The open edits are kept.
 	 */
 	duplicateSet(id: string, source?: DuplicateSource): Promise<DuplicateSetResult>;
 
@@ -430,15 +427,7 @@ class IdbSetStore implements SetStore {
 
 	duplicateSet(id: string, copied: DuplicateSource = {}): Promise<DuplicateSetResult> {
 		return this.transact([SETS, ENTRIES], 'readwrite', async (tx): Promise<DuplicateSetResult> => {
-			const source = await this.readSet(tx, id);
-			if (!source) return { ok: false, reason: 'set_missing' };
-			const plan = planDuplicate(
-				source.set,
-				copied.entries ?? source.entries,
-				await this.readSets(tx),
-				this.mint,
-				{ name: copied.name, description: copied.description }
-			);
+			const plan = planDuplicateOf(await this.readSet(tx, id), copied, await this.readSets(tx), this.mint);
 			if (!plan.ok) return plan;
 			await this.write(tx, { set: plan.set, puts: plan.entries });
 			return this.stored(tx, plan.set.id);

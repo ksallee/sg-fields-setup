@@ -26,7 +26,8 @@
  *   (finding 117). Such a create is refused, even when the entry asks for exactly that name.
  * - An update is one request with every property that differs (finding 121). The site applies a
  *   request whole or not at all, and checks it against the state it would leave, in any order. The
- *   properties go in a fixed order all the same: `UPDATE_ORDER`.
+ *   properties go in a fixed order all the same: `UPDATE_ORDER`. There is never a second request,
+ *   so nothing is ever half written.
  * - No write can clear a value: null, "", spaces alone and [] are refused (findings 116 and 121).
  *   A difference that would need one is blocked: a default, a description, valid values or valid
  *   types that the entry leaves empty and the site holds.
@@ -136,14 +137,9 @@ export interface UpdateRequest {
 	properties: PropertyWrite[];
 }
 
-/** What an update sends. Always exactly one request: a list, so a caller sends `requests` in order. */
-export interface UpdatePayload {
-	requests: UpdateRequest[];
-}
-
 /**
  * The order of the properties in an update's request. The site does not care (finding 121). It is
- * fixed so that the same differences always give the same request.
+ * fixed so that the same differences always give the same request. `updateRequest` builds from it.
  */
 export const UPDATE_ORDER = ['name', 'description', 'valid_values', 'default_value', 'valid_types'] as const;
 
@@ -176,7 +172,7 @@ export interface PlanItem {
 	/** `create`: the request to send. Null for every other class. */
 	create: CreatePayload | null;
 	/** `update`: the one request to send. Null for every other class. */
-	update: UpdatePayload | null;
+	update: UpdateRequest | null;
 	/**
 	 * The entity types on which applying this item makes a reverse field, each one a field name
 	 * taken on that type for good (corpus findings 116 and 121). `create` of an entity or a
@@ -308,13 +304,18 @@ function write(property_name: PropertyName, value: PropertyWrite['value']): Prop
 function updateRequest(entry: EntryDefinition, differences: readonly Difference[]): UpdateRequest {
 	const has = (setting: DiffSetting) => differences.some((difference) => difference.setting === setting);
 	const wanted = wantedDefault(entry);
-	const properties: PropertyWrite[] = [];
-	if (has('displayName')) properties.push(write('name', entry.displayName));
-	if (has('description') && entry.description !== null) properties.push(write('description', entry.description));
-	if (has('validValues')) properties.push(write('valid_values', [...entry.validValues]));
-	if (has('defaultValue') && wanted !== null) properties.push(write('default_value', wanted));
-	if (has('validTypes')) properties.push(write('valid_types', [...entry.validTypes]));
-	return { properties };
+	const values: Partial<Record<(typeof UPDATE_ORDER)[number], PropertyWrite['value']>> = {};
+	if (has('displayName')) values.name = entry.displayName;
+	if (has('description') && entry.description !== null) values.description = entry.description;
+	if (has('validValues')) values.valid_values = [...entry.validValues];
+	if (has('defaultValue') && wanted !== null) values.default_value = wanted;
+	if (has('validTypes')) values.valid_types = [...entry.validTypes];
+	return {
+		properties: UPDATE_ORDER.flatMap((name) => {
+			const value = values[name];
+			return value === undefined ? [] : [write(name, value)];
+		})
+	};
 }
 
 /** What a create sends (PLN-13): every setting in one request (corpus finding 116). */
@@ -465,7 +466,7 @@ export function planEntry(entry: PlanEntry, read: LiveFieldRead | null, site: Pl
 	const added = differences.some((difference) => difference.setting === 'validTypes')
 		? wanted.validTypes.filter((type) => !live.validTypes.includes(type))
 		: [];
-	return { ...item, class: 'update', differences, update: { requests: [updateRequest(wanted, differences)] }, reverseFieldTypes: added };
+	return { ...item, class: 'update', differences, update: updateRequest(wanted, differences), reverseFieldTypes: added };
 }
 
 /**

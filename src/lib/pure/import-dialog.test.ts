@@ -9,6 +9,7 @@ import {
 	exceedsSizeCap,
 	failSaving,
 	fileProblemText,
+	finishAdding,
 	IMPORT_SIZE_CAP_BYTES,
 	initialImportDialog,
 	NO_COLUMNS_TEXT,
@@ -34,7 +35,7 @@ function csvBucket(name: string, headers: string[] = ['A']): ImportBucket {
 function withFiles(...names: string[]): ImportDialogState {
 	let state = startAdding(initialImportDialog());
 	for (const name of names) state = acceptFile(state, state.session, name, [csvBucket(name)]).state;
-	return state;
+	return finishAdding(state, state.session);
 }
 
 describe('which files are taken (IMP-2, IMP-3)', () => {
@@ -273,6 +274,34 @@ describe('confirming (IMP-11, IMP-13, IMP-51)', () => {
 		const two = acceptFile(ready(), 0, 'b.csv', [csvBucket('b.csv')]).state;
 		expect(confirmEnabled(two)).toBe(false);
 		expect(confirmEnabled(removeBucket(two, two.rows[1].id))).toBe(true);
+	});
+
+	it('IMP-11: not while a file is still being read: its buckets would be left out without a word', () => {
+		// One file is in, with its fallback. A second drop is still being read.
+		const reading = startAdding(ready());
+		expect(reading.reading).toBe(1);
+		expect(confirmEnabled(reading)).toBe(false);
+		expect(startSaving(reading)).toBeNull();
+		// Two drops at once: both must end.
+		const twice = startAdding(reading);
+		const one = finishAdding(twice, twice.session);
+		expect(confirmEnabled(one)).toBe(false);
+		const none = finishAdding(one, one.session);
+		expect(none.reading).toBe(0);
+		expect(confirmEnabled(none)).toBe(true);
+		// The second file arrived meanwhile and needs its fallback like any other.
+		const arrived = finishAdding(acceptFile(reading, reading.session, 'b.csv', [csvBucket('b.csv')]).state, reading.session);
+		expect(confirmEnabled(arrived)).toBe(false);
+		expect(confirmEnabled(setFallback(arrived, arrived.rows[1].id, 'Asset'))).toBe(true);
+	});
+
+	it('IMP-13: a read that ends after the dialog was opened again answers to nobody, and the count never goes below zero', () => {
+		const old = startAdding(initialImportDialog(3));
+		const reopened = startAdding(initialImportDialog(4));
+		expect(finishAdding(reopened, old.session)).toBe(reopened);
+		const idle = initialImportDialog(4);
+		expect(finishAdding(idle, 4)).toBe(idle);
+		expect(initialImportDialog().reading).toBe(0);
 	});
 
 	it('IMP-11: saving starts only when confirm is enabled, and clears the problem', () => {

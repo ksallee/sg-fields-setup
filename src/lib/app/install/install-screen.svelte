@@ -15,6 +15,7 @@
 	import PageState from '$lib/app/page-state.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
+	import { SELECTION_LOST } from '$lib/pure/install-entries';
 	import { leaveQuestion, siteHost } from '$lib/pure/install-text';
 	import { CONNECT_PATH, HOME_PATH, setPath } from '$lib/pure/routes';
 	import { fieldCount } from '$lib/pure/set-text';
@@ -78,6 +79,10 @@
 {#if load.status === 'not-found'}
 	<PageState state="empty" title="Set not found" line="It may have been deleted, or it was made in another browser.">
 		{#snippet action()}<Button variant="outline" href={HOME_PATH}>Back to sets</Button>{/snippet}
+	</PageState>
+{:else if load.status === 'selection-lost'}
+	<PageState state="empty" title={SELECTION_LOST.title} line={SELECTION_LOST.line}>
+		{#snippet action()}<Button variant="outline" href={editor}>Back to the set</Button>{/snippet}
 	</PageState>
 {:else if load.status === 'set-failed'}
 	<PageState state="error" title="The set did not load" line={load.message}>

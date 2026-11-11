@@ -153,9 +153,15 @@ describe('diffEntry', () => {
 			]);
 		});
 
-		it('compares structured values by content', () => {
+		it('a structured live default never equals a wanted one: an entry holds a text, a boolean or none', () => {
 			const wanted = entry({ dataType: 'list', validValues: ['a'], defaultValue: 'a' });
-			expect(settings(wanted, live({ dataType: 'list', validValues: ['a'], defaultValue: { value: 'a' } }))).toEqual(['defaultValue']);
+			expect(diffEntry(wanted, live({ dataType: 'list', validValues: ['a'], defaultValue: { value: 'a' } }))).toEqual([
+				{ setting: 'defaultValue', live: { value: 'a' }, wanted: 'a' }
+			]);
+			expect(settings(wanted, live({ dataType: 'list', validValues: ['a'], defaultValue: ['a'] }))).toEqual(['defaultValue']);
+			expect(settings(entry({ dataType: 'checkbox', defaultValue: true }), live({ dataType: 'checkbox', defaultValue: { value: true } }))).toEqual([
+				'defaultValue'
+			]);
 		});
 
 		it('wantedDefault: text for a list, null for none and for a type that carries none', () => {
