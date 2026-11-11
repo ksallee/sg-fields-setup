@@ -13,7 +13,8 @@ Launcher. One site at a time. The navbar shows it; click it to change site or si
     pnpm build
 
 `.github/workflows/gates.yml` runs those three on every pull request and on pushes to `dev` and
-`main`.
+`main`, then `pnpm check:build`: it fails when the built output holds dev-only code (the dev token
+route, the script key's variable names, the fake site). Run it after a `pnpm build`.
 
 ## Ports
 
@@ -88,8 +89,7 @@ land mid-run. `?fake&faults=0` turns the two faults off. `window.__installFake` 
 
 A production build cannot reach it: the flag is read behind `import.meta.env.DEV`, and the
 build drops the branch and the module. `src/lib/io/install-site.test.ts` holds the source to
-that. To check a build: `pnpm build`, then
-`grep -rl "fake.shotgrid.autodesk.com" .svelte-kit/output .vercel/output` finds nothing.
+that. To check a build: `pnpm build`, then `pnpm check:build`.
 
 ## The sandbox
 
