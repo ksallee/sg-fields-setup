@@ -45,6 +45,7 @@ describe('the confirmation before the first write', () => {
 			lines: [
 				'This creates 2 fields and updates 1 field on https://example.shotgrid.autodesk.com.',
 				'A created field takes its name for good. Deleting the field later does not free the name.',
+				'A created field starts visible on every project.',
 				'3 reverse fields are made on the linked entity types. Each takes a name there for good.',
 				'1 field already matches and gets visibility only.',
 				'Visibility: All eligible projects (12). Up to 36 visibility changes.',
@@ -62,9 +63,10 @@ describe('the confirmation before the first write', () => {
 			'There is no undo.'
 		]);
 		const creates = confirmText({ ...input, summary: { creates: 1, updates: 0, alreadyMatching: 0, conflicts: 0, blocked: 0, reverseFields: 1 } });
-		expect(creates.lines.slice(0, 3)).toEqual([
+		expect(creates.lines.slice(0, 4)).toEqual([
 			'This creates 1 field on https://example.shotgrid.autodesk.com.',
 			'A created field takes its name for good. Deleting the field later does not free the name.',
+			'A created field starts visible on every project.',
 			'1 reverse field is made on the linked entity type. It takes a name there for good.'
 		]);
 		expect(creates.confirmLabel).toBe('Install 1 field');

@@ -41,6 +41,11 @@ when the install screen opens, on refresh, and again at the start of every run.
   description, custom metadata and visible as editable (`findings/040_field_revive.md`). Until probe
   G5 answers, treat valid types, valid values and default value as **conditionally updatable**: plan
   them as updates, verify by read-back (RUN-15), and report a failed verification as a failure.
+  *Note, 2026-11-10:* probes 116 and 121 settled it (`findings/116_field_settings_create_update.md`,
+  `findings/121_field_settings_edges.md`). Valid values of a list and a status list, an entity
+  link's valid types and the default are plain updates. Unique and a multi-entity link's valid
+  types stay blocked. Emptying a value is blocked, since no value can be emptied. Removing an
+  entity link's valid type is blocked, since it retires a reverse field. Read-back stays (RUN-15).
 - PLN-9. A blocked entry keeps two lists: the blocked differences and the differences that would
   have been fine. Nothing is written for it, not even the fine ones: a partial update would leave the
   field half-matching.
@@ -80,6 +85,8 @@ valid types, unique. Each carries the live value and the wanted value.
 | unique | only when on |
 
 What an update sends: one item per difference, with the wanted value.
+*Note, 2026-11-10:* an update is one request carrying every difference, applied whole or not at
+all (`findings/116_field_settings_create_update.md`, `findings/121_field_settings_edges.md`).
 
 ## Checks added to the plan (changes from baseline)
 

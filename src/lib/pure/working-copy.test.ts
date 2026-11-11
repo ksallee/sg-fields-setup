@@ -154,6 +154,25 @@ describe('editRow', () => {
 		expect(rowByKey(wc, 'new-1')?.programmaticName).toBe('');
 	});
 
+	it('G11, MOD-17: a non-ASCII display name derives sg_<data_type>, as the site would name it', () => {
+		const wc = editRow(addRow(open(), 'new-1', 'Shot'), 'new-1', { displayName: 'Durée' });
+		expect(rowByKey(wc, 'new-1')?.programmaticName).toBe('sg_text');
+	});
+
+	it('G11: with a non-ASCII display name a data type edit re-derives the name', () => {
+		let wc = editRow(addRow(open(), 'new-1', 'Shot'), 'new-1', { displayName: 'Durée' });
+		wc = editRow(wc, 'new-1', { dataType: 'number' });
+		expect(rowByKey(wc, 'new-1')?.programmaticName).toBe('sg_number');
+		wc = editRow(wc, 'new-1', { dataType: '' });
+		expect(rowByKey(wc, 'new-1')?.programmaticName).toBe('');
+	});
+
+	it('EDT-25: with an ASCII display name a data type edit leaves the name alone', () => {
+		let wc = setNameMode(open(), 'a', 'derived');
+		wc = editRow(wc, 'a', { dataType: 'number' });
+		expect(rowByKey(wc, 'a')?.programmaticName).toBe('sg_a');
+	});
+
 	it('EDT-25: in derived mode the programmatic name is read-only', () => {
 		const wc = editRow(addRow(open(), 'new-1', 'Shot'), 'new-1', { displayName: 'Lens' });
 		const next = editRow(wc, 'new-1', { programmaticName: 'sg_other', description: 'kept' });

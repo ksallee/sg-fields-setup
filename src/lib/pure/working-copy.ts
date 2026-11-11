@@ -9,7 +9,7 @@
  */
 import { cleanEntry } from './clean';
 import { isMirror } from './data-types';
-import { predictFieldName } from './field-name';
+import { hasNonAscii, predictFieldName } from './field-name';
 import type { Entry, EntryDefinition, EntrySnapshot, FieldSet } from './model';
 import { validateSet, type SetValidity } from './validity';
 
@@ -152,14 +152,19 @@ function updateRow(workingCopy: WorkingCopy, key: string, change: (row: Row) => 
  * The definition with `patch` applied by the rules of one row: derived mode keeps the
  * programmatic name read-only and re-derives it on a display name edit, from the display name as
  * it will be stored, trimmed (EDT-25, MOD-17, MOD-7); a blank display name gives a blank name
- * (MOD-19).
+ * (MOD-19). A non-ASCII display name derives `sg_<data_type>`, blank without a data type, and
+ * re-derives on a data type edit (G11). The plan refuses such a create; the row says why.
  */
 function applyPatch(row: Row, patch: Partial<EntryDefinition>): Row {
 	if (row.nameMode === 'manual') return { ...row, ...patch };
 	const { programmaticName: _ignored, ...rest } = patch;
 	const next = { ...row, ...rest };
-	// From the trimmed display name: that is what is stored (MOD-7) and what the site is sent.
-	if ('displayName' in patch) next.programmaticName = predictFieldName(next.displayName.trim()) ?? '';
+	// From the trimmed display name: that is what is stored (MOD-7) and what the site is sent. A
+	// non-ASCII display name gives `sg_<data_type>` (G11), so a data type edit re-derives it too.
+	const display = next.displayName.trim();
+	if ('displayName' in patch || ('dataType' in patch && hasNonAscii(display))) {
+		next.programmaticName = predictFieldName(display, next.dataType.trim() || undefined) ?? '';
+	}
 	return next;
 }
 

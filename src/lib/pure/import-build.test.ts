@@ -15,7 +15,6 @@ import {
 	importTotals,
 	inferFallback,
 	resolvedEntityTypes,
-	shouldApplyFallback,
 	type ImportBucket,
 	type ImportSite
 } from './import-build';
@@ -112,15 +111,6 @@ describe('inferFallback (IMP-15)', () => {
 	it('IMP-15: only the common types count, whatever else the lookup holds', () => {
 		const withCustom = new Map([...fieldsByType, ['CustomEntity19', [makeLiveField('CustomEntity19', 'sg_a', { displayName: 'A' })]]]);
 		expect(inferFallback(bucket(['A']), withCustom, COMMON_ENTITY_TYPES)).toBeNull();
-	});
-});
-
-describe('shouldApplyFallback (IMP-16)', () => {
-	it('IMP-16: applies only to an empty fallback, and only when something was inferred', () => {
-		expect(shouldApplyFallback('', 'Shot')).toBe(true);
-		expect(shouldApplyFallback('  ', 'Shot')).toBe(true);
-		expect(shouldApplyFallback('Asset', 'Shot')).toBe(false);
-		expect(shouldApplyFallback('', null)).toBe(false);
 	});
 });
 
@@ -292,6 +282,21 @@ describe('buildEntries (IMP-30 to IMP-32, IMP-48, IMP-52)', () => {
 			importedAt: NOW
 		});
 		expect(entries[0]).toMatchObject({ targetEntityType: 'shot', programmaticName: 'sg_fps', displayName: 'FPS', dataType: 'number', snapshot: null });
+	});
+
+	it('G11, IMP-48: non-ASCII headers get no predicted name, so two of them are both kept', () => {
+		const { entries, dropped } = buildEntries({
+			buckets: [bucket(['Durée', 'Début'], [['a', 'b']], { fallback: 'Shot' })],
+			mode: 'automatic',
+			delimiter: '::',
+			site: null,
+			importedAt: NOW
+		});
+		expect(dropped).toBe(0);
+		expect(entries.map((one) => [one.displayName, one.programmaticName])).toEqual([
+			['Durée', ''],
+			['Début', '']
+		]);
 	});
 
 	it('no buckets builds nothing', () => {

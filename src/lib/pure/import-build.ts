@@ -159,11 +159,6 @@ export function inferFallback(
 	return best;
 }
 
-/** Whether an inferred fallback goes in: only into an empty one, never over the user's (IMP-16). */
-export function shouldApplyFallback(current: string, inferred: string | null): boolean {
-	return current.trim() === '' && inferred !== null;
-}
-
 /* Building entries. */
 
 /** The connected site, as the build needs it. */
@@ -195,6 +190,8 @@ export interface BuildResult {
 function guessedDraft(targetEntityType: string, fieldName: string, values: readonly string[]): EntryDraft {
 	return {
 		targetEntityType,
+		// No data type here: a non-ASCII header stays blank rather than `sg_<guessed type>`, which
+		// would make two such columns one and drop the second as a duplicate (IMP-48, G11).
 		programmaticName: predictFieldName(fieldName) ?? '',
 		displayName: fieldName,
 		dataType: guessDataType(values),

@@ -96,7 +96,11 @@ export function confirmText(input: ConfirmInput): ConfirmText {
 	if (creates > 0) does.push(`creates ${fieldCount(creates)}`);
 	if (updates > 0) does.push(`updates ${fieldCount(updates)}`);
 	const lines = [`This ${does.length > 0 ? does.join(' and ') : 'creates and updates no field'} on ${input.siteUrl}.`];
-	if (creates > 0) lines.push('A created field takes its name for good. Deleting the field later does not free the name.');
+	if (creates > 0) {
+		lines.push('A created field takes its name for good. Deleting the field later does not free the name.');
+		// Finding 115: why a create adds no visibility to the count below.
+		lines.push('A created field starts visible on every project.');
+	}
 	if (reverseFields === 1) lines.push('1 reverse field is made on the linked entity type. It takes a name there for good.');
 	else if (reverseFields > 1) lines.push(`${reverseFields} reverse fields are made on the linked entity types. Each takes a name there for good.`);
 	if (alreadyMatching === 1) lines.push('1 field already matches and gets visibility only.');

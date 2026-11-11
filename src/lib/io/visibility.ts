@@ -15,12 +15,10 @@
  * wrapped by `schema-client.visibilityWriter` and handed to `visibilityPort` by
  * `install-site`. Without a writer a write rejects, which the executor turns into a failed step.
  *
- * The listing read leans on 0.3.1 the way `core-schema-source` does: core's `fields(type,
- * projectId)` does the HTTP and answers a normalised field without `visible`, so the body is
- * listened to. It goes when core ships `readRawFields(entityType, projectId)`, which is a
- * `VisibilitySource` as it is.
+ * The listing read is core's `RestSchemaClient.readRawFields(entityType, projectId)`: the
+ * wrapped records, each with that project's `visible`.
  */
-import { RestClient, SgApiError, type RestClientOptions, type SearchOptions, type SearchResult } from 'sg-widgets-core';
+import { RestSchemaClient, type RestClientOptions, type SearchOptions, type SearchResult } from 'sg-widgets-core';
 import { PROJECT_ELIGIBILITY_FIELDS } from '$lib/pure/project-eligibility';
 import { runCapped } from '$lib/pure/run-capped';
 import {
@@ -92,7 +90,7 @@ export async function loadProjects(client: ProjectLister): Promise<ProjectsRead>
 
 /* The listing read, per type and project. */
 
-/** Named and shaped after core's coming `SchemaClient.readRawFields(entityType, projectId)`. */
+/** Core's `SchemaClient.readRawFields(entityType, projectId)`, with the project required. */
 export interface VisibilitySource {
 	/**
 	 * The `data` of `GET /schema/<Type>/fields?project_id=N`: every field of the type with that
@@ -102,35 +100,18 @@ export interface VisibilitySource {
 	readRawFields(entityType: string, projectId: number): Promise<unknown>;
 }
 
-/** A name that is one path segment. Core puts it into the address as it is. */
+/** A name that is one path segment. Refused before asking, so a bad name never reaches the site. */
 const NAME = /^[A-Za-z0-9_]+$/;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 export function coreVisibilitySource(options: RestClientOptions): VisibilitySource {
-	const send = options.fetch ?? globalThis.fetch.bind(globalThis);
+	const schema = new RestSchemaClient(options);
 	return {
 		async readRawFields(entityType, projectId) {
 			if (!NAME.test(entityType)) throw new Error(`'${entityType}' is not an entity type name.`);
 			// Without a project every field reads visible. Never ask that way.
 			if (!Number.isInteger(projectId) || projectId <= 0) throw new Error(`'${String(projectId)}' is not a project id.`);
-			let body: unknown = null;
-			const listen: typeof fetch = async (input, init) => {
-				const response = await send(input, init);
-				if (response.ok) body = await response.clone().json();
-				return response;
-			};
-			try {
-				// A client per read keeps two reads apart.
-				await new RestClient({ ...options, fetch: listen }).fields(entityType, projectId);
-			} catch (error) {
-				// Core's own message is the title, "Not Found". The detail names what is wrong.
-				if (error instanceof SgApiError) throw new SgApiError(error.status, error.body, errorMessage(error));
-				throw error;
-			}
-			return isRecord(body) ? (body['data'] ?? null) : null;
+			// A refusal is core's SchemaApiError, its message the site's detail.
+			return schema.readRawFields(entityType, projectId);
 		}
 	};
 }
