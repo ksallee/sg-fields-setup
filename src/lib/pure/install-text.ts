@@ -4,6 +4,7 @@
  * of a run in `run-text`, of visibility in `visibility-text` and `visibility-scope`.
  */
 import type { PlanClass } from './plan';
+import { runCounters, type RunCounters, type RunState } from './run';
 import { fileSlug } from './set-file';
 import { countText, fieldCount } from './set-text';
 
@@ -45,7 +46,8 @@ export function installSummary(rows: readonly SummaryRow[]): InstallSummary {
 }
 
 export interface SummaryItem {
-	key: 'creates' | 'updates' | 'alreadyMatching' | 'conflicts' | 'blocked';
+	/** The first five are the plan's. The last four are a run's. */
+	key: 'creates' | 'updates' | 'alreadyMatching' | 'conflicts' | 'blocked' | 'applied' | 'skipped' | 'failed' | 'notStarted';
 	count: number;
 	/** "2 to create". */
 	text: string;
@@ -61,6 +63,30 @@ export function summaryItems(summary: InstallSummary): SummaryItem[] {
 		{ key: 'conflicts', count: summary.conflicts, text: countText(summary.conflicts, 'conflict'), skipped: true },
 		{ key: 'blocked', count: summary.blocked, text: `${summary.blocked} blocked`, skipped: true }
 	];
+}
+
+/**
+ * What a run did, in the words of its closing toast (RUN-24, `run-text.summaryText`): applied,
+ * skipped, failed, and what was not started while any is left.
+ */
+export function runSummaryItems(counters: Pick<RunCounters, 'done' | 'skipped' | 'failed' | 'pending'>): SummaryItem[] {
+	const items: SummaryItem[] = [
+		{ key: 'applied', count: counters.done, text: `${counters.done} applied`, skipped: false },
+		{ key: 'skipped', count: counters.skipped, text: `${counters.skipped} skipped`, skipped: true },
+		{ key: 'failed', count: counters.failed, text: `${counters.failed} failed`, skipped: false }
+	];
+	if (counters.pending > 0) items.push({ key: 'notStarted', count: counters.pending, text: `${counters.pending} not started`, skipped: false });
+	return items;
+}
+
+/**
+ * The summary line at the top of the install screen (RUN-5). Before a run it counts the plan:
+ * what Install would do. Once a run exists those counts describe what a retry would do, which is
+ * not what the person wants to read there. So from the first step of a run until Refresh it
+ * counts the run: what Install did.
+ */
+export function screenSummary(plan: InstallSummary, run: RunState): SummaryItem[] {
+	return run.status === 'idle' ? summaryItems(plan) : runSummaryItems(runCounters(run));
 }
 
 /** The site as a person names it: its host. A text that is no address shows as it is. */

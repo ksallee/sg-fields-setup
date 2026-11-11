@@ -29,7 +29,7 @@ import { installSite, type InstallSite } from '$lib/io/install-site';
 import { sharedSetStore } from '$lib/io/set-store';
 import { installEntries } from '$lib/pure/install-entries';
 import { footerActions, type Footer } from '$lib/pure/install-footer';
-import { confirmText, installSummary, planContext, reportFileName, summaryItems, type ConfirmText, type SummaryItem } from '$lib/pure/install-text';
+import { confirmText, installSummary, planContext, reportFileName, screenSummary, type ConfirmText, type SummaryItem } from '$lib/pure/install-text';
 import { analysisRows, groupRows, viewRows, type ViewGroup, type ViewRow } from '$lib/pure/install-view';
 import type { LiveEntityType } from '$lib/pure/live-entity-types';
 import { emptyPlanText, type PlanEntry, type PlanItem } from '$lib/pure/plan';
@@ -113,7 +113,8 @@ export class InstallSession {
 	/** Checkboxes and the picker are locked while running and after finishing (RUN-25). */
 	readonly locked: boolean = $derived(this.run.status !== 'idle' || this.refreshing);
 	readonly running: boolean = $derived(this.run.status === 'running');
-	readonly summary: SummaryItem[] = $derived(summaryItems(this.#summary()));
+	/** The plan's counts, then the run's once there is one (`install-text.screenSummary`). */
+	readonly summary: SummaryItem[] = $derived(screenSummary(this.#summary(), this.run));
 	readonly scopeText: string = $derived(scopeSummary(this.resolved));
 	readonly scopeNotes: string[] = $derived(scopeNotes(this.resolved));
 	readonly visibilityCount: VisibilityCount = $derived(

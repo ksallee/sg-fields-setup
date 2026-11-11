@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { setFileName } from './set-file';
-import { confirmText, installSummary, leaveQuestion, planContext, reportFileName, summaryItems } from './install-text';
+import { confirmText, installSummary, leaveQuestion, planContext, reportFileName, screenSummary, summaryItems } from './install-text';
+import { INITIAL_RUN_STATE, type RowState, type RunState } from './run';
 
 const ROWS = [
 	{ class: 'create', ticked: true, reverseFieldTypes: ['Shot', 'Asset'] },
@@ -81,6 +82,42 @@ describe('the confirmation before the first write', () => {
 
 	it('names a site it cannot parse as it is', () => {
 		expect(confirmText({ ...input, siteUrl: 'not a url' }).title).toBe('Install on not a url?');
+	});
+});
+
+describe('the summary once there is a run (RUN-5, RUN-24)', () => {
+	const plan = installSummary(ROWS);
+	const run = (status: RunState['status'], states: RowState[]): RunState => ({
+		...INITIAL_RUN_STATE,
+		status,
+		rows: states.map((state, index) => ({ entryId: `e${index}`, entityType: 'Shot', programmaticName: `sg_${index}`, displayName: `F${index}`, dataType: 'text', class: 'create', state, note: null, effects: [], visibility: null }))
+	});
+
+	it('shows the plan\'s counts until a run starts', () => {
+		expect(screenSummary(plan, INITIAL_RUN_STATE)).toEqual(summaryItems(plan));
+	});
+
+	it('shows what the run did once it has ended, in the words of the closing toast', () => {
+		expect(screenSummary(plan, run('finished', ['done', 'done', 'skipped'])).map((item) => [item.key, item.count, item.text])).toEqual([
+			['applied', 2, '2 applied'],
+			['skipped', 1, '1 skipped'],
+			['failed', 0, '0 failed']
+		]);
+	});
+
+	it('counts as the run goes, and says what is left', () => {
+		expect(screenSummary(plan, run('running', ['done', 'in_progress', 'pending', 'pending'])).map((item) => item.text)).toEqual([
+			'1 applied',
+			'0 skipped',
+			'0 failed',
+			'2 not started'
+		]);
+		expect(screenSummary(plan, run('cancelled', ['done', 'failed', 'pending'])).map((item) => item.text)).toEqual(['1 applied', '0 skipped', '1 failed', '1 not started']);
+	});
+
+	it('marks a failure as such and nothing else', () => {
+		const items = screenSummary(plan, run('finished', ['done', 'failed']));
+		expect(items.filter((item) => item.skipped).map((item) => item.key)).toEqual(['skipped']);
 	});
 });
 

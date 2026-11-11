@@ -137,13 +137,13 @@ describe('a run, class by class (RUN-7)', () => {
 		expect(site.calls.map((call) => call.op)).toEqual(['readRawEntityTypes']);
 	});
 
-	it('RUN-7, VIS-5: an entry that already matches gets visibility only and reads "nothing to change"', async () => {
+	it('RUN-7, VIS-5: an entry that already matches gets visibility only, stays skipped and says the field is unchanged', async () => {
 		const site = createFakeSite().seed('Version', 'sg_lens', { displayName: 'Lens' });
 		const visibility = scriptedVisibility();
 		const state = await engine(site, { applyVisibility: visibility.apply }).start([entry()]);
 		expect(row(state)).toMatchObject({ class: 'already-matches', state: 'skipped', note: { code: 'nothing-to-change' }, effects: [] });
 		expect(visibility.calls).toEqual([{ field: 'Version.sg_lens', origin: 'existing' }]);
-		expect(rowText(row(state))).toBe('Nothing to change. Visibility changed on 3 projects.');
+		expect(rowText(row(state))).toBe('Field unchanged. Made visible on 3 projects.');
 		expect(site.writes()).toEqual([]);
 	});
 

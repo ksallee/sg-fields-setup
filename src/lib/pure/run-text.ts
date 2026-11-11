@@ -175,17 +175,14 @@ export function visibilityProgress(row: Pick<RunRow, 'visibility'>): string | nu
 	return `${visibility.done} of ${count(visibility.total, 'project', 'projects')}`;
 }
 
-/**
- * What a row says about visibility once it has run, or null when there is nothing to say: none
- * was applied, it is still running, or it changed nothing and nothing failed.
- *
- * `warning` is true when a retry of the row's visibility is worth offering (VIS-7).
- */
-export function visibilityNote(row: Pick<RunRow, 'visibility'>): { warning: boolean; text: string } | null {
-	const visibility = row.visibility;
-	if (!visibility || visibility.status === 'applying') return null;
+const CHANGED = 'Visibility changed on';
+/** For a field that was there before the run: it is only ever made visible, never hidden (VIS-5, VIS-6). */
+const MADE_VISIBLE = 'Made visible on';
+
+/** The lines of a row's visibility once it has run, in reading order. Empty when there is nothing to say. */
+function visibilityLines(visibility: NonNullable<RunRow['visibility']>, wrote: string): string[] {
 	const lines: string[] = [];
-	if (visibility.written > 0) lines.push(`Visibility changed on ${count(visibility.written, 'project', 'projects')}.`);
+	if (visibility.written > 0) lines.push(`${wrote} ${count(visibility.written, 'project', 'projects')}.`);
 	if (visibility.status === 'cancelled') {
 		lines.push(
 			visibility.total === 0
@@ -198,18 +195,41 @@ export function visibilityNote(row: Pick<RunRow, 'visibility'>): { warning: bool
 		lines.push(`Visibility was not set on ${count(visibility.failures.length, 'project', 'projects')}.`);
 		for (const failure of visibility.failures) lines.push(`${failure.projectName}: ${failure.message}`);
 	}
+	return lines;
+}
+
+/**
+ * What a row says about visibility once it has run, or null when there is nothing to say: none
+ * was applied, it is still running, or it changed nothing and nothing failed.
+ *
+ * `warning` is true when a retry of the row's visibility is worth offering (VIS-7).
+ */
+export function visibilityNote(row: Pick<RunRow, 'visibility'>): { warning: boolean; text: string } | null {
+	const visibility = row.visibility;
+	if (!visibility || visibility.status === 'applying') return null;
+	const lines = visibilityLines(visibility, CHANGED);
 	if (lines.length === 0) return null;
 	return { warning: needsVisibilityRetry(row as RunRow), text: lines.join(' ') };
 }
 
 /**
  * Everything a finished row says, in reading order: its reason or error, then its visibility
- * line. An "already matches" row whose visibility changed something says both: "Nothing to
- * change. Visibility changed on 3 projects." (VIS-5).
+ * line.
+ *
+ * An "already matches" row gets visibility only and ends skipped (RUN-7, VIS-5). When that
+ * visibility did something, "Nothing to change" beside "Visibility changed on 13 projects" reads
+ * as a contradiction. Such a row says what is true of each: "Field unchanged. Made visible on 13
+ * projects." Its state stays skipped. When visibility did nothing either, it is "Nothing to
+ * change."
  */
 export function rowParts(row: RunRow): ReasonPart[] {
-	const visibility = visibilityNote(row);
-	return sentence(noteParts(row, row.note), visibility ? text(visibility.text) : []);
+	const visibility = row.visibility;
+	if (row.note?.code === 'nothing-to-change' && visibility && visibility.status !== 'applying') {
+		const lines = visibilityLines(visibility, MADE_VISIBLE);
+		if (lines.length > 0) return text(['Field unchanged.', ...lines].join(' '));
+	}
+	const note = visibilityNote(row);
+	return sentence(noteParts(row, row.note), note ? text(note.text) : []);
 }
 
 /** The row's words as one plain text. A link reads as its text followed by its address in brackets. */
