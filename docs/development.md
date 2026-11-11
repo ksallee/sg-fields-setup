@@ -13,7 +13,8 @@ Launcher. One site at a time. The navbar shows it; click it to change site or si
     pnpm build
 
 `.github/workflows/gates.yml` runs those three on every pull request and on pushes to `dev` and
-`main`.
+`main`, then `pnpm check:build`: it fails when the built output holds dev-only code (the dev token
+route, the script key's variable names, the fake site). Run it after a `pnpm build`.
 
 ## Ports
 
@@ -36,6 +37,10 @@ Under `vite dev`, `POST /live/dev-token` then mints a 600 s bearer from that scr
 connects to that site with no sign-in, and the navbar reads "Dev key". Signing in over it writes as
 yourself. A production build answers that route 404 and always signs in.
 
+`pnpm dev --host` puts the dev server on the network, and the dev token route has no caller check:
+anyone on the LAN could then mint a bearer from the script key. Never use `--host` with a script
+key in `.env.local`.
+
 Every schema write spends a field name for good. Write to the sandbox only, with the corpus's
 throwaway naming.
 
@@ -43,6 +48,45 @@ The browser calls the site itself, writes included. The site answers the preflig
 `PUT` and `DELETE` on `/api/v1/schema/...` with the page's origin and
 `authorization,content-type`. Measured from `localhost` in the drive below. No server route sits
 between the page and the site.
+
+## What a set file carries
+
+An exported set file (`src/lib/pure/set-file.ts`) holds the set and its fields, and with them: the
+address of the site each field was captured from (`snapshotSite`), each captured field's schema
+record as the site sent it (`snapshot`: every property, valid values and status values included),
+and the names of the spreadsheets it was imported from (`originDetails.sourceFiles`). No token, no
+person. The export toast says so when the set has captured fields.
+
+An imported set file is refused over 20 MB, before it is read, and when a snapshot nests more than
+32 deep.
+
+## Which sites are accepted
+
+A site is an https address with no user name, no password and no port, on a host ending
+`.shotgrid.autodesk.com` or `.shotgunstudio.com`. `src/lib/pure/site-host.ts` is the rule. The
+`/live/` endpoints refuse anything else with a 400, follow no redirect, wait ten seconds, and answer
+only the fields the page reads. The dev token route holds `FPT_API_SITE_URL` to the same rule.
+
+A site on another domain needs `FPT_EXTRA_SITE_SUFFIXES`: comma-separated host names, such as
+`flow.example.com`. Each is allowed with its subdomains. An entry that is no plain host name of two
+labels or more is dropped. The variable is server only and never reaches the page's code.
+
+## Security headers
+
+`src/lib/pure/security-headers.ts` holds them. `src/lib/pure/security-headers.test.ts` pins them.
+
+- Pages carry a Content Security Policy from SvelteKit's `csp` option (`vite.config.ts`), with a
+  nonce per response on every script. The theme script in `src/app.html` carries the nonce. Scripts
+  come from the app alone. Styles allow `'unsafe-inline'`: bits-ui, sonner and the widgets set
+  `style` attributes. Images allow `https:`, for the site's thumbnails.
+- `connect-src` is the app itself and the hosts of "Which sites are accepted". It reads
+  `FPT_EXTRA_SITE_SUFFIXES` when the app is built, so set the variable for the build and for the
+  functions, and redeploy after changing it. The hosts named there show in the policy.
+- `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and `X-Frame-Options: DENY` go
+  on every path through `vercel.json`, and on everything the server answers through
+  `src/hooks.server.ts`. The `/live/` endpoints also answer
+  `default-src 'none'; frame-ancestors 'none'`.
+- `vite dev` serves the same policy, so a blocked call shows while developing.
 
 ## The fake site
 
@@ -60,8 +104,7 @@ land mid-run. `?fake&faults=0` turns the two faults off. `window.__installFake` 
 
 A production build cannot reach it: the flag is read behind `import.meta.env.DEV`, and the
 build drops the branch and the module. `src/lib/io/install-site.test.ts` holds the source to
-that. To check a build: `pnpm build`, then
-`grep -rl "fake.shotgrid.autodesk.com" .svelte-kit/output .vercel/output` finds nothing.
+that. To check a build: `pnpm build`, then `pnpm check:build`.
 
 ## The sandbox
 
@@ -138,6 +181,7 @@ Set in the Vercel project, value never in the repo:
 | var | what it does deployed |
 |---|---|
 | `PUBLIC_FPT_SITE_URL` | fills the site field on the connect page. It never connects by itself. |
+| `FPT_EXTRA_SITE_SUFFIXES` | optional. Extra site hosts the `/live/` endpoints accept. See "Which sites are accepted". |
 
 `FPT_API_SITE_URL`, `FPT_API_SCRIPT_NAME` and `FPT_API_API_KEY` are dev only, in `.env.local`. Never
 set them on Vercel.

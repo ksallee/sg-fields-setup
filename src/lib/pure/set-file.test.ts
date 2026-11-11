@@ -12,7 +12,12 @@ import {
 	encodeSetFile,
 	refusalMessage,
 	setFileName,
-	type SetFileRefusal
+	type SetFileRefusal,
+	SET_FILE_SIZE_CAP_BYTES,
+	SNAPSHOT_MAX_DEPTH,
+	exceedsSetFileCap,
+	setFileTooLargeText,
+	sortKeys
 } from './set-file';
 
 const T0 = '2026-11-10T09:00:00.000Z';
@@ -441,6 +446,73 @@ describe('decodeSetFile', () => {
 		it('checks the version before anything else in the file', () => {
 			expect(refusal(file(minimal({ version: 99, name: '' })))).toMatchObject({ kind: 'newerVersion' });
 		});
+	});
+});
+
+describe('set file edge cases (B6 of the security audit)', () => {
+	const nested = (depth: number): string => `${'{"a":'.repeat(depth)}1${'}'.repeat(depth)}`;
+	const withSnapshot = (snapshot: string): string =>
+		`{"format":"sg-fields-setup/set","version":1,"name":"Lens","origin":"manual","entries":[{"targetEntityType":"Shot","programmaticName":"sg_lens","displayName":"Lens","dataType":"text","snapshot":${snapshot}}]}`;
+
+	it('states the two caps', () => {
+		expect(SET_FILE_SIZE_CAP_BYTES).toBe(20 * 1024 * 1024);
+		expect(SNAPSHOT_MAX_DEPTH).toBe(32);
+	});
+
+	it('refuses a file over the size cap by its size alone', () => {
+		expect(exceedsSetFileCap(SET_FILE_SIZE_CAP_BYTES)).toBe(false);
+		expect(exceedsSetFileCap(SET_FILE_SIZE_CAP_BYTES + 1)).toBe(true);
+		expect(setFileTooLargeText('big.fieldset.json')).toBe('"big.fieldset.json" is over 20 MB.');
+	});
+
+	it('reads a snapshot nested to the cap', () => {
+		expect(decodeSetFile(withSnapshot(nested(SNAPSHOT_MAX_DEPTH))).ok).toBe(true);
+	});
+
+	it('refuses a snapshot nested one deeper, naming the entry', () => {
+		const found = refusal(withSnapshot(nested(SNAPSHOT_MAX_DEPTH + 1)));
+		expect(found).toEqual({ kind: 'snapshotTooDeep', entry: 1, programmaticName: 'sg_lens', max: SNAPSHOT_MAX_DEPTH });
+		expect(refusalMessage(found)).toBe('Entry 1 (sg_lens): "snapshot" is nested more than 32 deep.');
+	});
+
+	it('counts lists as depth too', () => {
+		const lists = `{"a":${'['.repeat(SNAPSHOT_MAX_DEPTH)}1${']'.repeat(SNAPSHOT_MAX_DEPTH)}}`;
+		expect(refusal(withSnapshot(lists)).kind).toBe('snapshotTooDeep');
+	});
+
+	it.each([5_000, 20_000])('refuses a snapshot nested %i deep cleanly, without overflowing the stack', (depth) => {
+		const result = decodeSetFile(withSnapshot(nested(depth)));
+		// Past what JSON.parse itself takes, the file is no JSON at all. Either way a refusal.
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(['snapshotTooDeep', 'notJson']).toContain(result.refusal.kind);
+	});
+
+	it('keeps a snapshot key named __proto__ through an export', () => {
+		const snapshot = JSON.parse('{"b":1,"a":{"__proto__":{"x":1},"constructor":2}}') as EntryDraft['snapshot'];
+		const { text } = encodeSetFile(SET, [draft({ snapshot, snapshotSite: 'https://a.example', snapshotTime: T0 })]);
+		expect(text).toContain('"__proto__"');
+		const written = JSON.parse(text).entries[0].snapshot;
+		expect(Object.keys(written)).toEqual(['a', 'b']);
+		expect(Object.keys(written.a)).toEqual(['__proto__', 'constructor']);
+		expect(Object.getOwnPropertyDescriptor(written.a, '__proto__')?.value).toEqual({ x: 1 });
+		expect(({} as Record<string, unknown>).x).toBeUndefined();
+	});
+
+	it('keeps it through a file read and written again', () => {
+		const first = decodeSetFile(withSnapshot('{"a":{"__proto__":{"x":1}}}'));
+		if (!first.ok) throw new Error('expected a set');
+		const { text } = encodeSetFile(first.set, first.set.entries);
+		expect(JSON.stringify(JSON.parse(text).entries[0].snapshot)).toBe('{"a":{"__proto__":{"x":1}}}');
+	});
+
+	it('sorts the keys of a snapshot far deeper than a stack, without recursing', () => {
+		let deep: Record<string, unknown> = { z: 1, a: 2 };
+		for (let i = 0; i < 100_000; i++) deep = { z: deep, a: [i] };
+		const sorted = sortKeys(deep) as Record<string, unknown>;
+		expect(Object.keys(sorted)).toEqual(['a', 'z']);
+		let at = sorted;
+		for (let i = 0; i < 100_000; i++) at = at.z as Record<string, unknown>;
+		expect(at).toEqual({ a: 2, z: 1 });
 	});
 });
 

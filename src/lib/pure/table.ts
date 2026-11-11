@@ -6,4 +6,10 @@ export interface ParsedTable {
 	rows: string[][];
 }
 
-export type TableResult = { ok: true; table: ParsedTable } | { ok: false; reason: 'no-header' | 'unreadable' };
+/**
+ * The most columns one table may have, CSV or worksheet (IMP-3, the note of 2026-11-10). A header
+ * becomes a row of the dialog and an entry of the set; a file past this is no field list.
+ */
+export const MAX_COLUMNS = 2000;
+
+export type TableResult = { ok: true; table: ParsedTable } | { ok: false; reason: 'no-header' | 'unreadable' | 'too-many-columns' };

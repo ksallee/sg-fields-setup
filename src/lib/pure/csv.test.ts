@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_COLUMNS } from './table';
 import { detectSeparator, parseCsv } from './csv';
 import type { ParsedTable } from './table';
 
@@ -250,5 +251,41 @@ describe('parseCsv: size', () => {
 		const started = performance.now();
 		expect(table(text, { maxRows: 20 }).rows).toHaveLength(20);
 		expect(performance.now() - started).toBeLessThan(200);
+	});
+});
+
+describe('parseCsv: columns (IMP-3 note of 2026-11-10, A4)', () => {
+	it('reads a header of the cap', () => {
+		const text = Array.from({ length: MAX_COLUMNS }, (_, i) => `h${i}`).join(',') + '\n';
+		const parsed = parseCsv(text);
+		expect(parsed.ok && parsed.table.headers.length).toBe(MAX_COLUMNS);
+	});
+
+	it('refuses a header of one more', () => {
+		const text = Array.from({ length: MAX_COLUMNS + 1 }, (_, i) => `h${i}`).join(',') + '\n';
+		expect(parseCsv(text)).toEqual({ ok: false, reason: 'too-many-columns' });
+	});
+
+	it('refuses a data row wider than the cap', () => {
+		expect(parseCsv(`a,b\n${'x,'.repeat(MAX_COLUMNS + 1)}\n`)).toEqual({ ok: false, reason: 'too-many-columns' });
+	});
+
+	it('takes its own cap', () => {
+		expect(parseCsv('a,b,c\n', { maxColumns: 2 })).toEqual({ ok: false, reason: 'too-many-columns' });
+		expect(parseCsv('a,b,\n', { maxColumns: 2 })).toEqual({ ok: false, reason: 'too-many-columns' });
+		expect(parseCsv('a,b\n', { maxColumns: 2 }).ok).toBe(true);
+	});
+
+	it('refuses 15 MB of header cells at the cap, without reading the rest', () => {
+		const text = 'a,'.repeat((15 * 1024 * 1024) / 2);
+		const start = performance.now();
+		const parsed = parseCsv(text, { maxRows: 50 });
+		const ms = performance.now() - start;
+		expect(parsed).toEqual({ ok: false, reason: 'too-many-columns' });
+		expect(ms).toBeLessThan(5000);
+	});
+
+	it('refuses 15 MB of separators', () => {
+		expect(parseCsv(','.repeat(15 * 1024 * 1024), { maxRows: 50 })).toEqual({ ok: false, reason: 'too-many-columns' });
 	});
 });

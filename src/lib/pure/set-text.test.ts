@@ -1,14 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	countText,
-	deleteQuestion,
-	duplicatedText,
-	fieldCount,
-	importedText,
-	ORIGIN_LABELS,
-	SORT_LABELS,
-	totalText
-} from './set-text';
+import { countText, deleteQuestion, duplicatedText, fieldCount, importedText, ORIGIN_LABELS, SORT_LABELS, totalText, exportedNote } from './set-text';
 
 describe('countText', () => {
 	it('picks the singular for one and the plural for the rest', () => {
@@ -68,6 +59,27 @@ describe('set list text', () => {
 	it('D1 the import confirmation says when the name was taken', () => {
 		expect(importedText({ name: 'Lens copy', askedName: 'Lens', entryCount: 3, duplicatesDropped: 0 })).toBe(
 			'Imported as "Lens copy" with 3 fields. The name "Lens" was taken.'
+		);
+	});
+});
+
+describe('exportedNote (B9 of the security audit)', () => {
+	const entry = (snapshotSite: string | null) => ({ snapshotSite, snapshot: snapshotSite === null ? null : {} });
+
+	it('says nothing for a set with no captured field', () => {
+		expect(exportedNote([])).toBeUndefined();
+		expect(exportedNote([entry(null), entry(null)])).toBeUndefined();
+	});
+
+	it('names the site the file carries', () => {
+		expect(exportedNote([entry('https://studio.shotgrid.autodesk.com'), entry(null), entry('https://studio.shotgrid.autodesk.com')])).toBe(
+			'The file carries the site address, https://studio.shotgrid.autodesk.com, and the schema record of each field captured there.'
+		);
+	});
+
+	it('counts the sites when there are several', () => {
+		expect(exportedNote([entry('https://a.shotgrid.autodesk.com'), entry('https://b.shotgrid.autodesk.com')])).toBe(
+			'The file carries 2 site addresses and the schema record of each captured field.'
 		);
 	});
 });

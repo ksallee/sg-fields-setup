@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { PlanItem } from './plan';
+import { planSet, type CreatePayload, type PlanEntry, type PlanItem, type PropertyName } from './plan';
 import type { PlanReason } from './plan-reason';
 import { INITIAL_RUN_STATE, type RunRow, type RunState } from './run';
 import {
+	CREATE_LIST_SHOWN,
+	CREATE_TEXT_SHOWN,
 	GROUPS,
 	analysisRows,
+	createLines,
 	differenceLine,
 	groupOf,
 	groupRows,
@@ -246,5 +249,146 @@ describe('the rows of the analysis after a run (RUN-26, VIS-8)', () => {
 			runRow('updated', { class: 'update', state: 'done' })
 		]);
 		expect(analysisRows(items, state).map((row) => row.class)).toEqual(['already-matches', 'already-matches', 'create', 'create', 'already-matches']);
+	});
+});
+
+describe('what a create writes (RUN-3, A5 of the security audit)', () => {
+	const payload = (properties: CreatePayload['properties'], data_type = 'list'): CreatePayload => ({ data_type, properties });
+
+	/** Whether a row shows this property of its create payload, somewhere a person reads it. */
+	function shown(row: ReturnType<typeof viewRows>[number], name: PropertyName, value: unknown): boolean {
+		if (name === 'name') return row.displayName === value || row.creates.some((line) => line.setting === 'displayName');
+		const setting = { description: 'description', valid_values: 'validValues', default_value: 'defaultValue', valid_types: 'validTypes', unique: 'unique' }[name];
+		return row.creates.some((line) => line.setting === setting && line.value === showValue(line.setting, value));
+	}
+
+	it('lists every property of the payload but the name the row already shows', () => {
+		const create = payload([
+			{ property_name: 'name', value: 'Lens' },
+			{ property_name: 'description', value: 'The lens.' },
+			{ property_name: 'valid_values', value: ['Wide', 'Long'] },
+			{ property_name: 'default_value', value: 'Wide' },
+			{ property_name: 'unique', value: true }
+		]);
+		const [row] = viewRows([item('a', 'create', { displayName: 'Lens', dataType: 'list', create })], INITIAL_RUN_STATE);
+		expect(row.creates.map((line) => line.text)).toEqual(['Description: "The lens."', 'Valid values: [Wide, Long]', 'Default value: "Wide"', 'Unique: on']);
+		for (const property of create.properties) expect(shown(row, property.property_name, property.value), property.property_name).toBe(true);
+	});
+
+	it('lists the valid types of a link', () => {
+		const create = payload(
+			[
+				{ property_name: 'name', value: 'Shots' },
+				{ property_name: 'valid_types', value: ['Shot', 'Asset'] }
+			],
+			'multi_entity'
+		);
+		expect(createLines({ displayName: 'Shots', create }).map((line) => line.text)).toEqual(['Valid types: [Shot, Asset]']);
+	});
+
+	it('shows a checkbox default as true or false', () => {
+		const create = payload([{ property_name: 'default_value', value: false }], 'checkbox');
+		expect(createLines({ displayName: 'x', create }).map((line) => line.text)).toEqual(['Default value: false']);
+	});
+
+	it('lists the name too, should the payload ever write another than the row shows', () => {
+		const create = payload([{ property_name: 'name', value: 'Another' }]);
+		expect(createLines({ displayName: 'Lens', create }).map((line) => line.text)).toEqual(['Display name: "Another"']);
+	});
+
+	it('has no line for a create that writes the name alone, and none for a row of another class', () => {
+		expect(createLines({ displayName: 'Lens', create: payload([{ property_name: 'name', value: 'Lens' }]) })).toEqual([]);
+		expect(createLines({ displayName: 'Lens', create: null })).toEqual([]);
+		const create = payload([{ property_name: 'description', value: 'x' }]);
+		const rows = viewRows([item('u', 'update', { create }), item('c', 'create', { create })], INITIAL_RUN_STATE);
+		expect(rows[0]?.creates).toEqual([]);
+		expect(rows[1]?.creates).toHaveLength(1);
+	});
+
+	it('drops the lines when a run moved the row to another class (RUN-19)', () => {
+		const create = payload([{ property_name: 'description', value: 'x' }]);
+		const run: RunState = { ...INITIAL_RUN_STATE, rows: [runRow('c', { class: 'update' })] };
+		expect(viewRows([item('c', 'create', { create })], run)[0]?.creates).toEqual([]);
+	});
+
+	it('cuts a long list to its first values and a count, the whole value kept', () => {
+		const values = Array.from({ length: 40 }, (_, i) => `v${i}`);
+		const [line] = createLines({ displayName: 'x', create: payload([{ property_name: 'valid_values', value: values }]) });
+		expect(line.value).toBe(`[${values.join(', ')}]`);
+		expect(line.short).toBe(`[${values.slice(0, CREATE_LIST_SHOWN).join(', ')}, and ${40 - CREATE_LIST_SHOWN} more]`);
+		expect(line.text).toBe(`Valid values: ${line.value}`);
+	});
+
+	it('does not cut a list of the limit, nor one more: a count of one saves nothing', () => {
+		for (const length of [CREATE_LIST_SHOWN, CREATE_LIST_SHOWN + 1]) {
+			const values = Array.from({ length }, (_, i) => `v${i}`);
+			const [line] = createLines({ displayName: 'x', create: payload([{ property_name: 'valid_values', value: values }]) });
+			expect(line.short).toBeNull();
+		}
+	});
+
+	it('cuts a list of few but long values by its length', () => {
+		const values = ['a'.repeat(200), 'b'.repeat(200)];
+		const [line] = createLines({ displayName: 'x', create: payload([{ property_name: 'valid_values', value: values }]) });
+		expect(line.short).not.toBeNull();
+		expect(line.short!.length).toBeLessThanOrEqual(CREATE_TEXT_SHOWN + 1);
+		expect(line.short!.endsWith('…')).toBe(true);
+	});
+
+	it('cuts a long text with an ellipsis, the whole value kept', () => {
+		const text = 'word '.repeat(100).trim();
+		const [line] = createLines({ displayName: 'x', create: payload([{ property_name: 'description', value: text }]) });
+		expect(line.value).toBe(`"${text}"`);
+		expect(line.short).toBe(`${line.value.slice(0, CREATE_TEXT_SHOWN)}…`);
+		const brief = createLines({ displayName: 'x', create: payload([{ property_name: 'description', value: 'Short.' }]) })[0];
+		expect(brief.short).toBeNull();
+	});
+
+	it('shows every property of every create the planner builds', () => {
+		const entry = (id: string, displayName: string, more: Partial<PlanEntry> = {}): PlanEntry => ({
+			id,
+			targetEntityType: 'Shot',
+			programmaticName: `sg_${displayName.toLowerCase().replaceAll(' ', '_')}`,
+			displayName,
+			dataType: 'text',
+			validTypes: [],
+			validValues: [],
+			defaultValue: null,
+			description: null,
+			uniquePerProject: false,
+			...more
+		});
+		const entries = [
+			entry('plain', 'Plain'),
+			entry('described', 'Described', { description: 'What it is.', uniquePerProject: true }),
+			entry('list', 'Pick one', { dataType: 'list', validValues: ['a', 'b'], defaultValue: 'a' }),
+			entry('check', 'Tick', { dataType: 'checkbox', defaultValue: true }),
+			entry('link', 'One link', { dataType: 'entity', validTypes: ['Asset'] }),
+			entry('links', 'Many links', { dataType: 'multi_entity', validTypes: ['Sequence'], description: 'Linked.' })
+		];
+		const absent = { kind: 'absent', reason: 'does-not-exist', message: 'No such field.' } as const;
+		const types = ['Shot', 'Asset', 'Sequence'].map((name) => ({ name, displayName: name, custom: false }));
+		const plan = planSet({
+			siteUrl: 'https://studio.shotgrid.autodesk.com',
+			trashPageUrl: null,
+			entityTypes: types,
+			fieldsByType: new Map([['Shot', []]]),
+			entries,
+			reads: new Map(entries.map((each) => [each.id, absent])),
+			scope: { kind: 'all-eligible', projects: [] }
+		});
+		const creates = plan.items.filter((each) => each.class === 'create');
+		expect(creates.map((each) => each.entryId)).toEqual(entries.map((each) => each.id));
+		const rows = viewRows(plan.items, INITIAL_RUN_STATE);
+		const names = new Set<string>();
+		for (const each of creates) {
+			const row = rows.find((candidate) => candidate.entryId === each.entryId)!;
+			for (const property of each.create!.properties) {
+				expect(shown(row, property.property_name, property.value), `${each.entryId}.${property.property_name}`).toBe(true);
+				names.add(property.property_name);
+			}
+		}
+		// Every property a create can carry was sent by one of them, so none goes unchecked.
+		expect([...names].sort()).toEqual(['default_value', 'description', 'name', 'unique', 'valid_types', 'valid_values']);
 	});
 });

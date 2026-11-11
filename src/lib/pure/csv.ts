@@ -16,14 +16,18 @@
  *   header line. Ties go to comma, then semicolon, then tab. None at all means comma.
  * - Text holding a NUL character is a binary file: `unreadable` (IMP-4). No header row: `no-header`
  *   (IMP-5).
+ * - A line of more than `MAX_COLUMNS` cells, blank or not, refuses the file: `too-many-columns`
+ *   (IMP-3, the note of 2026-11-10). The read stops at that cell.
  */
-import type { TableResult } from './table';
+import { MAX_COLUMNS, type TableResult } from './table';
 
 export type Separator = ',' | ';' | '\t';
 
 export interface CsvOptions {
 	/** Keep at most this many data rows. Blank lines dropped do not count. Default: all. */
 	maxRows?: number;
+	/** The most cells one line may hold. Default `MAX_COLUMNS`. */
+	maxColumns?: number;
 }
 
 const QUOTE = 34;
@@ -97,9 +101,10 @@ export function detectSeparator(text: string): Separator {
 
 /**
  * Walks the records of the text in one pass, calling `visit` for each non-blank one, in order.
- * `visit` returns false to stop early.
+ * `visit` returns false to stop early. False when a line held more than `maxCells` cells: the walk
+ * stops there, so a line of millions of separators costs what `maxCells` of them cost.
  */
-function readRecords(text: string, separator: Separator, visit: (cells: string[]) => boolean): void {
+function readRecords(text: string, separator: Separator, maxCells: number, visit: (cells: string[]) => boolean): boolean {
 	const n = text.length;
 	const sep = separator.charCodeAt(0);
 	let cells: string[] = [];
@@ -145,18 +150,21 @@ function readRecords(text: string, separator: Separator, visit: (cells: string[]
 			i = k;
 		}
 		cells.push(value);
+		if (cells.length > maxCells) return false;
 
 		if (i < n && text.charCodeAt(i) === sep) {
 			i++;
 			if (i < n) continue;
 			cells.push('');
+			if (cells.length > maxCells) return false;
 		} else if (i < n) {
 			i += text.charCodeAt(i) === CR && text.charCodeAt(i + 1) === LF ? 2 : 1;
 		}
-		if (content && !visit(cells)) return;
+		if (content && !visit(cells)) return true;
 		cells = [];
 		content = false;
 	}
+	return true;
 }
 
 /**
@@ -169,7 +177,7 @@ export function parseCsv(text: string, options: CsvOptions = {}): TableResult {
 	const maxRows = options.maxRows ?? Infinity;
 	let headers: string[] | null = null;
 	const rows: string[][] = [];
-	readRecords(body, detectSeparator(body), (cells) => {
+	const withinWidth = readRecords(body, detectSeparator(body), options.maxColumns ?? MAX_COLUMNS, (cells) => {
 		if (headers === null) {
 			headers = cells.map((cell) => cell.trim());
 			return rows.length < maxRows;
@@ -177,6 +185,7 @@ export function parseCsv(text: string, options: CsvOptions = {}): TableResult {
 		rows.push(cells);
 		return rows.length < maxRows;
 	});
+	if (!withinWidth) return { ok: false, reason: 'too-many-columns' };
 	if (headers === null) return { ok: false, reason: 'no-header' };
 	return { ok: true, table: { headers, rows } };
 }
