@@ -212,6 +212,14 @@ export function needsRead(entry: EntryDefinition, entityTypes: readonly LiveEnti
 	return !isMirror(cleaned) && !isIncomplete(cleaned) && hasEntityType(entityTypes, cleaned.targetEntityType);
 }
 
+/**
+ * A display name as two are compared (CMP-6, PLN-16): trimmed, without case. The one spelling of
+ * that rule: the planner compares with it, and a caller that indexes a listing by label keys by it.
+ */
+export function labelKey(displayName: string): string {
+	return displayName.trim().toLowerCase();
+}
+
 function liveDefaultText(live: LiveField): string | null {
 	return typeof live.defaultValue === 'string' && live.defaultValue.trim() !== '' ? live.defaultValue : null;
 }
@@ -404,10 +412,8 @@ export function planEntry(entry: PlanEntry, read: LiveFieldRead | null, site: Pl
 		if (fields === undefined) {
 			throw new PlanInputError(`No field listing of ${wanted.targetEntityType} was given to the plan.`);
 		}
-		const label = wanted.displayName.toLowerCase();
-		const namesake = fields.find(
-			(field) => field.name !== wanted.programmaticName && field.displayName.trim().toLowerCase() === label
-		);
+		const label = labelKey(wanted.displayName);
+		const namesake = fields.find((field) => field.name !== wanted.programmaticName && labelKey(field.displayName) === label);
 		if (namesake) reasons.push(reason('label-taken', { other: namesake.name }));
 
 		if (wanted.dataType === 'status_list' && wanted.validValues.length === 0) {
