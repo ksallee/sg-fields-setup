@@ -2,6 +2,8 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import AppShell from '$lib/app/app-shell.svelte';
+	import { Toaster } from '$lib/components/ui/sonner/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { apply, mode } from '$lib/theme';
 
 	let { children } = $props();
@@ -19,4 +21,7 @@
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
-<AppShell>{@render children()}</AppShell>
+<Tooltip.Provider delayDuration={400}>
+	<AppShell>{@render children()}</AppShell>
+</Tooltip.Provider>
+<Toaster position="bottom-right" closeButton />
