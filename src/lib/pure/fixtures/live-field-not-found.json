@@ -1,0 +1,13 @@
+{
+  "errors": [
+    {
+      "id": "<id>",
+      "status": 404,
+      "code": 103,
+      "title": "Not Found",
+      "source": null,
+      "detail": "Field 'Version.sg_not_a_field' does not exist.",
+      "meta": null
+    }
+  ]
+}

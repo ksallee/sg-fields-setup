@@ -25,6 +25,8 @@
  */
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/public';
+import { coreSchemaSource } from '$lib/io/core-schema-source';
+import { createLiveSchema, type LiveSchema } from '$lib/io/schema';
 import { connectedSite } from '$lib/pure/site';
 import { createSessionTokenAuth, createSgContext, RestClient, type EntityRow, type SgContext } from 'sg-widgets-core';
 
@@ -151,6 +153,7 @@ function devTokenAuth(first: DevToken): () => Promise<string> {
 let state: LiveState = { siteUrl: '', session: null, devToken: false, problem: null };
 let context: SgContext | null = null;
 let writer: RestClient | null = null;
+let schema: LiveSchema | null = null;
 let ready: Promise<LiveState> | null = null;
 
 async function resolve(): Promise<LiveState> {
@@ -170,6 +173,8 @@ async function resolve(): Promise<LiveState> {
 	const problem = !site ? 'Name the site.' : token ? null : 'Sign in to read Flow PT.';
 	const refuse = (): Promise<string> => Promise.reject(new Error(problem ?? 'Not connected to Flow PT.'));
 	writer = new RestClient({ siteUrl: site, token: token ?? refuse });
+	// One schema cache per connected site, for the life of the page (D6).
+	schema = createLiveSchema(coreSchemaSource({ siteUrl: site, token: token ?? refuse }));
 	context = createSgContext({ client: writer, siteUrl: site });
 	return { siteUrl: site, session: stored, devToken: devToken !== null, problem };
 }
@@ -197,6 +202,12 @@ export function liveContext(): SgContext {
 export function liveWriter(): RestClient {
 	if (!writer) throw new Error('Not connected to Flow PT. Await prepareLive() first.');
 	return writer;
+}
+
+/** The site's schema for this session: entity types and fields, read once and kept (`$lib/io/schema`). */
+export function liveSchema(): LiveSchema {
+	if (!schema) throw new Error('Not connected to Flow PT. Await prepareLive() first.');
+	return schema;
 }
 
 /** The person behind the session: their HumanUser row, by login, read once. */
