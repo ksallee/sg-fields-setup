@@ -15,7 +15,6 @@ import {
 	importTotals,
 	inferFallback,
 	resolvedEntityTypes,
-	shouldApplyFallback,
 	type ImportBucket,
 	type ImportSite
 } from './import-build';
@@ -112,15 +111,6 @@ describe('inferFallback (IMP-15)', () => {
 	it('IMP-15: only the common types count, whatever else the lookup holds', () => {
 		const withCustom = new Map([...fieldsByType, ['CustomEntity19', [makeLiveField('CustomEntity19', 'sg_a', { displayName: 'A' })]]]);
 		expect(inferFallback(bucket(['A']), withCustom, COMMON_ENTITY_TYPES)).toBeNull();
-	});
-});
-
-describe('shouldApplyFallback (IMP-16)', () => {
-	it('IMP-16: applies only to an empty fallback, and only when something was inferred', () => {
-		expect(shouldApplyFallback('', 'Shot')).toBe(true);
-		expect(shouldApplyFallback('  ', 'Shot')).toBe(true);
-		expect(shouldApplyFallback('Asset', 'Shot')).toBe(false);
-		expect(shouldApplyFallback('', null)).toBe(false);
 	});
 });
 

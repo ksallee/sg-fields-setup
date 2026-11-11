@@ -159,11 +159,6 @@ export function inferFallback(
 	return best;
 }
 
-/** Whether an inferred fallback goes in: only into an empty one, never over the user's (IMP-16). */
-export function shouldApplyFallback(current: string, inferred: string | null): boolean {
-	return current.trim() === '' && inferred !== null;
-}
-
 /* Building entries. */
 
 /** The connected site, as the build needs it. */
