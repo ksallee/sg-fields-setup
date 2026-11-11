@@ -139,18 +139,26 @@ const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/;
 const STEM_MAX = 80;
 
 /**
- * The file name to suggest for a set called `name`: lowercased, every run of characters that are
- * not letters or digits made one hyphen, no hyphen at either end, at most 80 characters, then
- * `.fieldset.json`. Letters of any script are kept. Safe on Windows, macOS and Linux: no
- * separators, no reserved characters, no reserved device names. A name with nothing left is `set`.
+ * A name as the stem of a file name: lowercased, every run of characters that are not letters or
+ * digits made one hyphen, no hyphen at either end, at most 80 characters. Letters of any script
+ * are kept. No separators and no reserved characters. Empty when nothing is left.
  */
-export function setFileName(name: string): string {
+export function fileSlug(name: string): string {
 	const slug = name
 		.normalize('NFC')
 		.toLowerCase()
 		.replace(/[^\p{L}\p{M}\p{N}]+/gu, '-')
 		.replace(/^-+|-+$/g, '');
-	let stem = [...slug].slice(0, STEM_MAX).join('').replace(/-+$/, '');
+	return [...slug].slice(0, STEM_MAX).join('').replace(/-+$/, '');
+}
+
+/**
+ * The file name to suggest for a set called `name`: its `fileSlug`, then `.fieldset.json`. Safe
+ * on Windows, macOS and Linux: no separators, no reserved characters, no reserved device names.
+ * A name with nothing left is `set`.
+ */
+export function setFileName(name: string): string {
+	let stem = fileSlug(name);
 	if (stem === '') stem = 'set';
 	if (WINDOWS_RESERVED.test(stem)) stem = `${stem}-set`;
 	return `${stem}${SET_FILE_SUFFIX}`;

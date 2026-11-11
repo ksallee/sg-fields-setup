@@ -81,14 +81,6 @@ export function asRefusal(error: unknown): PortRefusal | null {
 	return { status: loose.status, message: typeof loose.message === 'string' ? loose.message : '', source: loose.source };
 }
 
-/** What a thrown value says, as text. */
-export function errorMessage(error: unknown): string {
-	if (error instanceof Error && error.message !== '') return error.message;
-	if (isRecord(error) && typeof error['message'] === 'string' && error['message'] !== '') return error['message'];
-	if (typeof error === 'string' && error !== '') return error;
-	return 'Unknown error.';
-}
-
 const RETIRED_NAME = /retired field with the same field_name:\s*([A-Za-z0-9_]+)/;
 
 function sourceFieldName(source: unknown): string | null {

@@ -77,6 +77,36 @@ describe('row notes (RUN-21)', () => {
 	});
 });
 
+describe('a row whose only work was visibility (RUN-7, VIS-5)', () => {
+	const matching = (visibility: RunRow['visibility']) => row({ class: 'already-matches', state: 'skipped', note: { code: 'nothing-to-change' }, visibility });
+	const applied: NonNullable<RunRow['visibility']> = { origin: 'existing', status: 'applied', done: 13, total: 13, written: 13, failures: [], error: null };
+
+	it('says the field is unchanged and where it was made visible, not "nothing to change"', () => {
+		expect(rowText(matching(applied))).toBe('Field unchanged. Made visible on 13 projects.');
+		expect(rowText(matching({ ...applied, written: 1 }))).toBe('Field unchanged. Made visible on 1 project.');
+	});
+
+	it('still says "nothing to change" when visibility changed nothing either', () => {
+		expect(rowText(matching({ ...applied, written: 0 }))).toBe('Nothing to change.');
+		expect(rowText(matching(null))).toBe('Nothing to change.');
+	});
+
+	it('VIS-7: keeps what failed and what was cut short after it', () => {
+		const failed = matching({ ...applied, written: 2, failures: [{ projectId: 71, projectName: 'Beta', message: 'Refused.' }] });
+		expect(rowText(failed)).toBe('Field unchanged. Made visible on 2 projects. Visibility was not set on 1 project. Beta: Refused.');
+		const none = matching({ ...applied, written: 0, failures: [{ projectId: 71, projectName: 'Beta', message: 'Refused.' }] });
+		expect(rowText(none)).toBe('Field unchanged. Visibility was not set on 1 project. Beta: Refused.');
+		const cut = matching({ ...applied, status: 'cancelled', done: 1, written: 1, total: 3 });
+		expect(rowText(cut)).toBe('Field unchanged. Made visible on 1 project. Visibility was cancelled after 1 of 3 projects.');
+	});
+
+	it('leaves every other row\'s words as they were', () => {
+		const updated = row({ class: 'update', state: 'done', note: null, visibility: applied });
+		expect(rowText(updated)).toBe('Visibility changed on 13 projects.');
+		expect(visibilityNote(matching(applied))?.text).toBe('Visibility changed on 13 projects.');
+	});
+});
+
 describe('progress and summary (RUN-23, RUN-24)', () => {
 	it('RUN-23: labels the counter', () => {
 		expect(progressLabel(state({}))).toBeNull();

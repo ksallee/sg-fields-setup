@@ -12,7 +12,7 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
-	import { explanationText, type RowComparison } from '$lib/pure/compare';
+	import { explanationKey, explanationText, type RowComparison } from '$lib/pure/compare';
 	import DataTypePicker from '$lib/components/data-type-picker.svelte';
 	import ValidValuesEditor from '$lib/components/valid-values-editor.svelte';
 	import { carries, CREATABLE_DATA_TYPES, DATA_TYPE_LABELS, isMirror } from '$lib/pure/data-types';
@@ -25,7 +25,7 @@
 		listDefaultValue,
 		missingRequired,
 		missingText,
-		nameWarning,
+		nonAsciiNameWarning,
 		type CheckboxDefault
 	} from '$lib/pure/editor-row';
 	import { MIRROR_TEXT, UNIQUE_NOTE } from '$lib/pure/editor-text';
@@ -56,16 +56,10 @@
 	const dataType = $derived(row.dataType.trim());
 	const missing = $derived(missingRequired(row));
 	const follows = $derived(row.nameMode === 'derived');
-	// A typed name only with the site's fields to check against: without them a stock field such
-	// as `code` would be called out as a name the site would not derive. A derived name is a new
-	// field's, so a non-ASCII display name is called out without the site too (G11).
-	const warning = $derived(
-		context && !comparison?.typeNotOnSite
-			? nameWarning(row, comparison?.nameExists != null)
-			: follows
-				? nameWarning(row, false)
-				: null
-	);
+	// With a site the planner judges the name, and its reason is among the notes above the form
+	// (`compare.ts`). Where it has not judged the row (no site, a type the site lacks, fields still
+	// on their way), a derived name with a non-ASCII display name is still called out (G11).
+	const warning = $derived(comparison?.planClass == null ? nonAsciiNameWarning(row) : null);
 	// The group says a type is not on the site; the row does not say it again.
 	const notes = $derived((comparison?.notes ?? []).filter((note) => note.kind !== 'type_not_on_site'));
 
@@ -84,7 +78,7 @@
 				Another field in this set has the same entity type and programmatic name.
 			</Notice>
 		{/if}
-		{#each notes as note (note.kind)}
+		{#each notes as note (explanationKey(note))}
 			<Notice tone={note.kind === 'on_site' ? 'info' : 'warning'} data-slot="site-note" data-kind={note.kind}>
 				{explanationText(note)}
 			</Notice>

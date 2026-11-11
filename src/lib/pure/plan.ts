@@ -96,7 +96,11 @@ export interface PlanInput extends PlanSite {
 	 * A read that failed is not a read: the caller stops before planning (PLN-3).
 	 */
 	reads: ReadonlyMap<string, LiveFieldRead>;
-	scope: PlanScope;
+	/**
+	 * Left out when the caller plans before the scope is known: the install screen's scope follows
+	 * the picker with no new plan (VIS-11). The plan then carries null.
+	 */
+	scope?: PlanScope | null;
 }
 
 /** The caller broke the contract: a read or a field listing the plan needs was not supplied. */
@@ -192,7 +196,8 @@ export interface Plan {
 	mirrorsLeftOut: number;
 	/** Why `items` is empty, or null when it is not. */
 	empty: 'no-entries' | 'only-mirrors' | null;
-	scope: PlanScope;
+	/** The scope the plan was made for (PLN-17), or null when none was given. */
+	scope: PlanScope | null;
 }
 
 /* Planning. */
@@ -205,6 +210,14 @@ export interface Plan {
 export function needsRead(entry: EntryDefinition, entityTypes: readonly LiveEntityType[]): boolean {
 	const cleaned = cleanEntry(entry);
 	return !isMirror(cleaned) && !isIncomplete(cleaned) && hasEntityType(entityTypes, cleaned.targetEntityType);
+}
+
+/**
+ * A display name as two are compared (CMP-6, PLN-16): trimmed, without case. The one spelling of
+ * that rule: the planner compares with it, and a caller that indexes a listing by label keys by it.
+ */
+export function labelKey(displayName: string): string {
+	return displayName.trim().toLowerCase();
 }
 
 function liveDefaultText(live: LiveField): string | null {
@@ -399,10 +412,8 @@ export function planEntry(entry: PlanEntry, read: LiveFieldRead | null, site: Pl
 		if (fields === undefined) {
 			throw new PlanInputError(`No field listing of ${wanted.targetEntityType} was given to the plan.`);
 		}
-		const label = wanted.displayName.toLowerCase();
-		const namesake = fields.find(
-			(field) => field.name !== wanted.programmaticName && field.displayName.trim().toLowerCase() === label
-		);
+		const label = labelKey(wanted.displayName);
+		const namesake = fields.find((field) => field.name !== wanted.programmaticName && labelKey(field.displayName) === label);
 		if (namesake) reasons.push(reason('label-taken', { other: namesake.name }));
 
 		if (wanted.dataType === 'status_list' && wanted.validValues.length === 0) {
@@ -488,7 +499,7 @@ export function planSet(input: PlanInput): Plan {
 		counts[item.class] += 1;
 	}
 	const empty = items.length > 0 ? null : mirrorsLeftOut > 0 ? 'only-mirrors' : 'no-entries';
-	return { siteUrl: input.siteUrl, items, counts, mirrorsLeftOut, empty, scope: input.scope };
+	return { siteUrl: input.siteUrl, items, counts, mirrorsLeftOut, empty, scope: input.scope ?? null };
 }
 
 /** Why a plan has nothing in it, ready to show. Null when it has items. */

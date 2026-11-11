@@ -21,6 +21,7 @@ import type { VisibilityPort } from '$lib/pure/visibility-run';
 import type { ProjectsRead } from '$lib/pure/visibility-scope';
 import { coreSchemaSource } from './core-schema-source';
 import { createTrashPage, siteSchemaClient } from './schema-client';
+import { afterSiteWrite } from './site-cache';
 import { coreVisibilitySource, createVisibilityAnalyser, loadProjects, visibilityPort, type VisibilityAnalyser } from './visibility';
 
 export interface InstallSite {
@@ -41,7 +42,10 @@ export interface InstallSite {
 	visibility: VisibilityPort;
 	/** What the project picker searches with. */
 	pickerContext: SgContext;
-	/** Forgets everything read: the refresh (D6). */
+	/**
+	 * Forgets everything read, here and in the widgets: the refresh (D6), and the end of a run,
+	 * since a write may have happened (`afterSiteWrite` in `./site-cache`).
+	 */
 	clear(): void;
 }
 
@@ -82,7 +86,7 @@ export function liveInstallSite(): InstallSite {
 		visibility: visibilityPort(coreSchemaSource(options), visibilityWriter),
 		pickerContext: liveContext(),
 		clear() {
-			schema.clear();
+			afterSiteWrite({ schema, context: liveContext() });
 			analyser.clear();
 		}
 	};

@@ -13,7 +13,8 @@
  *
  * Two callers asking for the same thing at once share one request. A failed read is not kept: the
  * next ask reads again. The one failure kept is a 404, the site saying it does not have the type,
- * since that is an answer. `refresh...` and `clear` read again whatever is held.
+ * since that is an answer. `refresh...` and `clear` read again whatever is held. When they are
+ * called is in `./site-cache`: after a run, on Refresh, on a re-sync and on a re-check.
  *
  * Two paths that must not be mixed up:
  *

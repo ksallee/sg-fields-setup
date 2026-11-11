@@ -13,6 +13,7 @@
 	import Notice from '$lib/app/notice.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import { siteErrorMessage } from '$lib/pure/site-error';
 	import { prepareLive, setSiteUrl, signIn, signOut, suggestedSiteUrl, type LiveState } from '$lib/live';
 	import { siteRefusalText } from '$lib/pure/site-host';
 
@@ -43,7 +44,7 @@
 			await signIn(state.siteUrl, (url) => window.open(url, '_blank', 'noopener'));
 			location.reload();
 		} catch (error) {
-			refusal = error instanceof Error ? error.message : String(error);
+			refusal = siteErrorMessage(error, 'Flow PT did not answer. Sign in again.');
 		} finally {
 			approving = false;
 		}

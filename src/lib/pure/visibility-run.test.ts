@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FieldReply } from './live-field';
 import type { PlanScope } from './plan';
-import { createApplyVisibility, errorMessage, retryVisibility, runVisibilitySteps, type VisibilityPlan, type VisibilityPort } from './visibility-run';
+import { createApplyVisibility, retryVisibility, runVisibilitySteps, type VisibilityPlan, type VisibilityPort } from './visibility-run';
 import { planVisibilitySteps } from './visibility-steps';
 import type { VisibilityHooks } from './visibility-types';
 import type { VisibleWrite } from './visibility-value';
@@ -246,23 +246,5 @@ describe('runVisibilitySteps', () => {
 			'read Version.sg_lens 3',
 			'read Version.sg_lens 1'
 		]);
-	});
-});
-
-describe('errorMessage', () => {
-	it('prefers what the server said: the detail, else the title', () => {
-		expect(errorMessage(refusal(400, "API schema_field_update(): The 'visible' property requires a project to be updated."))).toBe(
-			"API schema_field_update(): The 'visible' property requires a project to be updated."
-		);
-		expect(errorMessage(Object.assign(new Error('Not Found'), { body: { errors: [{ title: 'Not Found', detail: "Field 'Version.sg_x' does not exist." }] } }))).toBe(
-			"Field 'Version.sg_x' does not exist."
-		);
-	});
-
-	it('falls back to the error\'s own message, then to a plain line', () => {
-		expect(errorMessage(new Error('Failed to fetch'))).toBe('Failed to fetch');
-		expect(errorMessage('timeout')).toBe('timeout');
-		expect(errorMessage(null)).toBe('The step failed.');
-		expect(errorMessage(new Error(''))).toBe('The step failed.');
 	});
 });

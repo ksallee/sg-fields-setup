@@ -6,7 +6,7 @@ import {
 	listDefaultValue,
 	missingRequired,
 	missingText,
-	nameWarning,
+	nonAsciiNameWarning,
 	rowBadges
 } from './editor-row';
 
@@ -23,9 +23,15 @@ describe('rowBadges (EDT-20, EDT-13, CMP-9)', () => {
 		expect(badges.map((badge) => badge.label)).toEqual(['Computed', 'Incomplete', 'Duplicate', 'Type mismatch', 'Label taken']);
 	});
 
+	it('PLN-15, PLN-16: a create the plan would refuse reads "Cannot create"', () => {
+		expect(rowBadges({ mirror: false, incomplete: false, duplicated: false, markers: ['cannot_create'] })).toEqual([
+			{ kind: 'cannot_create', label: 'Cannot create', tone: 'warning' }
+		]);
+	});
+
 	it('CMP-9: on site reads as fine, the others as trouble', () => {
 		const tones = Object.fromEntries(
-			rowBadges({ mirror: true, incomplete: true, duplicated: true, markers: ['on_site', 'type_mismatch', 'cannot_update', 'label_taken'] }).map(
+			rowBadges({ mirror: true, incomplete: true, duplicated: true, markers: ['on_site', 'type_mismatch', 'cannot_update', 'cannot_create', 'label_taken'] }).map(
 				(badge) => [badge.kind, badge.tone]
 			)
 		);
@@ -36,6 +42,7 @@ describe('rowBadges (EDT-20, EDT-13, CMP-9)', () => {
 			on_site: 'success',
 			type_mismatch: 'warning',
 			cannot_update: 'warning',
+			cannot_create: 'warning',
 			label_taken: 'warning'
 		});
 	});
@@ -79,41 +86,34 @@ describe('default value inputs (EDT-29, MOD-10)', () => {
 	});
 });
 
-describe('nameWarning (EDT-25, B2, Q3)', () => {
-	const row = { ...complete, displayName: 'Lens (serial)', programmaticName: 'sg_lens_serial', nameMode: 'manual' as const };
+/*
+ * Was `nameWarning`, which also judged a typed name against the name the site would derive (B2,
+ * PLN-15). That check is the planner's: with a site, the comparison asks it and the open row
+ * shows its reason (compare.test.ts, `unreachable-name` and `non-ascii-name`). What stays here is
+ * the one hint that needs no site.
+ */
+describe('nonAsciiNameWarning (EDT-25, G11): where the planner has no say', () => {
+	const row = { ...complete, displayName: 'Durée', programmaticName: 'sg_text', nameMode: 'derived' as const };
 
-	it('B2: a typed name the site would not derive is called out, with the name it would give', () => {
-		expect(nameWarning(row, false)).toBe(
-			'The site would name a new field sg_lens__serial_. Install refuses to create it under another name.'
+	it('G11, PLN-15: a non-ASCII display name on a derived name says why, with the name the site would give', () => {
+		expect(nonAsciiNameWarning(row)).toBe(
+			'The display name holds a character outside ASCII. The site would name a new field sg_text. Install refuses to create it. Use an ASCII display name.'
 		);
-	});
-
-	it('B2: no warning when the name is the derived one, the field is on the site, or there is nothing to compare', () => {
-		expect(nameWarning({ ...row, programmaticName: 'sg_lens__serial_' }, false)).toBeNull();
-		expect(nameWarning(row, true)).toBeNull();
-		expect(nameWarning({ ...row, programmaticName: ' ' }, false)).toBeNull();
-		expect(nameWarning({ ...row, displayName: '' }, false)).toBeNull();
-	});
-
-	it('MOD-7: the site is sent the trimmed display name, so that is what the name is checked against', () => {
-		expect(nameWarning({ ...row, displayName: ' Lens ', programmaticName: 'sg_lens' }, false)).toBeNull();
-	});
-
-	it('G11, PLN-15: a non-ASCII display name says why, in either mode, with the name the site would give', () => {
-		const text =
-			'The display name holds a character outside ASCII. The site would name a new field sg_text. Install refuses to create it. Use an ASCII display name.';
-		expect(nameWarning({ ...row, displayName: 'Durée', programmaticName: 'sg_text' }, false)).toBe(text);
-		expect(nameWarning({ ...row, displayName: 'Durée', programmaticName: 'sg_text', nameMode: 'derived' }, false)).toBe(text);
-		expect(nameWarning({ ...row, displayName: 'Durée', programmaticName: '', dataType: '', nameMode: 'derived' }, false)).toBe(
+		expect(nonAsciiNameWarning({ ...row, dataType: '' })).toBe(
 			'The display name holds a character outside ASCII. The site would name a new field after its data type. Install refuses to create it. Use an ASCII display name.'
 		);
 	});
 
-	it('G11: no non-ASCII warning when the field is already on the site', () => {
-		expect(nameWarning({ ...row, displayName: 'Durée', programmaticName: 'sg_duree' }, true)).toBeNull();
+	it('says nothing of an ASCII display name', () => {
+		expect(nonAsciiNameWarning({ ...row, displayName: ' Lens ' })).toBeNull();
+		expect(nonAsciiNameWarning({ ...row, displayName: '' })).toBeNull();
+	});
+
+	it('says nothing of a typed name: without the site\'s fields it may be a field that exists', () => {
+		expect(nonAsciiNameWarning({ ...row, nameMode: 'manual' })).toBeNull();
 	});
 
 	it('EDT-32: never on a mirror row', () => {
-		expect(nameWarning({ ...row, dataType: 'calculated' }, false)).toBeNull();
+		expect(nonAsciiNameWarning({ ...row, dataType: 'calculated' })).toBeNull();
 	});
 });
