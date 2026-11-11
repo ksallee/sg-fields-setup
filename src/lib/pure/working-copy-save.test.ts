@@ -115,7 +115,7 @@ describe('saveRequest', () => {
 			},
 			{
 				targetEntityType: 'Asset',
-				programmaticName: 'sg_focal_',
+				programmaticName: 'sg_focal',
 				displayName: 'Focal',
 				dataType: 'list',
 				validTypes: [],

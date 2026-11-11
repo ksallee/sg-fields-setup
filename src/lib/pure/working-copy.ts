@@ -150,14 +150,16 @@ function updateRow(workingCopy: WorkingCopy, key: string, change: (row: Row) => 
 
 /**
  * The definition with `patch` applied by the rules of one row: derived mode keeps the
- * programmatic name read-only and re-derives it on a display name edit (EDT-25, MOD-17); a blank
- * display name gives a blank name (MOD-19).
+ * programmatic name read-only and re-derives it on a display name edit, from the display name as
+ * it will be stored, trimmed (EDT-25, MOD-17, MOD-7); a blank display name gives a blank name
+ * (MOD-19).
  */
 function applyPatch(row: Row, patch: Partial<EntryDefinition>): Row {
 	if (row.nameMode === 'manual') return { ...row, ...patch };
 	const { programmaticName: _ignored, ...rest } = patch;
 	const next = { ...row, ...rest };
-	if ('displayName' in patch) next.programmaticName = predictFieldName(next.displayName) ?? '';
+	// From the trimmed display name: that is what is stored (MOD-7) and what the site is sent.
+	if ('displayName' in patch) next.programmaticName = predictFieldName(next.displayName.trim()) ?? '';
 	return next;
 }
 
