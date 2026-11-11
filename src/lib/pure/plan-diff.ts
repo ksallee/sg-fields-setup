@@ -9,7 +9,7 @@
  * | display name  | equal after trimming both                                                        |
  * | description   | equal after trimming both; none and blank are the same                           |
  * | default value | compared only on a type that carries one. None, missing and blank are the same.  |
- * |               | Otherwise same kind and same value, structured values by content.                |
+ * |               | Otherwise same kind and same value. A structured live value never equals one.    |
  * | valid values  | list: same values, same order. Status list: same set. Any other type: equal.     |
  * | valid types   | same types in the same order                                                     |
  * | unique        | same boolean; missing is off                                                     |
@@ -53,18 +53,6 @@ export interface Difference {
 
 function isBlank(value: unknown): boolean {
 	return value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
-}
-
-function sameContent(a: unknown, b: unknown): boolean {
-	if (a === b) return true;
-	if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
-	if (Array.isArray(a) !== Array.isArray(b)) return false;
-	const aKeys = Object.keys(a);
-	const bKeys = Object.keys(b);
-	if (aKeys.length !== bKeys.length) return false;
-	return aKeys.every(
-		(key) => Object.hasOwn(b, key) && sameContent((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])
-	);
 }
 
 function sameOrder(a: readonly string[], b: readonly string[]): boolean {
@@ -124,7 +112,8 @@ export function diffEntry(entry: EntryDefinition, live: LiveField): Difference[]
 	if (carries(wanted.dataType, 'defaultValue')) {
 		const want = wantedDefault(wanted);
 		const liveDefault = isBlank(live.defaultValue) ? null : live.defaultValue;
-		const equal = wanted.dataType === 'checkbox' ? (liveDefault ?? false) === want : sameContent(liveDefault, want);
+		// A wanted default is a text, a boolean or none (`DefaultValue`), so identity is the whole of "by content".
+		const equal = wanted.dataType === 'checkbox' ? (liveDefault ?? false) === want : liveDefault === want;
 		if (!equal) differences.push({ setting: 'defaultValue', live: liveDefault, wanted: want });
 	}
 
