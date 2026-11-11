@@ -44,6 +44,7 @@ import {
 	type Mint,
 	type NameTaken,
 	type SetMissing,
+	type Stale,
 	type StoredSet
 } from '$lib/pure/set-plan';
 import type { SaveRequest } from '$lib/pure/working-copy-save';
@@ -118,7 +119,7 @@ export type CreateSetResult = Stored | BlankName | NameTaken | DuplicateEntries;
 /** A saved set as reloaded, and the entries stored for the request's `added`, in the same order. */
 export type Saved = Stored & { added: Entry[] };
 
-export type SaveSetResult = Saved | BlankName | NameTaken | DuplicateEntries | SetMissing | EntryMissing;
+export type SaveSetResult = Saved | BlankName | NameTaken | DuplicateEntries | SetMissing | EntryMissing | Stale;
 export type DuplicateSetResult = Stored | SetMissing | DuplicateEntries;
 
 /** What the editor's duplicate copies instead of the stored set (EDT-9). Each part is optional. */
@@ -165,7 +166,10 @@ export interface SetStore {
 	 * (EDT-44 to EDT-48): name and description, removals, changes, additions. On success the
 	 * result is the set as reloaded from storage (EDT-46), and `added`: the stored entries made
 	 * for `request.added`, in the same order, to pair with `addedKeys`. Refuses `blank_name`,
-	 * `name_taken`, `duplicate_entries`, `set_missing` and `entry_missing`.
+	 * `name_taken`, `duplicate_entries`, `set_missing`, `entry_missing` and `stale`: the set was
+	 * saved in another tab since the request's working copy was loaded, and this save would write
+	 * over that one. The read, the check and the write are one transaction, so no save slips
+	 * between them.
 	 *
 	 * A refusal or a thrown `SetStoreError` means nothing was written, so the same request can be
 	 * sent again as it is and an addition is never stored twice (EDT-47). The reload happens

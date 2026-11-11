@@ -72,7 +72,47 @@ export interface EntryMissing {
 	entryIds: string[];
 }
 
-export type SetRefusal = BlankName | NameTaken | DuplicateEntries | SetMissing | EntryMissing;
+/**
+ * The set was saved somewhere else, another tab, after this save's working copy was loaded, and
+ * this save would write over what that one stored. Nothing is written. The working copy is the
+ * caller's to keep: a duplicate of it saves the work, a reload takes the other state.
+ */
+export interface Stale {
+	ok: false;
+	reason: 'stale';
+	/** The set's name or description was changed there, and this save changes them too. */
+	details: boolean;
+	/**
+	 * The display names of the fields changed there that this save would change or remove. A changed
+	 * one by the name this save gives it, which is what its screen shows; a removed one as stored.
+	 */
+	fields: string[];
+}
+
+export type SetRefusal = BlankName | NameTaken | DuplicateEntries | SetMissing | EntryMissing | Stale;
+
+/** How many fields a stale message names before it counts the rest. */
+const STALE_NAMED = 5;
+
+function andJoined(items: readonly string[]): string {
+	return items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+}
+
+function staleMessage(refusal: Stale): string {
+	const named = refusal.fields.filter((name) => name.trim() !== '').map((name) => `"${name}"`);
+	const unnamed = refusal.fields.length - named.length;
+	const shown = named.slice(0, STALE_NAMED);
+	const more = named.length - shown.length + unnamed;
+	const what: string[] = [];
+	if (refusal.details) what.push('The name or description of this set');
+	if (refusal.fields.length > 0) {
+		const lead = refusal.details ? 'the' : 'The';
+		if (shown.length === 0) what.push(refusal.fields.length === 1 ? (refusal.details ? 'a field' : 'A field') : `${refusal.fields.length} fields`);
+		else what.push(`${lead} ${refusal.fields.length === 1 ? 'field' : 'fields'} ${andJoined(more > 0 ? [...shown, `${more} more`] : shown)}`);
+	}
+	const plural = refusal.fields.length > 1 || (refusal.details && refusal.fields.length > 0);
+	return `${what.join(' and ')} ${plural ? 'were' : 'was'} changed in another tab. Nothing was saved. Reload to see it, or duplicate this set to keep your changes.`;
+}
 
 /** The plain sentence for a refusal, ready for a dialog or a notification (MOD-2, SET-17, IMP-51). */
 export function refusalMessage(refusal: SetRefusal): string {
@@ -89,6 +129,8 @@ export function refusalMessage(refusal: SetRefusal): string {
 			return 'This set no longer exists.';
 		case 'entry_missing':
 			return 'A field of this set no longer exists. Reload the set.';
+		case 'stale':
+			return staleMessage(refusal);
 	}
 }
 
@@ -285,13 +327,24 @@ export interface SavePlan extends StoredSet {
  *
  * Refuses a blank name (MOD-1), a name another set has (MOD-2), a repeated pair (MOD-5), and a
  * change to an entry the stored set does not hold.
+ *
+ * Two tabs. When the request says what it was built on (`request.loaded`) and the stored set has
+ * moved since, the save is refused as `stale` where it would write over the other save, and only
+ * there:
+ *
+ * - an entry it changes or removes whose stored `changedAt` is not the loaded one;
+ * - the name or description, when the request changes them and the stored ones are not the
+ *   loaded ones.
+ *
+ * What the other save changed and this one leaves alone is no conflict: both are kept. Asking for
+ * exactly what is stored is no conflict either, so a request can still be applied again.
  */
 export function planSave(
 	stored: StoredSet,
 	request: SaveRequest,
 	existing: readonly SetRef[],
 	mint: Mint
-): SavePlan | BlankName | NameTaken | DuplicateEntries | EntryMissing {
+): SavePlan | BlankName | NameTaken | DuplicateEntries | EntryMissing | Stale {
 	const refused = request.details ? refuseName(request.details.name, existing, stored.set.id) : null;
 	if (refused) return refused;
 
@@ -299,8 +352,19 @@ export function planSave(
 	const name = request.details ? request.details.name.trim() : stored.set.name;
 	const description = request.details ? cleanDescription(request.details.description) : stored.set.description;
 
+	// Saved elsewhere since this request's working copy was loaded: the set's changed time moved.
+	const loaded = request.loaded && request.loaded.setChangedAt !== stored.set.changedAt ? request.loaded : null;
+	const movedElsewhere = (entry: Entry) => loaded !== null && loaded.entryChangedAt[entry.id] !== entry.changedAt;
+	const staleDetails =
+		loaded !== null &&
+		request.details !== null &&
+		(stored.set.name !== loaded.name || stored.set.description !== loaded.description) &&
+		(name !== stored.set.name || description !== stored.set.description);
+	const staleFields: string[] = [];
+
 	const removed = new Set(request.removedIds);
-	const deletes = stored.entries.filter((entry) => removed.has(entry.id)).map((entry) => entry.id);
+	const removedEntries = stored.entries.filter((entry) => removed.has(entry.id));
+	const deletes = removedEntries.map((entry) => entry.id);
 	const next = new Map(stored.entries.filter((entry) => !removed.has(entry.id)).map((entry) => [entry.id, entry]));
 
 	const written = new Map<string, Entry>();
@@ -315,11 +379,14 @@ export function planSave(
 		const attributes = storable(change, now);
 		const candidate: Entry = { ...current, ...attributes };
 		if (sameValue(candidate, current)) continue;
+		if (movedElsewhere(current)) staleFields.push(attributes.displayName);
 		const entry = { ...candidate, changedAt: now };
 		next.set(entry.id, entry);
 		written.set(entry.id, entry);
 	}
 	if (missing.length > 0) return { ok: false, reason: 'entry_missing', entryIds: missing };
+	for (const entry of removedEntries) if (movedElsewhere(entry)) staleFields.push(entry.displayName);
+	if (staleDetails || staleFields.length > 0) return { ok: false, reason: 'stale', details: staleDetails, fields: staleFields };
 
 	const added: Entry[] = request.added.map((draft) => ({
 		...storable(draft, now),

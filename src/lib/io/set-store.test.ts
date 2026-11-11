@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import type { Entry, EntryDraft } from '$lib/pure/model';
-import type { SaveRequest } from '$lib/pure/working-copy-save';
+import { refusalMessage } from '$lib/pure/set-plan';
+import { editRow, openWorkingCopy, removeRow, setDescription, type WorkingCopy } from '$lib/pure/working-copy';
+import { afterSave, draftsOf, saveRequest, type SaveRequest } from '$lib/pure/working-copy-save';
 import {
 	DB_NAME,
 	DB_VERSION,
@@ -522,6 +524,85 @@ describe('saveSet', () => {
 		expect(loaded?.entries.filter((e) => e.description === 'Edited')).toHaveLength(450);
 		expect(page.items[0].entryCount).toBe(500);
 		expect(elapsed).toBeLessThan(5000);
+	});
+});
+
+describe('two tabs on one set (audit H1, M3)', () => {
+	/** One set with two fields, and a second store on the same database: the other tab. */
+	async function twoTabs() {
+		const here = await open();
+		const there = await openSetStore({ idb: here.idb });
+		const created = await here.store.createSet({
+			name: 'Camera report',
+			description: 'Lens fields',
+			origin: 'import',
+			originDetails: { sourceFiles: 'report.csv', importedAt: T0 },
+			entries: [draft({ programmaticName: 'sg_lens' }), draft({ programmaticName: 'sg_slate', displayName: 'Slate' })]
+		});
+		if (!created.ok) throw new Error('seed failed');
+		const load = () => openWorkingCopy(created.set, created.entries);
+		const key = (wc: WorkingCopy, name: string) => wc.rows.find((row) => row.programmaticName === name)!.key;
+		return { a: there, b: here.store, idb: here.idb, set: created.set, load, key };
+	}
+
+	it('H1: a save from a tab on the old state does not write over a newer save of the same field', async () => {
+		const { a, b, set, load, key } = await twoTabs();
+		// Both tabs load the set. Tab A renames the lens and saves.
+		const tabA = load();
+		const tabB = load();
+		const savedA = await a.saveSet(set.id, saveRequest(editRow(tabA, key(tabA, 'sg_lens'), { displayName: 'Lens B' })));
+		expect(savedA.ok).toBe(true);
+
+		// Tab B, still showing "Lens", edits its description and saves.
+		const editedB = editRow(tabB, key(tabB, 'sg_lens'), { description: 'Which lens.' });
+		const savedB = await b.saveSet(set.id, saveRequest(editedB));
+		expect(savedB).toEqual({ ok: false, reason: 'stale', details: false, fields: ['Lens'] });
+		if (savedB.ok) return;
+		expect(refusalMessage(savedB)).toBe(
+			'The field "Lens" was changed in another tab. Nothing was saved. Reload to see it, or duplicate this set to keep your changes.'
+		);
+		// A's rename is still there, and nothing of B's was written.
+		const now = await b.getSet(set.id);
+		expect(now?.entries.map((e) => [e.displayName, e.description])).toEqual([
+			['Lens B', null],
+			['Slate', null]
+		]);
+		expect(savedA.ok && now?.set.changedAt).toBe(savedA.ok && savedA.set.changedAt);
+
+		// What B can do next: its working copy is kept, and a duplicate of it stores its work.
+		const copy = await b.duplicateSet(set.id, { name: editedB.name, description: editedB.description, entries: draftsOf(editedB) });
+		expect(copy).toMatchObject({ ok: true, set: { name: 'Camera report copy' } });
+		expect(copy.ok && copy.entries.map((e) => [e.displayName, e.description])).toEqual([
+			['Lens', 'Which lens.'],
+			['Slate', null]
+		]);
+	});
+
+	it('H1: the other tab changed the description, this one changes it too: refused, and a removal of a field changed there as well', async () => {
+		const { a, b, set, load, key } = await twoTabs();
+		const tabA = load();
+		const tabB = load();
+		await a.saveSet(set.id, saveRequest(setDescription(editRow(tabA, key(tabA, 'sg_slate'), { displayName: 'Slate number' }), 'Theirs.')));
+		const result = await b.saveSet(set.id, saveRequest(setDescription(removeRow(tabB, key(tabB, 'sg_slate')), 'Mine.')));
+		expect(result).toEqual({ ok: false, reason: 'stale', details: true, fields: ['Slate number'] });
+		expect((await b.getSet(set.id))?.entries).toHaveLength(2);
+	});
+
+	it('H1: changes to different fields from two tabs are both kept', async () => {
+		const { a, b, set, load, key } = await twoTabs();
+		const tabA = load();
+		const tabB = load();
+		await a.saveSet(set.id, saveRequest(editRow(tabA, key(tabA, 'sg_lens'), { displayName: 'Lens B' })));
+		const result = await b.saveSet(set.id, saveRequest(editRow(tabB, key(tabB, 'sg_slate'), { description: 'Board.' })));
+		expect(result.ok && result.entries.map((e) => [e.displayName, e.description])).toEqual([
+			['Lens B', null],
+			['Slate', 'Board.']
+		]);
+		// The tab reloads from what was stored, so its next save is on the new state.
+		if (!result.ok) return;
+		const next = afterSave(tabB, result.set, result.entries);
+		const again = await b.saveSet(set.id, saveRequest(editRow(next, key(next, 'sg_lens'), { description: 'Which lens.' })));
+		expect(again).toMatchObject({ ok: true });
 	});
 });
 
