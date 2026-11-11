@@ -1,10 +1,11 @@
 /**
- * Bulk actions over a list of row keys (EDT-41). Clearing the selection afterwards is the view's
- * business. Re-sync from site (EDT-42) lands with issue #8 over `replaceDefinition`.
+ * Bulk actions over a list of row keys (EDT-41, EDT-42). Clearing the selection afterwards is the
+ * view's business.
  */
 import { isMirror } from './data-types';
+import type { ResyncUpdate } from './live-to-entry';
 import type { EntryDefinition } from './model';
-import { editRow, removeRows, type WorkingCopy } from './working-copy';
+import { editRow, removeRows, replaceDefinition, type WorkingCopy } from './working-copy';
 
 /** A bulk edit's outcome: the new working copy and how many listed mirror rows it left alone. */
 export interface BulkResult {
@@ -45,4 +46,15 @@ export function bulkChangeDataType(workingCopy: WorkingCopy, keys: readonly stri
 /** Removes every listed row, mirrors included (EDT-41, EDT-33). Unknown keys are ignored. */
 export function bulkDelete(workingCopy: WorkingCopy, keys: readonly string[]): WorkingCopy {
 	return removeRows(workingCopy, keys);
+}
+
+/**
+ * Applies a re-sync (EDT-42): each update of `resyncRows` (`live-to-entry.ts`) replaces its row's
+ * definition and snapshot, mirror rows included. Rows with no update stay as they are. Unknown
+ * keys are ignored. The result is unsaved until Save.
+ */
+export function bulkResync(workingCopy: WorkingCopy, updates: readonly ResyncUpdate[]): WorkingCopy {
+	let next = workingCopy;
+	for (const update of updates) next = replaceDefinition(next, update.key, update.definition, update.snapshot);
+	return next;
 }

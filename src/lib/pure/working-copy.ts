@@ -224,12 +224,25 @@ export function removeRow(workingCopy: WorkingCopy, key: string): WorkingCopy {
 }
 
 /**
- * The seam for re-sync from site (EDT-42, issue #8): replaces a row's nine definition keys with
- * `definition`, wholesale. Nothing else moves: not the key, the name mode, nor the snapshot. No
- * derivation, no mirror lock: re-sync is how a mirror row catches up with the site.
+ * The seam for re-sync from site (EDT-42): replaces a row's nine definition keys with
+ * `definition`, wholesale, and its three snapshot fields with `snapshot` when one is given.
+ * Nothing else moves: not the key, nor the name mode. No derivation, no mirror lock: re-sync is
+ * how a mirror row catches up with the site. A snapshot is never compared (EDT-3): a refreshed
+ * one alone leaves the set clean, and it is stored when the row's definition is (`saveRequest`).
  */
-export function replaceDefinition(workingCopy: WorkingCopy, key: string, definition: EntryDefinition): WorkingCopy {
-	return updateRow(workingCopy, key, (row) => ({ ...row, ...definitionOf(definition) }));
+export function replaceDefinition(
+	workingCopy: WorkingCopy,
+	key: string,
+	definition: EntryDefinition,
+	snapshot?: EntrySnapshot
+): WorkingCopy {
+	return updateRow(workingCopy, key, (row) => ({
+		...row,
+		...definitionOf(definition),
+		...(snapshot
+			? { snapshot: snapshot.snapshot, snapshotSite: snapshot.snapshotSite, snapshotTime: snapshot.snapshotTime }
+			: {})
+	}));
 }
 
 function sameList(a: readonly string[], b: readonly string[]): boolean {

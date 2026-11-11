@@ -237,6 +237,20 @@ describe('planCreate', () => {
 });
 
 describe('planSave', () => {
+	it('EDT-42, MOD-8: a changed entry that carries a re-synced snapshot stores it, with the time of storing', () => {
+		const lens = entry('e1', { snapshot: { name: { value: 'Lens' } }, snapshotSite: 'https://old.example', snapshotTime: T0 });
+		const change = { ...lens, displayName: 'Lens serial', snapshot: { name: { value: 'Lens serial' } }, snapshotSite: 'https://site.example', snapshotTime: null };
+		const plan = planSave(stored([lens]), request({ changed: [change] }), OTHERS, mint());
+		expect(plan.ok && plan.entries[0]).toMatchObject({
+			id: 'e1',
+			displayName: 'Lens serial',
+			snapshot: { name: { value: 'Lens serial' } },
+			snapshotSite: 'https://site.example',
+			snapshotTime: T1,
+			changedAt: T1
+		});
+	});
+
 	const lens = entry('e1', { programmaticName: 'sg_lens' });
 	const slate = entry('e2', { programmaticName: 'sg_slate', displayName: 'Slate' });
 

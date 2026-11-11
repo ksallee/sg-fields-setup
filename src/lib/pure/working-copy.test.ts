@@ -252,6 +252,20 @@ describe('replaceDefinition', () => {
 		const wc = open();
 		expect(replaceDefinition(wc, 'nope', storedEntry('x'))).toBe(wc);
 	});
+
+	it('EDT-42 seam: a snapshot given beside the definition replaces the row\'s three snapshot fields', () => {
+		const wc = open([storedEntry('a', { snapshot: { x: 1 }, snapshotSite: 'https://old.example', snapshotTime: '2026-11-01T08:00:00.000Z' })]);
+		const fresh = { snapshot: { x: 2 }, snapshotSite: 'https://site.example', snapshotTime: null };
+		const row = rowByKey(replaceDefinition(wc, 'a', storedEntry('a', { displayName: 'Lens A' }), fresh), 'a');
+		expect(row).toMatchObject({ displayName: 'Lens A', key: 'a', entryId: 'a', nameMode: 'manual', ...fresh });
+	});
+
+	it('EDT-42 seam, EDT-3: a refreshed snapshot alone does not make the set dirty', () => {
+		const wc = open([storedEntry('a', { snapshot: { x: 1 } })]);
+		const next = replaceDefinition(wc, 'a', storedEntry('a'), { snapshot: { x: 2 }, snapshotSite: 'https://site.example', snapshotTime: null });
+		expect(rowByKey(next, 'a')?.snapshot).toEqual({ x: 2 });
+		expect(isDirty(next)).toBe(false);
+	});
 });
 
 describe('isDirty', () => {
