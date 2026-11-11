@@ -7,6 +7,7 @@ import type { PlanClass } from './plan';
 import { runCounters, type RunCounters, type RunState } from './run';
 import { fileSlug } from './set-file';
 import { countText, fieldCount } from './set-text';
+import { siteHost } from './site-host';
 
 /** A plan row as the summary needs it. */
 export interface SummaryRow {
@@ -87,15 +88,6 @@ export function runSummaryItems(counters: Pick<RunCounters, 'done' | 'skipped' |
  */
 export function screenSummary(plan: InstallSummary, run: RunState): SummaryItem[] {
 	return run.status === 'idle' ? summaryItems(plan) : runSummaryItems(runCounters(run));
-}
-
-/** The site as a person names it: its host. A text that is no address shows as it is. */
-export function siteHost(siteUrl: string): string {
-	try {
-		return new URL(siteUrl).host || siteUrl;
-	} catch {
-		return siteUrl;
-	}
 }
 
 export interface ConfirmInput {

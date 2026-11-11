@@ -29,6 +29,7 @@
 import type { LiveEntityType } from './live-entity-types';
 import type { LiveField, LiveFieldRead } from './live-field';
 import type { CreatePayload, PropertyWrite } from './plan';
+import { isRecord } from './is-record';
 
 /** What a revive answered. `revived: false` carries the server's refusal. */
 export type ReviveAnswer = { revived: true } | { revived: false; status: number; message: string };
@@ -67,10 +68,6 @@ export interface PortRefusal {
 	message: string;
 	/** The first error's `source`, when the server sent one. */
 	source?: unknown;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /** The thrown value as a refusal, or null when it is not one: no numeric status, so not the site's answer. */

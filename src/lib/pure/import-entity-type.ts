@@ -9,6 +9,7 @@
  *   name, plural-tolerant API name, plural-tolerant display name. Within a tier, the list's order.
  * - The fallback is used trimmed and as given. It is not checked against the site's types.
  */
+import { trimFold } from './fold';
 
 /** The fields this module needs of a site's entity type. */
 export interface SiteEntityType {
@@ -22,10 +23,6 @@ export interface SiteEntityType {
 export const IMPORT_MODES = ['automatic', 'worksheet', 'header_prefix'] as const;
 
 export type ImportMode = (typeof IMPORT_MODES)[number];
-
-function key(text: string): string {
-	return text.trim().toLowerCase();
-}
 
 function isPluralOf(a: string, b: string): boolean {
 	return a === b + 's' || a === b + 'es';
@@ -44,7 +41,7 @@ function pluralTolerant(a: string, b: string): boolean {
  * is in the module comment.
  */
 export function resolveEntityType(text: string, types: readonly SiteEntityType[]): string | null {
-	const wanted = key(text);
+	const wanted = trimFold(text);
 	if (wanted === '') return null;
 	const tiers: [(a: string, b: string) => boolean, 'name' | 'displayName'][] = [
 		[exact, 'name'],
@@ -53,7 +50,7 @@ export function resolveEntityType(text: string, types: readonly SiteEntityType[]
 		[pluralTolerant, 'displayName']
 	];
 	for (const [matches, field] of tiers) {
-		const found = types.find((type) => matches(wanted, key(type[field])));
+		const found = types.find((type) => matches(wanted, trimFold(type[field])));
 		if (found) return found.name;
 	}
 	return null;

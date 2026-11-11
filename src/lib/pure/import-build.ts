@@ -26,6 +26,7 @@ import { draftFromLiveField } from './live-to-entry';
 import type { EntryDraft, OriginDetails, Timestamp } from './model';
 import type { ParsedTable } from './table';
 import type { WorkbookSheet } from './xlsx';
+import { countText } from './set-text';
 
 /* Buckets. */
 
@@ -72,14 +73,10 @@ export function importTotals(buckets: readonly ImportBucket[]): ImportTotals {
 	return { columns: buckets.reduce((sum, bucket) => sum + bucketColumnCount(bucket), 0), buckets: buckets.length };
 }
 
-function count(n: number, singular: string, plural: string): string {
-	return `${n} ${n === 1 ? singular : plural}`;
-}
-
 /** The footer line (IMP-10): "72 columns in 1 bucket." */
 export function importFooterText(buckets: readonly ImportBucket[]): string {
 	const totals = importTotals(buckets);
-	return `${count(totals.columns, 'column', 'columns')} in ${count(totals.buckets, 'bucket', 'buckets')}.`;
+	return `${countText(totals.columns, 'column')} in ${countText(totals.buckets, 'bucket')}.`;
 }
 
 /* Which types the import resolves to. */
@@ -276,12 +273,12 @@ export function defaultSetName(currentName: string, fileName: string): string {
 
 /** The confirmation after a successful import (IMP-50). */
 export function importSuccessText(imported: number, skipped: number): string {
-	const text = `Imported ${count(imported, 'field', 'fields')}.`;
-	return skipped > 0 ? `${text} Skipped ${count(skipped, 'duplicate column', 'duplicate columns')}.` : text;
+	const text = `Imported ${countText(imported, 'field')}.`;
+	return skipped > 0 ? `${text} Skipped ${countText(skipped, 'duplicate column')}.` : text;
 }
 
 /** The editor's banner on the new set (IMP-50). */
 export function importBannerText(imported: number): string {
 	const ask = imported === 1 ? 'Check its entity type and data type.' : 'Check each entity type and data type.';
-	return `Imported ${count(imported, 'field', 'fields')}. ${ask}`;
+	return `Imported ${countText(imported, 'field')}. ${ask}`;
 }

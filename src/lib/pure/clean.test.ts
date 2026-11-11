@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanEntry, withSnapshotTime } from './clean';
+import { cleanDescription, cleanEntry, withSnapshotTime } from './clean';
 import type { Entry } from './model';
 
 const T0 = '2026-11-10T09:00:00.000Z';
@@ -157,6 +157,15 @@ describe('cleanEntry', () => {
 		const cleaned = cleanEntry(draft);
 		expect(cleaned.displayName).toBe('Lens');
 		expect(Object.keys(cleaned).sort()).toEqual(Object.keys(draft).sort());
+	});
+});
+
+describe('cleanDescription', () => {
+	it('MOD-7: trimmed, and null when nothing is left', () => {
+		expect(cleanDescription('  Camera data ')).toBe('Camera data');
+		expect(cleanDescription('   ')).toBeNull();
+		expect(cleanDescription(null)).toBeNull();
+		expect(cleanDescription(undefined)).toBeNull();
 	});
 });
 

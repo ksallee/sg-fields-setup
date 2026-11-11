@@ -107,3 +107,15 @@ const REFUSALS: Record<SiteRefusal, string> = {
 export function siteRefusalText(reason: SiteRefusal): string {
 	return REFUSALS[reason];
 }
+
+/**
+ * The site as every screen names it, the navbar and the install screen alike: its whole host,
+ * `studio.shotgrid.autodesk.com`. A text that is no address shows as it is.
+ */
+export function siteHost(siteUrl: string): string {
+	try {
+		return new URL(siteUrl).host || siteUrl;
+	} catch {
+		return siteUrl;
+	}
+}

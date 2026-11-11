@@ -154,6 +154,19 @@ filler. Sentence case everywhere, no capitals for labels.
 - Words that a screen shows live in a pure module with tests, not in markup, once they take an
   argument.
 
+## Comparing names
+
+Names are folded before they are compared, and the rule differs on purpose by what is compared.
+Tests pin each difference.
+
+| folding | rule | where |
+|---|---|---|
+| `trimFold` (`$lib/pure/fold`) | trim, lowercase | the planner's label check (`labelKey` in `plan.ts`, CMP-6, PLN-16), the type meant by a valid type, the editor search (EDT-34), the import's entity type match (IMP-21) |
+| `setNameKey` (`copy-name.ts`) | trim, NFC, lowercase | set names: the clash check and copy names (MOD-2) |
+| `fold` (`set-query.ts`) | NFC, lowercase; the search is trimmed first | the set list search (SET-2) |
+| `normaliseName` (`import-normalise.ts`) | NFC, trim, lowercase, one space per run of other characters | the import's field match (IMP-27, IMP-28): "Shot-Code" matches "Shot Code" there, and is no label clash in the plan |
+| none | exact, case included | API names: entity types, field names, valid types (finding 121) |
+
 ## The install screen
 
 `app/install/`, held to everything above, with these rules of its own.

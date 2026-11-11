@@ -33,7 +33,7 @@ import { FakeSite, FakeSiteError } from '$lib/pure/fixtures/fake-site';
 import type { RunReader, SchemaWritePort } from '$lib/pure/run-port';
 import type { VisibilityPort } from '$lib/pure/visibility-run';
 import type { InstallSite } from './install-site';
-import { onceLoaded } from './install-site';
+import { onceLoaded } from './read-once';
 import { createVisibilityAnalyser, loadProjects, visibilityPort } from './visibility';
 
 /** The projects of the mock client: the picker and the fake site share them. */

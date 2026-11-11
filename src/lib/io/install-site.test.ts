@@ -16,7 +16,6 @@ import { decodeSetFile } from '$lib/pure/set-file';
 import { createApplyVisibility } from '$lib/pure/visibility-run';
 import { resolveScope } from '$lib/pure/visibility-scope';
 import { FAKE_PROJECT_IDS, FAKE_TRASH_PAGE_URL, fakeInstallSite, fakeOptions, seededFakeSite } from './install-site-fake';
-import { onceLoaded } from './install-site';
 
 const SRC = join(process.cwd(), 'src');
 
@@ -133,17 +132,5 @@ describe('the fake options', () => {
 		const site = fakeInstallSite(FAST);
 		const failure = await site.port.createField('Shot', { data_type: 'text', properties: [{ property_name: 'name', value: 'Drive Refused' }] }).catch((error: unknown) => error);
 		expect(asRefusal(failure)).toMatchObject({ status: 403 });
-	});
-});
-
-describe('onceLoaded (VIS-3)', () => {
-	it('reads the project list once, and again after a read that failed', async () => {
-		let reads = 0;
-		const answers = [{ status: 'failed' as const, message: 'No.' }, { status: 'loaded' as const, projects: [] }];
-		const load = onceLoaded(async () => answers[Math.min(reads++, 1)]!);
-		expect((await load()).status).toBe('failed');
-		expect((await load()).status).toBe('loaded');
-		expect((await load()).status).toBe('loaded');
-		expect(reads).toBe(2);
 	});
 });

@@ -20,6 +20,7 @@ import type { RunReader, SchemaWritePort } from '$lib/pure/run-port';
 import type { VisibilityPort } from '$lib/pure/visibility-run';
 import type { ProjectsRead } from '$lib/pure/visibility-scope';
 import { coreSchemaSource } from './core-schema-source';
+import { onceLoaded } from './read-once';
 import { createTrashPage, siteSchemaClient } from './schema-client';
 import { afterSiteWrite } from './site-cache';
 import { coreVisibilitySource, createVisibilityAnalyser, loadProjects, visibilityPort, type VisibilityAnalyser } from './visibility';
@@ -53,17 +54,6 @@ export type InstallSiteResult = { ok: true; site: InstallSite } | { ok: false; p
 
 /** The address flag that asks for the fake site. Read under `vite dev` only. */
 export const FAKE_FLAG = 'fake';
-
-/** Reads the list once, and again after a read that failed. */
-export function onceLoaded(read: () => Promise<ProjectsRead>): () => Promise<ProjectsRead> {
-	let held: Promise<ProjectsRead> | null = null;
-	return async () => {
-		const mine = (held ??= read());
-		const answer = await mine;
-		if (answer.status === 'failed' && held === mine) held = null;
-		return answer;
-	};
-}
 
 let live: InstallSite | null = null;
 

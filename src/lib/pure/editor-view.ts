@@ -14,6 +14,8 @@
  * - When entries exist but nothing is visible, the view says so (`no_matches`).
  */
 import { ENTRY_CATEGORIES, type EntryCategory } from './category';
+import { compareCodeUnits, nameCollator } from './text-order';
+import { trimFold } from './fold';
 
 /** What the view reads from a row of the working copy. Rows keep their own other fields. */
 export interface ViewRow {
@@ -99,8 +101,6 @@ export interface EditorView {
 	filterActive: boolean;
 }
 
-const collator = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
-
 const CATEGORY_RANK: Record<EntryCategory, number> = Object.fromEntries(
 	ENTRY_CATEGORIES.map((category, index) => [category, index])
 ) as Record<EntryCategory, number>;
@@ -109,7 +109,7 @@ function compareTypes(a: string, b: string): number {
 	if (a === b) return 0;
 	if (a === '') return 1;
 	if (b === '') return -1;
-	return collator.compare(a, b) || (a < b ? -1 : 1);
+	return nameCollator.compare(a, b) || compareCodeUnits(a, b);
 }
 
 function labelFor(type: string, typeDisplayName: (apiName: string) => string | undefined): string {
@@ -118,14 +118,10 @@ function labelFor(type: string, typeDisplayName: (apiName: string) => string | u
 	return name ? name : type;
 }
 
-function normalizeQuery(search: string): string {
-	return search.trim().toLowerCase();
-}
-
 /**
  * Whether a row matches a search (EDT-34): case-insensitive substring of its display name,
  * programmatic name, target entity type, or the type's site display name when given. A blank
- * query matches every row. The query comes trimmed and lowercased (`normalizeQuery`).
+ * query matches every row. The query comes trimmed and lowercased (`trimFold`).
  */
 function matchesQuery(row: ViewRow, query: string, typeLabel: string | undefined): boolean {
 	if (query === '') return true;
@@ -151,7 +147,7 @@ interface Bucket {
 
 /** The editor list's view model for one set's rows (EDT-16 to EDT-38). Reads its input, never changes it. */
 export function buildEditorView(input: EditorViewInput): EditorView {
-	const query = normalizeQuery(input.search);
+	const query = trimFold(input.search);
 	const searchActive = query !== '';
 	const filterActive = input.filter !== 'all';
 

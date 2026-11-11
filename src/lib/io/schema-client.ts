@@ -27,13 +27,12 @@ import type { CreatePayload, PropertyWrite } from '$lib/pure/plan';
 import type { RunReader, SchemaWritePort } from '$lib/pure/run-port';
 import type { VisibleWrite } from '$lib/pure/visibility-value';
 import type { LiveSchema } from './schema';
+import { readOnce } from './read-once';
 import type { VisibilityWriter } from './visibility';
+import { isSchemaName } from '$lib/pure/schema-name';
 
 /** The four writes of core's schema client. */
 export type SchemaWriter = Pick<SchemaClient, 'createField' | 'updateField' | 'retireField' | 'reviveField'>;
-
-/** A name that is one path segment: an entity type or a field. */
-const NAME = /^[A-Za-z0-9_]+$/;
 
 /** The properties a create or an update of this app ever sends (PLN-13). `visible` is not one: it has its own writer. */
 const SCHEMA_PROPERTIES: readonly string[] = ['name', 'description', 'valid_values', 'default_value', 'valid_types', 'unique'];
@@ -43,8 +42,8 @@ function refuseToSend(why: string): never {
 }
 
 function checkNames(entityType: string, field?: string): void {
-	if (!NAME.test(entityType)) refuseToSend(`'${entityType}' is not an entity type name.`);
-	if (field !== undefined && !NAME.test(field)) refuseToSend(`'${field}' is not a field name.`);
+	if (!isSchemaName(entityType)) refuseToSend(`'${entityType}' is not an entity type name.`);
+	if (field !== undefined && !isSchemaName(field)) refuseToSend(`'${field}' is not a field name.`);
 }
 
 function checkProperties(properties: readonly PropertyWrite[]): void {
@@ -191,11 +190,6 @@ async function lookUpTrashPage(client: PageLister, siteUrl: string): Promise<{ u
  * that failed is asked again the next time.
  */
 export function createTrashPage(client: PageLister, siteUrl: string): () => Promise<string | null> {
-	let held: Promise<{ url: string | null; failed: boolean }> | null = null;
-	return async () => {
-		const mine = (held ??= lookUpTrashPage(client, siteUrl));
-		const answer = await mine;
-		if (answer.failed && held === mine) held = null;
-		return answer.url;
-	};
+	const lookUp = readOnce(() => lookUpTrashPage(client, siteUrl), (answer) => answer.failed);
+	return async () => (await lookUp()).url;
 }

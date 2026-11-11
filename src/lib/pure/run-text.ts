@@ -13,6 +13,7 @@ import { dataTypeLabel } from './data-types';
 import type { Difference } from './plan-diff';
 import { formatValue, reasonParts, settingLabel, trashParts, type PlanReason, type ReasonPart } from './plan-reason';
 import { needsVisibilityRetry, runCounters, type Retrash, type RowNote, type RunAction, type RunRow, type RunState, type WriteKind } from './run';
+import { countText } from './set-text';
 
 type Named = Pick<RunRow, 'entityType' | 'programmaticName' | 'displayName' | 'dataType'>;
 
@@ -37,10 +38,6 @@ function sentence(...runs: ReasonPart[][]): ReasonPart[] {
 
 function fieldLabel(row: Named): string {
 	return `"${row.displayName}" (${row.entityType}.${row.programmaticName})`;
-}
-
-function count(n: number, one: string, many: string): string {
-	return `${n} ${n === 1 ? one : many}`;
 }
 
 function show(setting: Difference['setting'], value: unknown): string {
@@ -106,7 +103,7 @@ export function noteParts(row: Named, note: RowNote | null): ReasonPart[] {
 			const lead = `${field} already exists on the site. Install did not create it.`;
 			if (note.differences.length === 0) return text(lead);
 			return text(
-				`${lead} ${count(note.differences.length, 'setting differs', 'settings differ')} from the set and ${note.differences.length === 1 ? 'was' : 'were'} left as on the site. ${differenceLines(note.differences)} Refresh to plan an update.`
+				`${lead} ${countText(note.differences.length, 'setting differs', 'settings differ')} from the set and ${note.differences.length === 1 ? 'was' : 'were'} left as on the site. ${differenceLines(note.differences)} Refresh to plan an update.`
 			);
 		}
 		case 'unknown-valid-types': {
@@ -172,7 +169,7 @@ export function noteParts(row: Named, note: RowNote | null): ReasonPart[] {
 export function visibilityProgress(row: Pick<RunRow, 'visibility'>): string | null {
 	const visibility = row.visibility;
 	if (!visibility || visibility.status !== 'applying') return null;
-	return `${visibility.done} of ${count(visibility.total, 'project', 'projects')}`;
+	return `${visibility.done} of ${countText(visibility.total, 'project')}`;
 }
 
 const CHANGED = 'Visibility changed on';
@@ -182,17 +179,17 @@ const MADE_VISIBLE = 'Made visible on';
 /** The lines of a row's visibility once it has run, in reading order. Empty when there is nothing to say. */
 function visibilityLines(visibility: NonNullable<RunRow['visibility']>, wrote: string): string[] {
 	const lines: string[] = [];
-	if (visibility.written > 0) lines.push(`${wrote} ${count(visibility.written, 'project', 'projects')}.`);
+	if (visibility.written > 0) lines.push(`${wrote} ${countText(visibility.written, 'project')}.`);
 	if (visibility.status === 'cancelled') {
 		lines.push(
 			visibility.total === 0
 				? 'Visibility was not applied. The install was cancelled first.'
-				: `Visibility was cancelled after ${visibility.done} of ${count(visibility.total, 'project', 'projects')}.`
+				: `Visibility was cancelled after ${visibility.done} of ${countText(visibility.total, 'project')}.`
 		);
 	}
 	if (visibility.error !== null) lines.push(`Visibility could not be applied. ${visibility.error}`);
 	if (visibility.failures.length > 0) {
-		lines.push(`Visibility was not set on ${count(visibility.failures.length, 'project', 'projects')}.`);
+		lines.push(`Visibility was not set on ${countText(visibility.failures.length, 'project')}.`);
 		for (const failure of visibility.failures) lines.push(`${failure.projectName}: ${failure.message}`);
 	}
 	return lines;
@@ -271,7 +268,7 @@ export function summaryText(state: RunState): string | null {
 	if (counters.pending > 0) parts.push(`${counters.pending} not started`);
 	const counts = `${parts.join(', ')}.`;
 	const warnings =
-		counters.visibilityWarnings > 0 ? ` Visibility is incomplete on ${count(counters.visibilityWarnings, 'field', 'fields')}.` : '';
+		counters.visibilityWarnings > 0 ? ` Visibility is incomplete on ${countText(counters.visibilityWarnings, 'field')}.` : '';
 	if (state.error !== null) return `Install stopped. ${state.error} ${counts}${warnings}`;
 	if (state.status === 'cancelled') return `Install cancelled. ${counts}${warnings}`;
 	return `${counts[0].toUpperCase()}${counts.slice(1)}${warnings}`;

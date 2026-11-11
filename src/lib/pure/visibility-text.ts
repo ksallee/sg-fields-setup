@@ -7,6 +7,7 @@ import type { PlanScope } from './plan';
 import type { RowVisibility } from './visibility-analysis';
 import type { ScopeProject } from './visibility-scope';
 import { NOT_EDITABLE_MESSAGE } from './visibility-run';
+import { countText } from './set-text';
 
 /** How many names a tooltip lists before "and N more" (VIS-9). */
 export const TOOLTIP_NAMES = 20;
@@ -101,7 +102,7 @@ export interface VisibilityCount {
 }
 
 function changes(count: number): string {
-	return `${count} visibility ${count === 1 ? 'change' : 'changes'}`;
+	return countText(count, 'visibility change');
 }
 
 /**

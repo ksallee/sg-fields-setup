@@ -36,6 +36,7 @@ import type { VisibilityPort } from '$lib/pure/visibility-run';
 import type { ProjectRow, ProjectsRead, ScopeProject } from '$lib/pure/visibility-scope';
 import { readVisibilityListing, type VisibleWrite } from '$lib/pure/visibility-value';
 import type { SchemaSource } from './schema';
+import { isSchemaName } from '$lib/pure/schema-name';
 
 /* The project list. */
 
@@ -101,14 +102,11 @@ export interface VisibilitySource {
 	readRawFields(entityType: string, projectId: number): Promise<unknown>;
 }
 
-/** A name that is one path segment. Refused before asking, so a bad name never reaches the site. */
-const NAME = /^[A-Za-z0-9_]+$/;
-
 export function coreVisibilitySource(options: RestClientOptions): VisibilitySource {
 	const schema = new RestSchemaClient(options);
 	return {
 		async readRawFields(entityType, projectId) {
-			if (!NAME.test(entityType)) throw new Error(`'${entityType}' is not an entity type name.`);
+			if (!isSchemaName(entityType)) throw new Error(`'${entityType}' is not an entity type name.`);
 			// Without a project every field reads visible. Never ask that way.
 			if (!Number.isInteger(projectId) || projectId <= 0) throw new Error(`'${String(projectId)}' is not a project id.`);
 			// A refusal is core's SchemaApiError, its message the site's detail.

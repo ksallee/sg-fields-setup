@@ -8,11 +8,12 @@
  *
  * Refusals are values, `{ ok: false, reason, ... }`, never thrown. `refusalMessage` words each.
  */
-import { cleanEntry, withSnapshotTime } from './clean';
+import { cleanDescription, cleanEntry, withSnapshotTime } from './clean';
 import { copyName, setNameKey } from './copy-name';
 import type { Entry, EntryDraft, FieldSet, Origin, OriginDetails, Timestamp } from './model';
 import { isValidSetName } from './validity';
 import type { SaveRequest } from './working-copy-save';
+import { compareCodeUnits } from './text-order';
 
 /** A set as it is stored and read: the set and its entries, ordered as EDT-1 asks. */
 export interface StoredSet {
@@ -136,10 +137,6 @@ export function refusalMessage(refusal: SetRefusal): string {
 
 // --- shared steps -------------------------------------------------------------------------------
 
-function byText(a: string, b: string): number {
-	return a < b ? -1 : a > b ? 1 : 0;
-}
-
 /**
  * The entries in the order a set is read: target entity type, then programmatic name (EDT-1),
  * then id so the order is fixed. Plain text order, as the API spells the names. A new array.
@@ -149,16 +146,10 @@ export function orderEntries<T extends Pick<Entry, 'id' | 'targetEntityType' | '
 ): T[] {
 	return [...entries].sort(
 		(a, b) =>
-			byText(a.targetEntityType, b.targetEntityType) ||
-			byText(a.programmaticName, b.programmaticName) ||
-			byText(a.id, b.id)
+			compareCodeUnits(a.targetEntityType, b.targetEntityType) ||
+			compareCodeUnits(a.programmaticName, b.programmaticName) ||
+			compareCodeUnits(a.id, b.id)
 	);
-}
-
-/** Trimmed, or null when nothing is left (MOD-7, the set table of file 02). */
-function cleanDescription(description: string | null | undefined): string | null {
-	const text = description?.trim() ?? '';
-	return text === '' ? null : text;
 }
 
 /** The set among `sets`, other than `ownId`, whose name is `name` by `setNameKey` (MOD-2). */

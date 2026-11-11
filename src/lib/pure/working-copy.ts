@@ -7,11 +7,12 @@
  * generation: the caller supplies the keys of new rows. What is visible, selected or expanded is
  * the view's business, not held here.
  */
-import { cleanEntry } from './clean';
+import { cleanDescription, cleanEntry } from './clean';
 import { isMirror } from './data-types';
 import { hasNonAscii, predictFieldName } from './field-name';
 import type { Entry, EntryDefinition, EntrySnapshot, FieldSet, Origin, OriginDetails, Timestamp } from './model';
 import { validateSet, type SetValidity } from './validity';
+import { compareCodeUnits } from './text-order';
 
 /**
  * How a row's programmatic name moves (EDT-25). Derived: it follows the display name and cannot
@@ -73,11 +74,6 @@ export function definitionOf(source: EntryDefinition): EntryDefinition {
 	};
 }
 
-/** Code unit order: deterministic in every locale. */
-function compareText(a: string, b: string): number {
-	return a < b ? -1 : a > b ? 1 : 0;
-}
-
 function storedRow(entry: Entry): Row {
 	return {
 		...definitionOf(entry),
@@ -101,8 +97,8 @@ export function openWorkingCopy(set: FieldSet, entries: readonly Entry[]): Worki
 		.map(storedRow)
 		.sort(
 			(a, b) =>
-				compareText(a.targetEntityType, b.targetEntityType) ||
-				compareText(a.programmaticName, b.programmaticName)
+				compareCodeUnits(a.targetEntityType, b.targetEntityType) ||
+				compareCodeUnits(a.programmaticName, b.programmaticName)
 		);
 	return {
 		setId: set.id,
@@ -279,8 +275,7 @@ export function cleanedName(workingCopy: WorkingCopy): string {
 
 /** The description as it would be stored: trimmed, blank as none (MOD-7). */
 export function cleanedDescription(workingCopy: WorkingCopy): string | null {
-	const description = workingCopy.description.trim();
-	return description === '' ? null : description;
+	return cleanDescription(workingCopy.description);
 }
 
 /** Whether the name or description differs from the saved one once cleaned. */

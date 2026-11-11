@@ -3,6 +3,7 @@
  * (specs/03-set-list.md). Pure: the store loads the summaries, this picks the page.
  */
 import type { FieldSet, Origin } from './model';
+import { compareCodeUnits, nameCollator } from './text-order';
 
 /** What one list row shows (SET-3): the set and how many entries it holds. */
 export interface SetSummary {
@@ -59,21 +60,14 @@ function fold(text: string): string {
 	return text.normalize('NFC').toLowerCase();
 }
 
-/** One fixed locale, so the order is the same in every browser. Case ignored, digits by value. */
-const byName = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
-
-function byText(a: string, b: string): number {
-	return a < b ? -1 : a > b ? 1 : 0;
-}
-
 /** Ties fall to the name, then the id, so a page boundary never moves between two requests. */
 function tieBreak(a: FieldSet, b: FieldSet): number {
-	return byName.compare(a.name, b.name) || byText(a.name, b.name) || byText(a.id, b.id);
+	return nameCollator.compare(a.name, b.name) || compareCodeUnits(a.name, b.name) || compareCodeUnits(a.id, b.id);
 }
 
 const COMPARE: Record<SetSort, (a: FieldSet, b: FieldSet) => number> = {
-	changed: (a, b) => byText(b.changedAt, a.changedAt) || tieBreak(a, b),
-	created: (a, b) => byText(b.createdAt, a.createdAt) || tieBreak(a, b),
+	changed: (a, b) => compareCodeUnits(b.changedAt, a.changedAt) || tieBreak(a, b),
+	created: (a, b) => compareCodeUnits(b.createdAt, a.createdAt) || tieBreak(a, b),
 	name: tieBreak
 };
 

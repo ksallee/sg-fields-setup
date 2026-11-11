@@ -10,7 +10,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { isDark, setMode } from '$lib/theme';
 	import { prepareLive, type LiveState } from '$lib/live';
-	import { shortHost } from '$lib/pure/site';
+	import { siteHost } from '$lib/pure/site-host';
 
 	let { children }: { children: Snippet } = $props();
 
@@ -54,7 +54,7 @@
 				>
 					{#if live.siteUrl}
 						<span class="text-xs">Site</span>
-						<span class="text-foreground truncate">{shortHost(live.siteUrl)}</span>
+						<span class="text-foreground truncate">{siteHost(live.siteUrl)}</span>
 						{#if live.session}
 							<span aria-hidden="true">·</span><span class="truncate">{live.session.login}</span>
 						{:else if live.devToken}

@@ -17,13 +17,8 @@ import { RestClient, RestSchemaClient, SchemaApiError, SgApiError, type RestClie
 import { isFieldMissing, type FieldReply } from '$lib/pure/live-field';
 import { siteErrorDetail } from '$lib/pure/site-error';
 import type { SchemaSource } from './schema';
-
-/** A name that is one path segment. Refused before asking, so a bad name never reaches the site. */
-const NAME = /^[A-Za-z0-9_]+$/;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
+import { isRecord } from '$lib/pure/is-record';
+import { isSchemaName } from '$lib/pure/schema-name';
 
 /** The same refusal, saying what the site said. `RestClient`'s own message is the title, "Not Found". */
 function withDetail(error: unknown): unknown {
@@ -54,13 +49,13 @@ export function coreSchemaSource(options: RestClientOptions): SchemaSource {
 		},
 
 		async readRawFields(entityType) {
-			if (!NAME.test(entityType)) throw new Error(`'${entityType}' is not an entity type name.`);
+			if (!isSchemaName(entityType)) throw new Error(`'${entityType}' is not an entity type name.`);
 			return schema.readRawFields(entityType);
 		},
 
 		async readField(entityType, field, projectId): Promise<FieldReply> {
-			if (!NAME.test(entityType)) throw new Error(`'${entityType}' is not an entity type name.`);
-			if (!NAME.test(field)) throw new Error(`'${field}' is not a field name.`);
+			if (!isSchemaName(entityType)) throw new Error(`'${entityType}' is not an entity type name.`);
+			if (!isSchemaName(field)) throw new Error(`'${field}' is not a field name.`);
 			const read = await schema.readField(entityType, field, projectId);
 			if (read.status === 'found') return { status: 'found', raw: read.raw };
 			if (read.status === 'undeclared') return { status: 'undeclared' };

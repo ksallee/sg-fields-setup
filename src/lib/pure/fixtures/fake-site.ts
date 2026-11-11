@@ -39,6 +39,7 @@ import { readFieldReply, readFields, type FieldReply } from '../live-field';
 import { predictFieldName } from '../field-name';
 import type { CreatePayload, PropertyWrite } from '../plan';
 import type { ReviveAnswer, RunReader, SchemaWritePort } from '../run-port';
+import { isRecord } from '../is-record';
 
 export const FAKE_OPS = [
 	'readRawEntityTypes',
@@ -205,10 +206,6 @@ const DEFAULT_CARRIERS = ['list', 'status_list', 'checkbox'];
 const VALUE_CARRIERS = ['list', 'status_list'];
 const TYPE_CARRIERS = ['entity', 'multi_entity'];
 const CREATE_PROPERTIES = ['name', 'description', 'valid_values', 'default_value', 'valid_types', 'unique'];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function unique(items: readonly string[]): string[] {
 	return [...new Set(items)];
