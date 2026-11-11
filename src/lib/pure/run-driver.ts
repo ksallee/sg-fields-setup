@@ -33,7 +33,7 @@
  *
  * Only one operation runs at a time. Starting another while one runs rejects.
  */
-import { needsRead, planEntry, type PlanEntry, type PlanItem, type PlanSite } from './plan';
+import { needsRead, planSet, type Plan, type PlanEntry, type PlanItem, type PlanScope, type PlanSite } from './plan';
 import type { LiveField, LiveFieldRead } from './live-field';
 import { applyItem } from './run-item';
 import type { RunReader, SchemaWritePort } from './run-port';
@@ -70,10 +70,17 @@ export interface RunDeps {
 const READS_AT_ONCE = 8;
 
 /**
- * The plan of these entries, read fresh from the site (RUN-6, PLN-3). Reads only. Rejects when
- * any read fails: a failed read is never taken for an absent field.
+ * The plan of these entries, read fresh from the site (RUN-6, PLN-3): the reads, then `planSet`.
+ * The one way the app plans. The screen and a run both call it, so they cannot disagree. Reads
+ * only. Rejects when any read fails: a failed read is never taken for an absent field.
+ *
+ * Answers the plan and the site as it was read, which a run plans each item against again.
  */
-export async function replan(deps: Pick<RunDeps, 'reader' | 'site'>, entries: readonly PlanEntry[]): Promise<{ site: PlanSite; items: PlanItem[] }> {
+export async function replan(
+	deps: Pick<RunDeps, 'reader' | 'site'>,
+	entries: readonly PlanEntry[],
+	scope: PlanScope | null = null
+): Promise<{ site: PlanSite; plan: Plan }> {
 	const entityTypes = await deps.reader.entityTypes();
 	const toRead = entries.filter((entry) => needsRead(entry, entityTypes));
 	const reads = new Map<string, LiveFieldRead>();
@@ -89,13 +96,8 @@ export async function replan(deps: Pick<RunDeps, 'reader' | 'site'>, entries: re
 		if (reads.get(entry.id)?.kind === 'absent' && !fieldsByType.has(type)) fieldsByType.set(type, await deps.reader.fields(type));
 	}
 	const site: PlanSite = { siteUrl: deps.site.siteUrl, trashPageUrl: deps.site.trashPageUrl, entityTypes, fieldsByType };
-	const items: PlanItem[] = [];
-	for (const entry of entries) {
-		const item = planEntry(entry, reads.get(entry.id) ?? null, site);
-		// A mirror entry is never planned (PLN-10): it gets no row.
-		if (item !== null) items.push(item);
-	}
-	return { site, items };
+	// A mirror entry is never planned (PLN-10): it gets no row, and the plan counts it.
+	return { site, plan: planSet({ ...site, entries, reads, scope }) };
 }
 
 type Emit = (event: RunEvent) => void;
@@ -140,7 +142,9 @@ export async function drive(
 	let site: PlanSite;
 	let items: PlanItem[];
 	try {
-		({ site, items } = await replan(deps, entries));
+		const planned = await replan(deps, entries);
+		site = planned.site;
+		items = planned.plan.items;
 	} catch (error) {
 		emit({ type: 'finished', status: 'finished', error: siteErrorMessage(error) });
 		return;

@@ -73,6 +73,45 @@ function scriptedVisibility(failing: number[] = []) {
 	return { apply, calls, fail };
 }
 
+/* The plan a run and the screen share. */
+
+describe('replan', () => {
+	it('PLN-17: answers the plan of planSet, with the counts per class', async () => {
+		const site = createFakeSite().seed('Version', 'sg_lens', { displayName: 'Lens', dataType: 'number' });
+		const { plan, site: read } = await replan(deps(site), [entry(), entry({ id: 'new', programmaticName: 'sg_new', displayName: 'New' })]);
+		expect(plan.items.map((item) => [item.entryId, item.class])).toEqual([
+			['lens', 'type-conflict'],
+			['new', 'create']
+		]);
+		expect(plan.counts).toMatchObject({ 'type-conflict': 1, create: 1, update: 0 });
+		expect(plan.empty).toBeNull();
+		expect(plan.mirrorsLeftOut).toBe(0);
+		expect(plan.siteUrl).toBe(site.siteUrl);
+		expect(read.entityTypes.length).toBeGreaterThan(0);
+	});
+
+	it('PLN-10: a selection of only mirror entries gives an empty plan that says why', async () => {
+		const site = createFakeSite();
+		const mirrors = [entry({ id: 'm1', dataType: 'pivot_column' }), entry({ id: 'm2', programmaticName: 'sg_other', dataType: 'summary' })];
+		const { plan } = await replan(deps(site), mirrors);
+		expect(plan.items).toEqual([]);
+		expect(plan.empty).toBe('only-mirrors');
+		expect(plan.mirrorsLeftOut).toBe(2);
+		expect(site.calls.filter((call) => call.op === 'readField')).toEqual([]);
+	});
+
+	it('PLN-1: no entry gives an empty plan that says so', async () => {
+		const { plan } = await replan(deps(createFakeSite()), []);
+		expect(plan.empty).toBe('no-entries');
+	});
+
+	it('PLN-17: carries a scope when it is given one, and null when not', async () => {
+		const scope = { kind: 'chosen' as const, projects: [{ id: 70, name: 'Alpha' }] };
+		expect((await replan(deps(createFakeSite()), [entry()], scope)).plan.scope).toEqual(scope);
+		expect((await replan(deps(createFakeSite()), [entry()])).plan.scope).toBeNull();
+	});
+});
+
 /* The table of RUN-7. */
 
 describe('a run, class by class (RUN-7)', () => {
@@ -216,7 +255,7 @@ describe('an update at its turn (RUN-7, RUN-15, RUN-27)', () => {
 		});
 		const wantedState = entry({ programmaticName: 'sg_state', displayName: 'State', dataType: 'status_list', validValues: ['vwd', 'apr'], defaultValue: 'vwd' });
 		// What the planner asks for: the values and the default together, which the site checks as a whole (finding 121).
-		const request = (await replan(deps(site), [wantedState])).items[0].update;
+		const request = (await replan(deps(site), [wantedState])).plan.items[0].update;
 		expect(request?.properties.map((property) => property.property_name)).toEqual(['valid_values', 'default_value']);
 
 		const state = await engine(site).start([wantedState]);
@@ -647,7 +686,7 @@ describe('the run as a whole (RUN-6, RUN-16, RUN-17)', () => {
 		expect(site.writesOverlapped()).toBe(false);
 
 		const again = await replan(deps(site), entries);
-		expect(again.items.map((item) => [item.entryId, item.class])).toEqual(entries.map((item) => [item.id, 'already-matches']));
+		expect(again.plan.items.map((item) => [item.entryId, item.class])).toEqual(entries.map((item) => [item.id, 'already-matches']));
 
 		// And a second run writes nothing.
 		const writes = site.writes().length;

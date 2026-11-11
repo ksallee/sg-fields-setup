@@ -202,11 +202,11 @@ export class InstallSession {
 				site.loadProjects()
 			]);
 			if (this.#disposed) return;
-			const mirrorsLeftOut = this.entries.length - planned.items.length;
 			this.projects = projects;
 			this.entityTypes = planned.site.entityTypes;
-			this.items = planned.items;
-			this.emptyText = emptyPlanText({ empty: planned.items.length > 0 ? null : mirrorsLeftOut > 0 ? 'only-mirrors' : 'no-entries', mirrorsLeftOut });
+			this.items = planned.plan.items;
+			// Why it is empty is the plan's to say (PLN-10): nothing is counted again here.
+			this.emptyText = emptyPlanText(planned.plan);
 			this.load = { status: 'loaded' };
 			this.#analyse();
 		} catch (error) {

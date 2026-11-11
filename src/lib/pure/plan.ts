@@ -96,7 +96,11 @@ export interface PlanInput extends PlanSite {
 	 * A read that failed is not a read: the caller stops before planning (PLN-3).
 	 */
 	reads: ReadonlyMap<string, LiveFieldRead>;
-	scope: PlanScope;
+	/**
+	 * Left out when the caller plans before the scope is known: the install screen's scope follows
+	 * the picker with no new plan (VIS-11). The plan then carries null.
+	 */
+	scope?: PlanScope | null;
 }
 
 /** The caller broke the contract: a read or a field listing the plan needs was not supplied. */
@@ -192,7 +196,8 @@ export interface Plan {
 	mirrorsLeftOut: number;
 	/** Why `items` is empty, or null when it is not. */
 	empty: 'no-entries' | 'only-mirrors' | null;
-	scope: PlanScope;
+	/** The scope the plan was made for (PLN-17), or null when none was given. */
+	scope: PlanScope | null;
 }
 
 /* Planning. */
@@ -488,7 +493,7 @@ export function planSet(input: PlanInput): Plan {
 		counts[item.class] += 1;
 	}
 	const empty = items.length > 0 ? null : mirrorsLeftOut > 0 ? 'only-mirrors' : 'no-entries';
-	return { siteUrl: input.siteUrl, items, counts, mirrorsLeftOut, empty, scope: input.scope };
+	return { siteUrl: input.siteUrl, items, counts, mirrorsLeftOut, empty, scope: input.scope ?? null };
 }
 
 /** Why a plan has nothing in it, ready to show. Null when it has items. */
