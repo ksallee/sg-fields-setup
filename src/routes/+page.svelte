@@ -13,6 +13,7 @@
 	import { DeleteSet } from '$lib/app/delete-set.svelte';
 	import CreateSetDialog from '$lib/app/create-set-dialog.svelte';
 	import ImportDialog from '$lib/app/import-dialog.svelte';
+	import Notice from '$lib/app/notice.svelte';
 	import PageHeader from '$lib/app/page-header.svelte';
 	import PageState from '$lib/app/page-state.svelte';
 	import SetRow from '$lib/app/set-list/set-row.svelte';
@@ -41,7 +42,7 @@
 	import { refusalMessage } from '$lib/pure/set-plan';
 	import type { SetSummary } from '$lib/pure/set-query';
 	import { createdText, duplicatedText, exportedNote, exportedText, failedTitle, importedText, SET_GONE_TEXT, totalText } from '$lib/pure/set-text';
-	import { isConnected } from '$lib/pure/site';
+	import { connectNudge, isConnected } from '$lib/pure/site';
 	import { cn } from '$lib/utils.js';
 
 	const SEARCH_DELAY_MS = 300;
@@ -220,8 +221,11 @@
 	void send(startLoad(initialSetList()));
 
 	// SET-25, SET-26: best effort, never awaited, only with a site that can be read.
+	let nudge = $state<ReturnType<typeof connectNudge>>(null);
+
 	void prepareLive()
 		.then((live) => {
+			nudge = connectNudge(live);
 			if (isConnected(live)) void liveSchema().warmUp();
 		})
 		.catch(() => {});
@@ -250,6 +254,15 @@
 		/>
 	{/if}
 </PageHeader>
+
+{#if nudge}
+	<div class="px-4 pt-3">
+		<Notice tone="warning" title={nudge.title} data-slot="connect-nudge">
+			{' '}{nudge.text}
+			{#snippet action()}<Button size="sm" href="/connect">{nudge?.action}</Button>{/snippet}
+		</Notice>
+	</div>
+{/if}
 
 <input bind:this={fileInput} type="file" accept=".json,application/json" multiple hidden onchange={pickedSetFiles} data-slot="set-file-input" />
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectedSite, isConnected, siteTitle, siteWho } from './site';
+import { connectedSite, connectNudge, isConnected, siteTitle, siteWho } from './site';
 
 describe('connectedSite (OVR-7, B10)', () => {
 	it('is empty until a site is named', () => {
@@ -57,5 +57,22 @@ describe('the navbar\'s site link (OVR-7, B10)', () => {
 		expect(siteWho({ session: { login: 'kevin' }, devToken: true })).toEqual({ kind: 'person', text: 'kevin' });
 		expect(siteWho({ session: null, devToken: true })).toEqual({ kind: 'dev-key', text: 'Dev key' });
 		expect(siteWho({ session: null, devToken: false })).toEqual({ kind: 'nobody', text: 'Not signed in' });
+	});
+});
+
+describe('connectNudge (OVR-7, CMP-3)', () => {
+	it('says nothing when the site can be read', () => {
+		expect(connectNudge({ siteUrl: 'https://a.shotgrid.autodesk.com', problem: null })).toBeNull();
+	});
+
+	it('asks for a site when none is named', () => {
+		expect(connectNudge({ siteUrl: '', problem: 'Name the site.' })).toMatchObject({ title: 'No site connected.', action: 'Connect a site' });
+	});
+
+	it('asks for a sign-in when the site is named and cannot be read', () => {
+		expect(connectNudge({ siteUrl: 'https://a.shotgrid.autodesk.com', problem: 'Sign in to read Flow PT.' })).toMatchObject({
+			title: 'Not signed in.',
+			action: 'Sign in'
+		});
 	});
 });
