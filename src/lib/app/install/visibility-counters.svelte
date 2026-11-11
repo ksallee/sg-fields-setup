@@ -1,5 +1,5 @@
 <!--
-	A row's visibility counters (VIS-9): "2 visible", "1 to add", each with the project names in a
+	A row's visibility counters (VIS-9): "2 visible", "1 to add", on a create "visible on 14", each with the project names in a
 	tooltip. The counters and their tooltips come from `visibility-text.rowCounters`.
 -->
 <script lang="ts">
@@ -15,7 +15,8 @@
 		analysing: 'text-muted-foreground/70',
 		locked: 'text-warning',
 		outside: 'text-muted-foreground',
-		toHide: 'text-foreground'
+		toHide: 'text-foreground',
+		newVisible: 'text-muted-foreground'
 	};
 </script>
 

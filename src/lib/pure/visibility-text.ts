@@ -21,7 +21,7 @@ export function projectNames(projects: readonly ScopeProject[], limit: number = 
 	return more > 0 ? `${names} and ${more} more` : names;
 }
 
-export type CounterKind = 'visible' | 'toAdd' | 'analysing' | 'locked' | 'outside' | 'toHide';
+export type CounterKind = 'visible' | 'toAdd' | 'analysing' | 'locked' | 'outside' | 'toHide' | 'newVisible';
 
 export interface VisibilityCounter {
 	kind: CounterKind;
@@ -32,7 +32,7 @@ export interface VisibilityCounter {
 	tooltip: string;
 }
 
-const COUNTERS: readonly { kind: CounterKind; word: string; tooltip: (names: string) => string }[] = [
+const COUNTERS: readonly { kind: Exclude<CounterKind, 'newVisible'>; word: string; tooltip: (names: string) => string }[] = [
 	{ kind: 'visible', word: 'visible', tooltip: (names) => `Visible on ${names}.` },
 	{ kind: 'toAdd', word: 'to add', tooltip: (names) => `To be made visible on ${names}.` },
 	{ kind: 'analysing', word: 'analysing', tooltip: (names) => `Still reading ${names}.` },
@@ -41,10 +41,35 @@ const COUNTERS: readonly { kind: CounterKind; word: string; tooltip: (names: str
 	{ kind: 'toHide', word: 'to hide', tooltip: (names) => `A new field. To be hidden on ${names}.` }
 ];
 
-/** A row's counters, in a fixed order, only those that count something (VIS-9). */
+/**
+ * A row's counters, in a fixed order, only those that count something (VIS-9).
+ *
+ * A create row says what is true after the run: a new field is visible on every project (corpus
+ * `findings/115`), so "visible on N" for the projects in scope, and "hidden on M" where a chosen
+ * scope hides it. It has nothing "to add".
+ */
 export function rowCounters(row: RowVisibility): VisibilityCounter[] {
 	if (!row.applies) return [];
 	const counters: VisibilityCounter[] = [];
+	if (row.class === 'create') {
+		if (row.toAdd.length > 0) {
+			counters.push({
+				kind: 'newVisible',
+				count: row.toAdd.length,
+				label: `visible on ${row.toAdd.length}`,
+				tooltip: `A new field is visible on every project. It will be visible on ${projectNames(row.toAdd)}.`
+			});
+		}
+		if (row.toHide.length > 0) {
+			counters.push({
+				kind: 'toHide',
+				count: row.toHide.length,
+				label: `hidden on ${row.toHide.length}`,
+				tooltip: `A new field. To be hidden on ${projectNames(row.toHide)}.`
+			});
+		}
+		return counters;
+	}
 	for (const { kind, word, tooltip } of COUNTERS) {
 		const projects = row[kind];
 		if (projects.length === 0) continue;
@@ -63,27 +88,41 @@ export function nothingLeftToDo(row: RowVisibility): boolean {
 }
 
 export interface VisibilityCount {
-	/** The number of projects to add over the selected rows, or its upper bound. */
+	/** The writes the run is expected to make over the selected rows, or their upper bound: `adds` plus `hides`. */
 	count: number;
-	/** True while a selected row is still being analysed: `count` is rows times projects in scope. */
+	/** Projects to make visible, on existing rows. A create adds none: a new field is visible everywhere (finding 115). */
+	adds: number;
+	/** True while a selected row is still being analysed: `adds` is existing rows times projects in scope. */
 	upperBound: boolean;
-	/** Where new fields will be hidden: chosen scope, create rows (VIS-4). Not part of `count`. */
+	/** Where new fields will be hidden: chosen scope, create rows (VIS-4). Known in advance. */
 	hides: number;
-	/** The summary's line (RUN-5). */
+	/** The summary's line (RUN-5), and the confirmation's. */
 	text: string;
 }
 
+function changes(count: number): string {
+	return `${count} visibility ${count === 1 ? 'change' : 'changes'}`;
+}
+
 /**
- * The summary's visibility count over the selected rows (VIS-10): the sum of "to add" once no
- * selected row is still being analysed; before that an upper bound, the selected rows that take
- * visibility times the projects in scope, marked as such.
+ * The summary's visibility count over the selected rows (VIS-10): the writes the run is expected
+ * to make. On existing rows, the projects to add. On create rows, none to add, since a new field
+ * is visible on every project (corpus `findings/115`), and the hides when the scope is chosen
+ * projects (VIS-4). While a selected row is still being analysed the adds are an upper bound,
+ * the existing rows that take visibility times the projects in scope, marked as such.
  */
 export function visibilityCount(selected: readonly RowVisibility[], scope: PlanScope): VisibilityCount {
 	const rows = selected.filter((row) => row.applies);
-	const upperBound = rows.some((row) => row.analysing.length > 0);
-	const count = upperBound ? rows.length * scope.projects.length : rows.reduce((sum, row) => sum + row.toAdd.length, 0);
-	const hides = rows.reduce((sum, row) => sum + row.toHide.length, 0);
-	let text = count === 0 ? 'No visibility changes' : `${upperBound ? 'Up to ' : ''}${count} visibility ${count === 1 ? 'change' : 'changes'}`;
-	if (hides > 0) text += `, ${hides} to hide`;
-	return { count, upperBound, hides, text };
+	const existing = rows.filter((row) => row.class !== 'create');
+	const upperBound = existing.some((row) => row.analysing.length > 0);
+	const adds = upperBound ? existing.length * scope.projects.length : existing.reduce((sum, row) => sum + row.toAdd.length, 0);
+	const hides = rows.reduce((sum, row) => sum + (row.class === 'create' ? row.toHide.length : 0), 0);
+	const count = adds + hides;
+	const upTo = upperBound ? 'Up to ' : '';
+	let text: string;
+	if (count === 0) text = 'No visibility changes';
+	else if (hides === 0) text = `${upTo}${changes(count)}`;
+	else if (adds === 0) text = `${upTo}${changes(count)}, all to hide`;
+	else text = `${upTo}${changes(count)}: ${upperBound ? 'up to ' : ''}${adds} to show, ${hides} to hide`;
+	return { count, adds, upperBound, hides, text };
 }
