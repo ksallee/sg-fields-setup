@@ -6,7 +6,7 @@
 	"description": "Keep named sets of Flow PT field definitions, compare them with a live site and install them, built on sg-widgets.",
 	"packageManager": "pnpm@12.5.1",
 	"engines": {
-		"node": ">=22"
+		"node": ">=22 <25"
 	},
 	"scripts": {
 		"dev": "vite dev",
