@@ -9,18 +9,19 @@ import { validateSet } from './validity';
 
 const NOW = '2026-11-10T09:00:00.000Z';
 
+/** A hand-built set file (`set-file.ts`), read only as far as this test needs. */
 interface FixtureEntry {
-	target_entity_type: string;
-	programmatic_name: string;
-	display_name: string;
-	data_type: string;
-	valid_types?: string[];
+	targetEntityType: string;
+	programmaticName: string;
+	displayName: string;
+	dataType: string;
+	validTypes: string[];
 }
 interface Fixture {
 	name: string;
 	description: string;
 	origin: string;
-	origin_details: string;
+	originDetails: { sourceFiles: string; importedAt: string };
 	entries: FixtureEntry[];
 }
 
@@ -31,7 +32,7 @@ function fromFixture(fixture: Fixture, setId: string): { set: FieldSet; entries:
 		name: fixture.name,
 		description: fixture.description,
 		origin: 'import',
-		originDetails: { sourceFiles: fixture.origin_details, importedAt: NOW },
+		originDetails: fixture.originDetails,
 		createdAt: NOW,
 		changedAt: NOW
 	};
@@ -39,11 +40,11 @@ function fromFixture(fixture: Fixture, setId: string): { set: FieldSet; entries:
 		(e, i): Entry => ({
 			id: `${setId}-${i}`,
 			setId,
-			targetEntityType: e.target_entity_type,
-			programmaticName: e.programmatic_name,
-			displayName: e.display_name,
-			dataType: e.data_type,
-			validTypes: e.valid_types ?? [],
+			targetEntityType: e.targetEntityType,
+			programmaticName: e.programmaticName,
+			displayName: e.displayName,
+			dataType: e.dataType,
+			validTypes: e.validTypes,
 			validValues: [],
 			defaultValue: null,
 			description: null,
