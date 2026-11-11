@@ -55,6 +55,23 @@ A site on another domain needs `FPT_EXTRA_SITE_SUFFIXES`: comma-separated host n
 `flow.example.com`. Each is allowed with its subdomains. An entry that is no plain host name of two
 labels or more is dropped. The variable is server only and never reaches the page's code.
 
+## Security headers
+
+`src/lib/pure/security-headers.ts` holds them. `src/lib/pure/security-headers.test.ts` pins them.
+
+- Pages carry a Content Security Policy from SvelteKit's `csp` option (`vite.config.ts`), with a
+  nonce per response on every script. The theme script in `src/app.html` carries the nonce. Scripts
+  come from the app alone. Styles allow `'unsafe-inline'`: bits-ui, sonner and the widgets set
+  `style` attributes. Images allow `https:`, for the site's thumbnails.
+- `connect-src` is the app itself and the hosts of "Which sites are accepted". It reads
+  `FPT_EXTRA_SITE_SUFFIXES` when the app is built, so set the variable for the build and for the
+  functions, and redeploy after changing it. The hosts named there show in the policy.
+- `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and `X-Frame-Options: DENY` go
+  on every path through `vercel.json`, and on everything the server answers through
+  `src/hooks.server.ts`. The `/live/` endpoints also answer
+  `default-src 'none'; frame-ancestors 'none'`.
+- `vite dev` serves the same policy, so a blocked call shows while developing.
+
 ## The fake site
 
 The install screen is the only one that writes to a site. To drive its run with no network and
