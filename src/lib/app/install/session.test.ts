@@ -13,6 +13,7 @@ vi.mock('$lib/io/set-store', async (original) => ({
 	sharedSetStore: async () => store
 }));
 
+import { notify } from '$lib/app/toast';
 import { SetStoreError } from '$lib/io/set-store';
 import type { EntryDefinition } from '$lib/pure/model';
 import { InstallSession } from './session.svelte';
@@ -103,7 +104,7 @@ describe('what was read is dropped when a write may have happened (audit finding
 	it('RUN-26: a run that finished', async () => {
 		const session = await opened(two);
 		const cleared = vi.spyOn(session.site!, 'clear');
-		await session.apply();
+		await session.apply(session.askConfirm());
 		expect(session.run.status).toBe('finished');
 		expect(session.run.rows.map((row) => row.state)).toEqual(['done', 'done']);
 		expect(cleared).toHaveBeenCalledTimes(1);
@@ -112,7 +113,7 @@ describe('what was read is dropped when a write may have happened (audit finding
 	it('RUN-18: a run that was cancelled', async () => {
 		const session = await opened(two, SLOW);
 		const cleared = vi.spyOn(session.site!, 'clear');
-		const running = session.apply();
+		const running = session.apply(session.askConfirm());
 		session.cancel();
 		await running;
 		expect(session.run.status).toBe('cancelled');
@@ -123,7 +124,7 @@ describe('what was read is dropped when a write may have happened (audit finding
 		const session = await opened(two);
 		const cleared = vi.spyOn(session.site!, 'clear');
 		vi.spyOn(session.site!.reader, 'entityTypes').mockRejectedValueOnce(new TypeError('Failed to fetch'));
-		await session.apply();
+		await session.apply(session.askConfirm());
 		expect(session.run).toMatchObject({ status: 'finished', error: 'Failed to fetch' });
 		expect(cleared).toHaveBeenCalledTimes(1);
 	});
@@ -131,7 +132,7 @@ describe('what was read is dropped when a write may have happened (audit finding
 	it('a run the person walked away from: the page is gone, the writes are not', async () => {
 		const session = await opened(two, SLOW);
 		const cleared = vi.spyOn(session.site!, 'clear');
-		const running = session.apply();
+		const running = session.apply(session.askConfirm());
 		session.dispose();
 		await running;
 		expect(cleared).toHaveBeenCalledTimes(1);
@@ -143,5 +144,83 @@ describe('what was read is dropped when a write may have happened (audit finding
 		await session.refresh();
 		expect(cleared).toHaveBeenCalledTimes(1);
 		expect(session.load).toEqual({ status: 'loaded' });
+	});
+});
+
+describe('Install needs the proof of the confirmation (audit finding 15)', () => {
+	const two = [definition(), definition({ programmaticName: 'sg_focal', displayName: 'Focal' })];
+	const writes = (session: InstallSession) => vi.spyOn(session.site!.port, 'createField');
+
+	it('does nothing for a caller that brings no proof', async () => {
+		const session = await opened(two);
+		const created = writes(session);
+		await session.apply(null);
+		expect(session.run.status).toBe('idle');
+		expect(created).not.toHaveBeenCalled();
+	});
+
+	it('hands out the proof with the words the dialog shows, and runs on it once', async () => {
+		const session = await opened(two);
+		const created = writes(session);
+		const confirmation = session.askConfirm();
+		expect(confirmation?.text).toEqual(session.confirm);
+		expect(confirmation?.text.confirmLabel).toBe('Install 2 fields');
+		await session.apply(confirmation);
+		expect(session.run.status).toBe('finished');
+		expect(created).toHaveBeenCalledTimes(2);
+	});
+
+	it('hands out none when Install is not on offer', async () => {
+		const session = await opened(two);
+		session.setAll(false);
+		expect(session.askConfirm()).toBeNull();
+	});
+
+	it('a tick changed between asking and confirming: nothing is installed, and the screen says why', async () => {
+		const warned = vi.spyOn(notify, 'warning').mockImplementation(() => {});
+		const session = await opened(two);
+		const created = writes(session);
+		const confirmation = session.askConfirm();
+		session.toggle('e1');
+		await session.apply(confirmation);
+		expect(session.run.status).toBe('idle');
+		expect(created).not.toHaveBeenCalled();
+		expect(warned).toHaveBeenCalledWith('The plan changed after you were asked. Nothing was installed. Check the plan, then install again.', undefined, { position: 'top-right' });
+	});
+
+	it('a refresh between asking and confirming: nothing is installed', async () => {
+		vi.spyOn(notify, 'warning').mockImplementation(() => {});
+		const session = await opened(two);
+		const created = writes(session);
+		const confirmation = session.askConfirm();
+		await session.refresh();
+		await session.apply(confirmation);
+		expect(session.run.status).toBe('idle');
+		expect(created).not.toHaveBeenCalled();
+	});
+
+	it('a pick in the project picker between asking and confirming: nothing is installed', async () => {
+		vi.spyOn(notify, 'warning').mockImplementation(() => {});
+		const session = await opened(two);
+		const confirmation = session.askConfirm();
+		session.choose([{ type: 'Project', id: 70 }]);
+		await session.apply(confirmation);
+		expect(session.run.status).toBe('idle');
+	});
+
+	it('only the proof of the dialog last opened counts, and it is spent by one try', async () => {
+		vi.spyOn(notify, 'warning').mockImplementation(() => {});
+		const session = await opened(two);
+		const created = writes(session);
+		const first = session.askConfirm();
+		const second = session.askConfirm();
+		await session.apply(first);
+		expect(session.run.status).toBe('idle');
+		// The try spent the pending one too: the dialog has to be opened again.
+		await session.apply(second);
+		expect(session.run.status).toBe('idle');
+		expect(created).not.toHaveBeenCalled();
+		await session.apply(session.askConfirm());
+		expect(session.run.status).toBe('finished');
 	});
 });

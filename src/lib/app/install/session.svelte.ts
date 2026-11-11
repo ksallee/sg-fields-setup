@@ -10,6 +10,7 @@
  * | scope, notes                 | `visibility-scope` (`resolveScope`, no site read, VIS-11)|
  * | counters, nothing left to do | `visibility-analysis`, `visibility-text`                |
  * | summary, confirmation        | `install-text`, `visibility-text.visibilityCount`       |
+ * | proof of the confirmation    | `install-confirm`                                       |
  * | footer                       | `install-footer`                                        |
  * | the run                      | `run-driver.createRun`, `visibility-run`                |
  *
@@ -27,6 +28,7 @@ import { downloadText } from '$lib/io/download';
 import { readInstallSelection } from '$lib/io/install-selection';
 import { installSite, type InstallSite } from '$lib/io/install-site';
 import { sharedSetStore } from '$lib/io/set-store';
+import { CONFIRM_CHANGED_TEXT, mintConfirmation, redeemConfirmation, type Confirmation, type ConfirmSubject } from '$lib/pure/install-confirm';
 import { installEntries } from '$lib/pure/install-entries';
 import { footerActions, type Footer } from '$lib/pure/install-footer';
 import { confirmText, installSummary, planContext, reportFileName, screenSummary, type ConfirmText, type SummaryItem } from '$lib/pure/install-text';
@@ -83,6 +85,10 @@ export class InstallSession {
 	#runner: Run | null = null;
 	#stopListening: (() => void) | null = null;
 	#trashPageUrl: string | null = null;
+	/** Moves with every plan read from the site: a confirmation is for one plan. */
+	#planSerial = 0;
+	/** The confirmation the dialog was last opened with, until it is spent. */
+	#pending: Confirmation | null = null;
 	/** Which analysis may still write to `analysis`: an older one is ignored. */
 	#asked = 0;
 	#disposed = false;
@@ -204,6 +210,7 @@ export class InstallSession {
 				site.loadProjects()
 			]);
 			if (this.#disposed) return;
+			this.#planSerial += 1;
 			this.projects = projects;
 			this.entityTypes = planned.site.entityTypes;
 			this.items = planned.plan.items;
@@ -271,10 +278,40 @@ export class InstallSession {
 
 	/* The run. */
 
-	/** Starts the run for the ticked rows, in plan order (RUN-6). Call after the person confirmed. */
-	async apply(): Promise<void> {
+	/** What a confirmation is for, as things stand now (`install-confirm`). */
+	#subject(): ConfirmSubject {
+		const ticked = this.ticked;
+		return {
+			planSerial: this.#planSerial,
+			entryIds: this.entries.filter((entry) => ticked.has(entry.id)).map((entry) => entry.id),
+			scope: { kind: this.resolved.scope.kind, projectIds: this.resolved.scope.projects.map((project) => project.id) },
+			text: this.confirm
+		};
+	}
+
+	/**
+	 * The dialog is opening: the proof of the confirmation it asks for, with the words to show.
+	 * Null when Install is not on offer. Only the last one handed out counts.
+	 */
+	askConfirm(): Confirmation | null {
+		this.#pending = this.site && this.footer.apply.enabled ? mintConfirmation(this.#subject()) : null;
+		return this.#pending;
+	}
+
+	/**
+	 * Starts the run for the ticked rows, in plan order (RUN-6), when `confirmation` is the proof
+	 * `askConfirm` last handed out and nothing changed since: the plan, the ticks, the scope, the
+	 * words. Otherwise nothing is written. `install-confirm` holds the rule.
+	 */
+	async apply(confirmation: Confirmation | null): Promise<void> {
 		const site = this.site;
 		if (!site || !this.footer.apply.enabled) return;
+		const verdict = redeemConfirmation(this.#pending, confirmation, this.#subject());
+		this.#pending = null;
+		if (verdict !== 'confirmed') {
+			if (verdict !== 'missing') notify.warning(CONFIRM_CHANGED_TEXT, undefined, ABOVE_FOOTER);
+			return;
+		}
 		const wanted = this.ticked;
 		const selected = this.entries.filter((entry) => wanted.has(entry.id));
 		// The scope as it stands now. The picker is locked from here on.

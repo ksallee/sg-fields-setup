@@ -181,7 +181,9 @@ filler. Sentence case everywhere, no capitals for labels.
 - **Counters.** Small dotted-underline words on the right of a row, each a tooltip trigger.
 - **First write.** Install asks first, in a dialog that names the site, what is created and
   updated, that a name is taken for good, and the visibility scope. Leaving while a run is in
-  progress asks too.
+  progress asks too. The session starts a run only on the proof it handed out when the dialog
+  opened (`$lib/pure/install-confirm`): a refresh, a tick or a pick in between spends it, and
+  the screen says the plan changed.
 - **No HTML.** Reasons and errors are rendered from parts, text and links. Never `{@html}`.
 
 ## Shared pieces
