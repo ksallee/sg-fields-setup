@@ -7,21 +7,25 @@ import type { EntryDefinition } from './model';
 /**
  * The data types a user may pick for a new entry, in picker order (MOD-13).
  *
- * Exactly the types the corpus measured as created (`findings/019_create_fields.md`). `color` was
- * measured refused (B9). `status_list` and currency are unmeasured. When probe G3 answers, add
- * the type here, and its label below if it has none: nothing else changes.
+ * Exactly the types the corpus measured as created: `findings/019_create_fields`, and probe G3's
+ * answer in `findings/116_field_settings_create_update` (`status_list`, which needs its valid
+ * values) and `findings/117_field_types_and_names` (`currency`, `timecode`, `footage`, each with a
+ * name alone). `color` and `image` were measured refused (B9), `calculated` a 500.
  */
 export const CREATABLE_DATA_TYPES = [
 	'text',
 	'number',
 	'float',
 	'percent',
+	'currency',
 	'duration',
+	'timecode',
 	'footage',
 	'date',
 	'date_time',
 	'checkbox',
 	'list',
+	'status_list',
 	'entity',
 	'multi_entity',
 	'url'
@@ -50,22 +54,23 @@ const LABELS: Readonly<Record<string, string>> = {
 	number: 'Number',
 	float: 'Float',
 	percent: 'Percent',
+	currency: 'Currency',
 	duration: 'Duration',
+	timecode: 'Timecode',
 	footage: 'Footage',
 	date: 'Date',
 	date_time: 'Date and time',
 	checkbox: 'Checkbox',
 	list: 'List',
+	status_list: 'Status list',
 	entity: 'Entity link',
 	multi_entity: 'Multi-entity link',
 	url: 'URL',
 	// Mirror types the corpus has a card for.
-	status_list: 'Status list',
 	color: 'Colour',
 	calculated: 'Calculated',
 	summary: 'Summary',
 	image: 'Image',
-	timecode: 'Timecode',
 	entity_type: 'Entity type',
 	pivot_column: 'Pivot column',
 	password: 'Password',
@@ -96,7 +101,7 @@ const NO_SETTINGS: readonly Setting[] = [];
 
 /**
  * The settings a data type carries (table under "Type-specific settings", MOD-9). Empty for every
- * other type, known or not. `status_list` is in the table though it is not creatable yet.
+ * other type, known or not.
  */
 export function settingsOf(dataType: string): readonly Setting[] {
 	return Object.hasOwn(SETTINGS, dataType) ? SETTINGS[dataType] : NO_SETTINGS;
