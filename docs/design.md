@@ -113,9 +113,14 @@ filler. Sentence case everywhere, no capitals for labels.
 ## Shared pieces
 
 `src/lib/app/`: `app-shell`, `page-header`, `page-state`, `notice`, `confirm-dialog`,
-`icon-button`, `relative-time`, `toast.ts`, `create-set-dialog`, `import-dialog`, `set-list/`.
+`icon-button`, `relative-time`, `toast.ts`, `create-set-dialog`, `import-dialog`, `file-drop`,
+`set-list/`.
 
 `src/lib/components/ui/` (shadcn-svelte, added with its CLI): alert-dialog, badge, button,
 checkbox, collapsible, dialog, dropdown-menu, input, label, progress, scroll-area, select,
 separator, skeleton, sonner, tabs, textarea, tooltip. `sonner` is edited to follow `$lib/theme`
 in place of mode-watcher. `Tooltip.Provider` is in the root layout.
+
+`src/lib/components/` (sg-widgets registry copies, added with the same CLI from
+`https://sg-widgets.vercel.app/r/svelte/<name>.json`, never edited here): entity-type-picker and what
+it installs with it.
