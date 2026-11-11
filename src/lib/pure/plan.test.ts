@@ -3,7 +3,7 @@ import { CREATABLE_DATA_TYPES } from './data-types';
 import { predictFieldName } from './field-name';
 import listing from './fixtures/live-version-fields.json';
 import schema from './fixtures/live-schema.json';
-import { readEntityTypes } from './live-entity-types';
+import { readEntityTypes, type LiveEntityType } from './live-entity-types';
 import { readField, readFieldReply, readFields, type LiveField, type LiveFieldRead } from './live-field';
 import {
 	PLAN_CLASSES,
@@ -18,12 +18,19 @@ import {
 	type PlanEntry,
 	type PlanItem,
 	type PlanSite,
-	type PropertyWrite
+	type PropertyWrite,
+	type UpdateRequest
 } from './plan';
 
 /* Fixtures. */
 
-const entityTypes = readEntityTypes(schema.data);
+/** The fixture's types, and three stock ones the fixture was cut without. */
+const entityTypes: LiveEntityType[] = [
+	...readEntityTypes(schema.data),
+	{ name: 'Shot', displayName: 'Shot', custom: false },
+	{ name: 'Sequence', displayName: 'Sequence', custom: false },
+	{ name: 'Task', displayName: 'Task', custom: false }
+];
 const versionFields = readFields('Version', listing.data);
 
 const site: PlanSite = {
@@ -99,12 +106,37 @@ function plan(e: PlanEntry, read: LiveFieldRead | null, at: PlanSite = site): Pl
 	return item;
 }
 
-const writes = (item: PlanItem): PropertyWrite[] => (item.update?.requests ?? []).map((request) => request.properties[0]);
+/** The properties of an update's one request, in the order sent (finding 121). */
+function writes(item: PlanItem): PropertyWrite[] {
+	const requests = item.update?.requests ?? [];
+	expect(requests.length).toBeLessThanOrEqual(1);
+	return requests.flatMap((request) => request.properties);
+}
 
-/* The site, as finding 116 measured it. */
+/* The site, as findings 116 and 121 measured it. */
+
+/** What a write did beside the field itself: the reverse fields it made and retired, by type (finding 121). */
+interface SiteLog {
+	made: string[];
+	retired: string[];
+}
+
+const unique = (items: readonly string[]): string[] => items.filter((item, index) => items.indexOf(item) === index);
+
+/** Valid types as the site takes them: repeats dropped, or a throw for a name that is no entity type. */
+function siteValidTypes(names: readonly string[]): string[] {
+	for (const name of names) {
+		if (entityTypes.some((type) => type.name === name)) continue;
+		if (entityTypes.some((type) => type.name.toLowerCase() === name.toLowerCase())) {
+			throw new Error('500 Shotgun Server Error. The field is retired.');
+		}
+		throw new Error('invalid/missing entity');
+	}
+	return unique(names);
+}
 
 /** The field the site reports after a create, or a throw where the site refuses. */
-function siteCreate(name: string, payload: CreatePayload): LiveField {
+function siteCreate(name: string, payload: CreatePayload, log: SiteLog = { made: [], retired: [] }): LiveField {
 	const value = (property: string) => payload.properties.find((write) => write.property_name === property)?.value;
 	const type = payload.data_type;
 	if (type === 'color' || type === 'image') throw new Error('data_type is not valid');
@@ -118,6 +150,10 @@ function siteCreate(name: string, payload: CreatePayload): LiveField {
 	for (const write of payload.properties) {
 		if (write.value === '' || (Array.isArray(write.value) && write.value.length === 0)) throw new Error('value must be filled');
 	}
+	const values = value('valid_values') as string[] | undefined;
+	const types = value('valid_types') as string[] | undefined;
+	const validTypes = types && siteValidTypes(types);
+	log.made.push(...(validTypes ?? []));
 	return liveField(
 		{
 			dataType: type,
@@ -125,44 +161,70 @@ function siteCreate(name: string, payload: CreatePayload): LiveField {
 			description: value('description') as string | undefined,
 			unique: value('unique') === true,
 			defaultValue: value('default_value'),
-			validValues: value('valid_values') as string[] | undefined,
-			validTypes: value('valid_types') as string[] | undefined
+			// A list drops a repeated value. A status list keeps it (finding 121).
+			validValues: values && type === 'list' ? unique(values) : values,
+			validTypes
 		},
 		name
 	);
 }
 
-/** The field after one update request, or a throw where the site refuses. */
-function sitePut(field: LiveField, write: PropertyWrite): LiveField {
-	const { property_name: property, value } = write;
-	if (value === '' || (Array.isArray(value) && value.length === 0)) throw new Error('value must be filled');
-	switch (property) {
-		case 'name':
-			return { ...field, displayName: value as string };
-		case 'description':
-			return { ...field, description: value as string };
-		case 'unique':
-			throw new Error("invalid property 'unique'");
-		case 'valid_types':
-			if (field.dataType !== 'entity') throw new Error("can't update 'valid_types' on this field");
-			return { ...field, validTypes: value as string[] };
-		case 'valid_values': {
-			if (field.dataType !== 'list' && field.dataType !== 'status_list') throw new Error("invalid property 'valid_values'");
-			const values = value as string[];
-			if (field.dataType === 'status_list' && typeof field.defaultValue === 'string' && !values.includes(field.defaultValue)) {
-				throw new Error("'valid_values' must include the 'default_value'");
+/**
+ * The field after one update request, or a throw where the site refuses. The request is applied
+ * whole or not at all, and checked against the state it would leave, in any order (finding 121).
+ */
+function sitePut(field: LiveField, request: UpdateRequest, log: SiteLog = { made: [], retired: [] }): LiveField {
+	if (request.properties.length === 0) throw new Error("can't create/update with no 'properties'");
+	let next = field;
+	const made: string[] = [];
+	const retired: string[] = [];
+	for (const { property_name: property, value } of request.properties) {
+		if (value === '' || (typeof value === 'string' && value.trim() === '')) throw new Error('value must be filled');
+		if (Array.isArray(value) && value.length === 0) throw new Error('value must be filled');
+		switch (property) {
+			case 'name':
+				next = { ...next, displayName: value as string };
+				break;
+			case 'description':
+				next = { ...next, description: value as string };
+				break;
+			case 'unique':
+				throw new Error("invalid property 'unique'");
+			case 'valid_types': {
+				if (field.dataType !== 'entity') throw new Error("can't update 'valid_types' on this field");
+				const types = siteValidTypes(value as string[]);
+				made.push(...types.filter((type) => !field.validTypes.includes(type)));
+				retired.push(...field.validTypes.filter((type) => !types.includes(type)));
+				next = { ...next, validTypes: types };
+				break;
 			}
-			return { ...field, validValues: values };
+			case 'valid_values':
+				if (field.dataType !== 'list' && field.dataType !== 'status_list') throw new Error("invalid property 'valid_values'");
+				next = { ...next, validValues: field.dataType === 'list' ? unique(value as string[]) : (value as string[]) };
+				break;
+			case 'default_value':
+				if (field.dataType === 'checkbox') {
+					if (typeof value !== 'boolean') throw new Error('a checkbox default sent as text is stored as text');
+				} else if (field.dataType !== 'list' && field.dataType !== 'status_list') {
+					throw new Error('default value is read-only');
+				}
+				next = { ...next, defaultValue: value };
+				break;
 		}
-		case 'default_value':
-			if (field.dataType === 'checkbox') {
-				if (typeof value !== 'boolean') throw new Error('a checkbox default sent as text is stored as text');
-				return { ...field, defaultValue: value };
-			}
-			if (field.dataType !== 'list' && field.dataType !== 'status_list') throw new Error('default value is read-only');
-			if (!field.validValues.includes(value as string)) throw new Error("'default_value' not in valid_values");
-			return { ...field, defaultValue: value };
 	}
+	// The whole request, against the state it would leave.
+	const sent = (property: string) => request.properties.some((write) => write.property_name === property);
+	const defaultValue = next.defaultValue;
+	if (typeof defaultValue === 'string') {
+		const inValues = next.validValues.includes(defaultValue);
+		if (sent('default_value') && !inValues) throw new Error("'default_value' not in valid_values");
+		if (next.dataType === 'status_list' && sent('valid_values') && !inValues) {
+			throw new Error("'valid_values' must include the 'default_value'");
+		}
+	}
+	log.made.push(...made);
+	log.retired.push(...retired);
+	return next;
 }
 
 /* Tests. */
@@ -405,17 +467,35 @@ describe('planEntry: present fields', () => {
 		expect(item).toMatchObject({ class: 'already-matches', differences: [], blocked: [], reasons: [], create: null, update: null });
 	});
 
-	it('PLN-7: writable differences are an update, one property per request', () => {
+	it('PLN-7, finding 121: writable differences are an update, one request with every property', () => {
 		const item = plan(entry({ displayName: 'Lens B', description: 'New.' }), present({ dataType: 'text', name: 'Lens', description: 'Old.' }));
 		expect(item.class).toBe('update');
 		expect(item.differences.map((difference) => difference.setting)).toEqual(['displayName', 'description']);
 		expect(item.update).toEqual({
 			requests: [
-				{ properties: [{ property_name: 'name', value: 'Lens B' }] },
-				{ properties: [{ property_name: 'description', value: 'New.' }] }
+				{
+					properties: [
+						{ property_name: 'name', value: 'Lens B' },
+						{ property_name: 'description', value: 'New.' }
+					]
+				}
 			]
 		});
 		expect(item.reasons).toEqual([]);
+	});
+
+	it('finding 121: the properties of the one request keep a fixed order', () => {
+		const list = plan(
+			entry({ displayName: 'Lens B', description: 'New.', dataType: 'list', validValues: ['b', 'c'], defaultValue: 'c' }),
+			present({ dataType: 'list', name: 'Lens', description: 'Old.', validValues: ['a', 'b'], defaultValue: 'a' })
+		);
+		expect(list.update?.requests).toHaveLength(1);
+		expect(writes(list).map((write) => write.property_name)).toEqual(['name', 'description', 'valid_values', 'default_value']);
+		const link = plan(
+			entry({ displayName: 'Lens B', description: 'New.', dataType: 'entity', validTypes: ['Shot', 'Asset'] }),
+			present({ dataType: 'entity', name: 'Lens', validTypes: ['Shot'] })
+		);
+		expect(writes(link).map((write) => write.property_name)).toEqual(['name', 'description', 'valid_types']);
 	});
 
 	it('PLN-8, G5: list values, an entity link valid types and a default are plain updates', () => {
@@ -446,59 +526,55 @@ describe('planEntry: present fields', () => {
 		]);
 	});
 
-	it('a list writes its values before a default that is one of the new values', () => {
-		const item = plan(
-			entry({ dataType: 'list', validValues: ['b', 'c'], defaultValue: 'c' }),
-			present({ dataType: 'list', name: 'Lens', validValues: ['a', 'b'], defaultValue: 'a' })
-		);
-		expect(writes(item)).toEqual([
-			{ property_name: 'valid_values', value: ['b', 'c'] },
-			{ property_name: 'default_value', value: 'c' }
-		]);
-	});
-
-	describe('status list: the values must include the default in force (finding 116)', () => {
+	describe('status list: values and default go in one request (finding 121)', () => {
 		const status = (validValues: string[], defaultValue: string | null) => entry({ dataType: 'status_list', validValues, defaultValue });
 		const liveStatus = (validValues: string[], defaultValue: string | null) =>
 			present({ dataType: 'status_list', name: 'Lens', validValues, defaultValue });
 
-		it('the new default is already a live value: default first, then the values', () => {
-			expect(writes(plan(status(['rev', 'vwd'], 'rev'), liveStatus(['na', 'rev'], 'na')))).toEqual([
-				{ property_name: 'default_value', value: 'rev' },
-				{ property_name: 'valid_values', value: ['rev', 'vwd'] }
-			]);
+		it('new values without the live default, with a new default: one request, no step between', () => {
+			// Measured: ["vwd","apr"] and "vwd" over ["na","rev"] and "na" is a 200.
+			const item = plan(status(['vwd', 'apr'], 'vwd'), liveStatus(['na', 'rev'], 'na'));
+			expect(item.class).toBe('update');
+			expect(item.update).toEqual({
+				requests: [
+					{
+						properties: [
+							{ property_name: 'valid_values', value: ['vwd', 'apr'] },
+							{ property_name: 'default_value', value: 'vwd' }
+						]
+					}
+				]
+			});
 		});
 
-		it('the new default is a new value and the old one stays valid: values first', () => {
-			expect(writes(plan(status(['na', 'vwd'], 'vwd'), liveStatus(['na', 'rev'], 'na')))).toEqual([
-				{ property_name: 'valid_values', value: ['na', 'vwd'] },
-				{ property_name: 'default_value', value: 'vwd' }
-			]);
+		it('the same order whatever the live field holds', () => {
+			for (const live of [liveStatus(['na', 'rev'], 'na'), liveStatus(['na', 'rev'], null), liveStatus(['rev', 'fin'], 'rev')]) {
+				expect(writes(plan(status(['rev', 'vwd'], 'vwd'), live)).map((write) => write.property_name)).toEqual(['valid_values', 'default_value']);
+			}
 		});
 
-		it('no live default: values first', () => {
-			expect(writes(plan(status(['vwd'], 'vwd'), liveStatus(['na', 'rev'], null)))).toEqual([
-				{ property_name: 'valid_values', value: ['vwd'] },
-				{ property_name: 'default_value', value: 'vwd' }
-			]);
+		it('default-not-in-values: a wanted default outside the wanted values is blocked', () => {
+			const item = plan(status(['rev', 'vwd'], 'fin'), liveStatus(['na', 'rev'], 'na'));
+			expect(item.class).toBe('blocked');
+			expect(item.blocked.map((difference) => [difference.setting, difference.why])).toEqual([['defaultValue', 'default-not-in-values']]);
+			expect(item.update).toBeNull();
 		});
 
-		it('neither order works: the old default is kept as a value until the new default is in', () => {
-			expect(writes(plan(status(['vwd', 'fin'], 'vwd'), liveStatus(['na', 'rev'], 'na')))).toEqual([
-				{ property_name: 'valid_values', value: ['vwd', 'fin', 'na'] },
-				{ property_name: 'default_value', value: 'vwd' },
-				{ property_name: 'valid_values', value: ['vwd', 'fin'] }
-			]);
+		it('one reason for a wanted default outside the wanted values: the live default would not stay', () => {
+			const item = plan(status(['rev'], 'fin'), liveStatus(['na', 'rev'], 'na'));
+			expect(item.class).toBe('blocked');
+			expect(item.blocked.map((difference) => [difference.setting, difference.why])).toEqual([['defaultValue', 'default-not-in-values']]);
+			expect(item.differences.map((difference) => difference.setting)).toEqual(['validValues']);
 		});
 
-		it('values that drop the default without changing it are blocked', () => {
+		it('status-values-need-default: values that drop the default without changing it are blocked', () => {
 			const item = plan(status(['rev'], 'na'), liveStatus(['na', 'rev'], 'na'));
 			expect(item.class).toBe('blocked');
 			expect(item.blocked).toEqual([{ setting: 'validValues', live: ['na', 'rev'], wanted: ['rev'], why: 'status-values-need-default' }]);
 			expect(item.reasons[0]).toMatchObject({ code: 'status-values-need-default', other: 'na' });
 		});
 
-		it('values that drop a default the entry cannot clear are blocked with it', () => {
+		it('status-values-need-default: values that drop a default the entry cannot clear are blocked with it', () => {
 			const item = plan(status(['rev'], null), liveStatus(['na', 'rev'], 'na'));
 			expect(item.class).toBe('blocked');
 			expect(item.blocked.map((difference) => [difference.setting, difference.why])).toEqual([
@@ -506,6 +582,177 @@ describe('planEntry: present fields', () => {
 				['validValues', 'status-values-need-default']
 			]);
 			expect(item.differences).toEqual([]);
+		});
+	});
+
+	describe('finding 121: valid type names', () => {
+		const link = (validTypes: string[], dataType = 'entity') => entry({ dataType, validTypes });
+		const liveLink = (validTypes: string[], dataType = 'entity') => present({ dataType, name: 'Lens', validTypes });
+
+		it('a create with a valid type in the wrong case is refused, with the API name meant', () => {
+			const item = plan(link(['shot', 'Asset']), ABSENT);
+			expect(item).toMatchObject({ class: 'refused', refusal: 'valid-type-not-on-site', create: null, update: null });
+			expect(item.reasons).toHaveLength(1);
+			expect(item.reasons[0]).toMatchObject({
+				code: 'valid-type-not-on-site',
+				setting: 'validTypes',
+				live: null,
+				wanted: ['shot', 'Asset'],
+				types: [{ name: 'shot', meant: 'Shot' }]
+			});
+		});
+
+		it('a create with a display name for a valid type is refused, with the API name meant', () => {
+			// The fixture's CustomEntity66 reads "Camera Rig " with a trailing space, CustomEntity01 "Lens".
+			const item = plan(link(['camera rig', 'Lens', 'Shot']), ABSENT);
+			expect(item.refusal).toBe('valid-type-not-on-site');
+			expect(item.reasons[0].types).toEqual([
+				{ name: 'camera rig', meant: 'CustomEntity66' },
+				{ name: 'Lens', meant: 'CustomEntity01' }
+			]);
+		});
+
+		it('a create with a name that is no type at all is refused, with no guess', () => {
+			const item = plan(link(['ZzNoSuchType'], 'multi_entity'), ABSENT);
+			expect(item.refusal).toBe('valid-type-not-on-site');
+			expect(item.reasons[0].types).toEqual([{ name: 'ZzNoSuchType', meant: null }]);
+		});
+
+		it('no guess when two types share the display name', () => {
+			const twins: PlanSite = {
+				...site,
+				entityTypes: [...entityTypes, { name: 'CustomEntity02', displayName: 'Lens', custom: true }]
+			};
+			expect(plan(link(['Lens']), ABSENT, twins).reasons[0].types).toEqual([{ name: 'Lens', meant: null }]);
+		});
+
+		it('an update that would send a wrong-case valid type is blocked, and sends nothing', () => {
+			const item = plan(link(['Shot', 'asset']), liveLink(['Shot']));
+			expect(item).toMatchObject({ class: 'blocked', create: null, update: null });
+			expect(item.blocked).toEqual([{ setting: 'validTypes', live: ['Shot'], wanted: ['Shot', 'asset'], why: 'valid-type-not-on-site' }]);
+			expect(item.reasons[0]).toMatchObject({ code: 'valid-type-not-on-site', types: [{ name: 'asset', meant: 'Asset' }] });
+			expect(item.reverseFieldTypes).toEqual([]);
+		});
+
+		it('the name is checked before the removal: "shot" over "Shot" is a wrong name', () => {
+			const item = plan(link(['shot']), liveLink(['Shot']));
+			expect(item.blocked.map((difference) => difference.why)).toEqual(['valid-type-not-on-site']);
+		});
+
+		it('exact names pass, a connection type included: the site lists it among the valid types', () => {
+			expect(plan(link(['Shot', 'CustomEntity29_sg_scene_Connection']), ABSENT).class).toBe('create');
+		});
+
+		it('valid types that are not sent are not checked: a live multi-entity link that matches', () => {
+			const gone: PlanSite = { ...site, entityTypes: entityTypes.filter((type) => type.name !== 'Shot') };
+			expect(plan(link(['Shot'], 'multi_entity'), liveLink(['Shot'], 'multi_entity'), gone).class).toBe('already-matches');
+		});
+	});
+
+	describe('finding 121: reverse fields', () => {
+		const link = (validTypes: string[], more: Partial<PlanEntry> = {}) => entry({ dataType: 'entity', validTypes, ...more });
+		const liveLink = (validTypes: string[]) => present({ dataType: 'entity', name: 'Lens', validTypes });
+
+		it('an update that removes a type is blocked: its reverse field would be retired', () => {
+			const item = plan(link(['Shot']), liveLink(['Shot', 'Asset']));
+			expect(item).toMatchObject({ class: 'blocked', update: null, reverseFieldTypes: [] });
+			expect(item.blocked).toEqual([{ setting: 'validTypes', live: ['Shot', 'Asset'], wanted: ['Shot'], why: 'valid-type-removed' }]);
+			expect(item.reasons[0]).toMatchObject({ code: 'valid-type-removed', types: [{ name: 'Asset', meant: null }], needsTrash: false });
+		});
+
+		it('an update that swaps a type is blocked, naming only the removed ones', () => {
+			const item = plan(link(['Task', 'Asset']), liveLink(['Shot', 'Asset', 'Sequence']));
+			expect(item.class).toBe('blocked');
+			expect(item.reasons[0].types).toEqual([
+				{ name: 'Shot', meant: null },
+				{ name: 'Sequence', meant: null }
+			]);
+		});
+
+		it('PLN-9: a removal blocks the fine differences with it', () => {
+			const item = plan(link(['Shot'], { description: 'New.' }), liveLink(['Shot', 'Asset']));
+			expect(item.class).toBe('blocked');
+			expect(item.differences.map((difference) => difference.setting)).toEqual(['description']);
+			expect(item.update).toBeNull();
+		});
+
+		it('an update that only adds types stays an update, and says which types gain a reverse field', () => {
+			const item = plan(link(['Shot', 'Asset', 'Sequence']), liveLink(['Shot']));
+			expect(item.class).toBe('update');
+			expect(writes(item)).toEqual([{ property_name: 'valid_types', value: ['Shot', 'Asset', 'Sequence'] }]);
+			expect(item.reverseFieldTypes).toEqual(['Asset', 'Sequence']);
+			expect(item.reasons).toEqual([]);
+		});
+
+		it('an update that adds and reorders names only the added type', () => {
+			const item = plan(link(['Sequence', 'Asset', 'Shot']), liveLink(['Shot', 'Asset']));
+			expect(item.class).toBe('update');
+			expect(item.reverseFieldTypes).toEqual(['Sequence']);
+		});
+
+		it('a reorder alone is an update that makes no reverse field', () => {
+			// Measured: ["Asset","Shot"] over ["Shot","Asset"] is a 200 and reads back in the order sent.
+			const item = plan(link(['Asset', 'Shot']), liveLink(['Shot', 'Asset']));
+			expect(item.class).toBe('update');
+			expect(writes(item)).toEqual([{ property_name: 'valid_types', value: ['Asset', 'Shot'] }]);
+			expect(item.reverseFieldTypes).toEqual([]);
+		});
+
+		it('a create of a link says which types gain a reverse field: entity and multi-entity', () => {
+			expect(plan(link(['Shot', 'Asset']), ABSENT)).toMatchObject({ class: 'create', reverseFieldTypes: ['Shot', 'Asset'] });
+			expect(plan(entry({ dataType: 'multi_entity', validTypes: ['Shot'] }), ABSENT)).toMatchObject({
+				class: 'create',
+				reverseFieldTypes: ['Shot']
+			});
+		});
+
+		it('no reverse field for any other item', () => {
+			expect(plan(entry(), ABSENT).reverseFieldTypes).toEqual([]);
+			expect(plan(entry({ displayName: 'Lens B' }), present({ dataType: 'text', name: 'Lens' })).reverseFieldTypes).toEqual([]);
+			expect(plan(link(['Shot'], { displayName: 'Lens B' }), liveLink(['Shot'])).reverseFieldTypes).toEqual([]);
+			expect(plan(link(['Shot']), liveLink(['Shot'])).reverseFieldTypes).toEqual([]);
+			expect(plan(link([]), ABSENT).reverseFieldTypes).toEqual([]);
+		});
+	});
+
+	describe('finding 121: repeated values', () => {
+		it('a create sends list values and valid types without repeats, first occurrence kept', () => {
+			expect(plan(entry({ dataType: 'list', validValues: ['beta', 'alpha', 'beta', 'alpha', 'gamma'] }), ABSENT).create?.properties).toEqual([
+				{ property_name: 'name', value: 'Lens' },
+				{ property_name: 'valid_values', value: ['beta', 'alpha', 'gamma'] }
+			]);
+			const link = plan(entry({ dataType: 'entity', validTypes: ['Shot', 'Shot', 'Asset'] }), ABSENT);
+			expect(link.create?.properties[1]).toEqual({ property_name: 'valid_types', value: ['Shot', 'Asset'] });
+			expect(link.reverseFieldTypes).toEqual(['Shot', 'Asset']);
+		});
+
+		it('a multi-entity link with one type repeated has one type', () => {
+			expect(plan(entry({ dataType: 'multi_entity', validTypes: ['Shot', 'Shot'] }), ABSENT).create?.properties[1]).toEqual({
+				property_name: 'valid_types',
+				value: ['Shot']
+			});
+		});
+
+		it('a status list is sent without repeats too: the site would store a repeated code twice', () => {
+			expect(plan(entry({ dataType: 'status_list', validValues: ['na', 'vwd', 'apr', 'na'] }), ABSENT).create?.properties[1]).toEqual({
+				property_name: 'valid_values',
+				value: ['na', 'vwd', 'apr']
+			});
+		});
+
+		it('an update sends them without repeats', () => {
+			const item = plan(
+				entry({ dataType: 'list', validValues: ['alpha', 'alpha', 'beta', 'gamma'] }),
+				present({ dataType: 'list', name: 'Lens', validValues: ['alpha', 'beta'] })
+			);
+			expect(writes(item)).toEqual([{ property_name: 'valid_values', value: ['alpha', 'beta', 'gamma'] }]);
+		});
+
+		it('PLN-20: a repeated value written and read back without the repeat already matches', () => {
+			const list = entry({ dataType: 'list', validValues: ['alpha', 'alpha', 'beta'] });
+			expect(plan(list, present({ dataType: 'list', name: 'Lens', validValues: ['alpha', 'beta'] })).class).toBe('already-matches');
+			const link = entry({ dataType: 'entity', validTypes: ['Shot', 'Shot', 'Asset'] });
+			expect(plan(link, present({ dataType: 'entity', name: 'Lens', validTypes: ['Shot', 'Asset'] })).class).toBe('already-matches');
 		});
 	});
 
@@ -561,6 +808,15 @@ describe('planEntry: present fields', () => {
 			);
 			expect(item.class).toBe('blocked');
 			expect(item.blocked.map((difference) => difference.why)).toEqual(['default-not-in-values']);
+		});
+
+		it('finding 121: a description of spaces alone is empty, and never planned as a write', () => {
+			for (const description of ['', ' ', '  \t ']) {
+				const item = plan(entry({ description }), present({ dataType: 'text', name: 'Lens', description: 'Old.' }));
+				expect(item.class).toBe('blocked');
+				expect(item.blocked).toEqual([{ setting: 'description', live: 'Old.', wanted: null, why: 'cannot-be-emptied' }]);
+				expect(item.update).toBeNull();
+			}
 		});
 
 		it('an empty value is never planned as a write: description, valid values, valid types', () => {
@@ -693,7 +949,8 @@ function variants(dataType: string): PlanEntry[] {
 				{ validValues: ['alpha', 'beta', 'gamma'] },
 				{ validValues: ['gamma', 'beta'], defaultValue: 'beta', description: 'Pick one.' },
 				{ validValues: ['alpha', 'beta', 'gamma'], defaultValue: 'alpha' },
-				{ validValues: ['delta'], defaultValue: 'delta' }
+				{ validValues: ['delta'], defaultValue: 'delta' },
+				{ validValues: ['beta', 'alpha', 'beta', 'alpha'], defaultValue: 'alpha' }
 			]);
 		case 'status_list':
 			return each([
@@ -701,12 +958,18 @@ function variants(dataType: string): PlanEntry[] {
 				{ validValues: ['na', 'rev'], defaultValue: 'na' },
 				{ validValues: ['rev', 'na', 'vwd'], defaultValue: 'rev', description: 'Where it stands.' },
 				{ validValues: ['vwd', 'fin'], defaultValue: 'vwd' },
-				{ validValues: ['fin', 'na'], defaultValue: 'fin' }
+				{ validValues: ['fin', 'na'], defaultValue: 'fin' },
+				{ validValues: ['apr', 'na', 'apr'], defaultValue: 'apr' }
 			]);
 		case 'entity':
-			return each([{ validTypes: ['Shot'] }, { validTypes: ['Shot', 'Asset'] }, { validTypes: ['Asset', 'Shot'], description: 'Source.' }]);
+			return each([
+				{ validTypes: ['Shot'] },
+				{ validTypes: ['Shot', 'Asset'] },
+				{ validTypes: ['Asset', 'Shot'], description: 'Source.' },
+				{ validTypes: ['Sequence', 'Shot', 'Shot', 'Asset'] }
+			]);
 		case 'multi_entity':
-			return each([{ validTypes: ['Shot'] }, { validTypes: ['Version'], description: 'Source.' }]);
+			return each([{ validTypes: ['Shot'] }, { validTypes: ['Version'], description: 'Source.' }, { validTypes: ['Asset', 'Asset'] }]);
 		default:
 			return each(described);
 	}
@@ -717,22 +980,29 @@ describe('PLN-20: idempotency', () => {
 
 	it('after a create, the entry already matches, for every creatable type and setting', () => {
 		let checked = 0;
+		let withReverseFields = 0;
 		for (const dataType of CREATABLE_DATA_TYPES) {
 			for (const wanted of variants(dataType)) {
 				const first = plan(wanted, ABSENT);
 				expect(first.class, `${dataType} ${wanted.id}`).toBe('create');
-				const created = siteCreate(wanted.programmaticName, first.create!);
+				const log: SiteLog = { made: [], retired: [] };
+				const created = siteCreate(wanted.programmaticName, first.create!, log);
 				// The name the site derives is the one the entry asked for (PLN-15).
 				expect(serverFieldName(created.displayName, dataType)).toBe(wanted.programmaticName);
 				expect(replan(wanted, created).class, `${dataType} ${wanted.id}`).toBe('already-matches');
+				// Finding 121: the note names exactly the reverse fields the site makes.
+				expect(first.reverseFieldTypes, `${dataType} ${wanted.id}`).toEqual(log.made);
+				if (log.made.length > 0) withReverseFields += 1;
 				checked += 1;
 			}
 		}
 		expect(checked).toBeGreaterThan(100);
+		expect(withReverseFields).toBeGreaterThan(10);
 	});
 
-	it('after an update, sent in order to a site that refuses what finding 116 saw refused, the entry already matches', () => {
+	it('after an update, one request to a site that refuses what findings 116 and 121 saw refused, the entry already matches', () => {
 		const classes = { update: 0, blocked: 0, 'already-matches': 0 };
+		let made = 0;
 		for (const dataType of CREATABLE_DATA_TYPES) {
 			const all = variants(dataType);
 			for (const from of all) {
@@ -747,22 +1017,41 @@ describe('PLN-20: idempotency', () => {
 					if (item.class === 'blocked') {
 						expect(item.update, label).toBeNull();
 						expect(item.reasons.length, label).toBe(item.blocked.length);
+						expect(item.reverseFieldTypes, label).toEqual([]);
 						continue;
 					}
 					if (item.class !== 'update') continue;
-					expect(item.update!.requests.length, label).toBeGreaterThan(0);
-					let field = live;
-					for (const request of item.update!.requests) {
-						expect(request.properties, label).toHaveLength(1);
-						// Throws where the site would refuse: a wrong order fails here.
-						field = sitePut(field, request.properties[0]);
-					}
+					// One request, applied whole (finding 121). Throws where the site would refuse.
+					expect(item.update!.requests, label).toHaveLength(1);
+					expect(item.update!.requests[0].properties.length, label).toBeGreaterThan(0);
+					const log: SiteLog = { made: [], retired: [] };
+					const field = sitePut(live, item.update!.requests[0], log);
 					expect(replan(wanted, field).class, label).toBe('already-matches');
+					// No planned update retires a reverse field, and the note names the ones it makes.
+					expect(log.retired, label).toEqual([]);
+					expect(item.reverseFieldTypes, label).toEqual(log.made);
+					made += log.made.length;
 				}
 			}
 		}
 		expect(classes.update).toBeGreaterThan(100);
 		expect(classes.blocked).toBeGreaterThan(20);
+		expect(made).toBeGreaterThan(0);
+	});
+
+	it('finding 121: the stand-in site applies a request whole or not at all', () => {
+		const list = liveField({ dataType: 'list', name: 'Lens', description: 'Old.', validValues: ['r', 's'], defaultValue: 's' });
+		const put = (properties: PropertyWrite[]) => sitePut(list, { properties });
+		// A default only the new values hold, in either order.
+		expect(put([{ property_name: 'default_value', value: 'u' }, { property_name: 'valid_values', value: ['t', 'u'] }]).defaultValue).toBe('u');
+		// A default only the old values hold: refused, the description with it.
+		expect(() => put([{ property_name: 'description', value: 'New.' }, { property_name: 'default_value', value: 'zzz' }])).toThrow('not in valid_values');
+		expect(() => put([{ property_name: 'description', value: ' ' }])).toThrow('value must be filled');
+		const status = liveField({ dataType: 'status_list', name: 'Lens', validValues: ['na', 'rev'], defaultValue: 'na' });
+		expect(() => sitePut(status, { properties: [{ property_name: 'valid_values', value: ['rev'] }] })).toThrow('must include');
+		const link = liveField({ dataType: 'entity', name: 'Lens', validTypes: ['Shot'] });
+		expect(() => sitePut(link, { properties: [{ property_name: 'valid_types', value: ['shot'] }] })).toThrow('500');
+		expect(() => sitePut(link, { properties: [{ property_name: 'valid_types', value: ['Shot', 'ZzNoSuchType'] }] })).toThrow('invalid/missing entity');
 	});
 
 	it('a blocked entry stays blocked: nothing was written', () => {

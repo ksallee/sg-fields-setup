@@ -30,7 +30,24 @@ Corpus paths are relative to `~/dev/sg-groundtruth/corpus`, tag `corpus/2026-09-
 | G2 | Revive still works. Retired fields still cannot be listed. No call deletes one for good; the name is freed only from the trash page in the web interface. The revive-first sequence stands. |
 
 Also measured there: a status field's per-project hidden values cannot be written through the API.
-The other gaps below are still open.
+~~The other gaps below are still open.~~ See the next table.
+
+**Answered by probes 115 to 121, 2026-11-10.** Findings are under `corpus/findings/`. The gaps
+table below is kept as it was written. Only G7 is still open.
+
+| gap | finding | answer |
+|---|---|---|
+| G3 | 116, 117 | `status_list` is created with its valid values. `currency`, `timecode` and `footage` are created with a name alone. `color` and `image` stay refused. |
+| G4 | 116 | An entity link takes several valid types at creation. A multi-entity link takes exactly one. |
+| G5 | 116, 121 | Changeable: display name, description, a list's and a status list's valid values, the default, an entity link's valid types. Never: unique, a multi-entity link's valid types. No value can be emptied. One request is applied whole or not at all. A status list's values must include its default. Two hazards on valid types: see `10-open-questions.md`, "Found while building". |
+| G6 | 115 | `visible` is per project. Read and written with a project id, never without one. A new field is visible in every project. |
+| G7 | | Open. |
+| G8 | 116 | A create takes description, unique, valid values, default and valid types in one request. Each reads back where PLN-6 says. |
+| G9 | 118 | Create, update, visibility, retire and revive answer on a custom entity and on Tag as on Version. |
+| G10 | 120 | The trash page for fields is a Page row named "Trash - Fields". Its id is per site, so the tool searches for it. |
+| G11 | 117 | One non-ASCII character and the field is named `sg_<data_type>`. ASCII names are lowercased, every other character becomes `_`, nothing is trimmed or cut. |
+
+Also measured: an absent, a retired and a live field told apart by the revive call (119).
 
 Each is a question to probe, not a fact. They can go into one sg-groundtruth issue. G1 and G2 are
 **re-probes**: "is this still as last measured?" Autodesk said it would look at the public reports

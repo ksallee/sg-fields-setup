@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import listing from './fixtures/live-version-fields.json';
 import { readFields, type LiveField } from './live-field';
 import type { EntryDefinition } from './model';
-import { DIFF_SETTINGS, diffEntry, wantedDefault } from './plan-diff';
+import { DIFF_SETTINGS, diffEntry, wantedDefault, wantedEntry, withoutRepeats } from './plan-diff';
 
 function entry(overrides: Partial<EntryDefinition> = {}): EntryDefinition {
 	return {
@@ -209,6 +209,54 @@ describe('diffEntry', () => {
 
 		it('PLN-11: an empty list and none are the same', () => {
 			expect(diffEntry(entry(), live({ validTypes: [] }))).toEqual([]);
+		});
+	});
+
+	describe('finding 121: repeated values', () => {
+		it('withoutRepeats: the first occurrence is kept, the order otherwise preserved', () => {
+			expect(withoutRepeats(['b', 'a', 'b', 'c', 'a'])).toEqual(['b', 'a', 'c']);
+			expect(withoutRepeats([])).toEqual([]);
+			expect(withoutRepeats(['Shot', 'shot'])).toEqual(['Shot', 'shot']);
+		});
+
+		it('wantedEntry: cleaned, with no repeat in valid values or valid types', () => {
+			const wanted = wantedEntry(entry({ dataType: 'list', displayName: ' Lens ', validValues: ['alpha', ' alpha ', 'beta'] }));
+			expect(wanted).toMatchObject({ displayName: 'Lens', validValues: ['alpha', 'beta'] });
+			expect(wantedEntry(entry({ dataType: 'entity', validTypes: ['Shot', 'Shot', 'Asset'] })).validTypes).toEqual(['Shot', 'Asset']);
+			expect(wantedEntry(entry({ dataType: 'status_list', validValues: ['na', 'vwd', 'na'] })).validValues).toEqual(['na', 'vwd']);
+		});
+
+		it('PLN-20: a list read back without its repeats matches the entry that holds them', () => {
+			// Measured: ["alpha","alpha","beta"] reads back ["alpha","beta"].
+			const wanted = entry({ dataType: 'list', validValues: ['alpha', 'alpha', 'beta'] });
+			expect(diffEntry(wanted, live({ dataType: 'list', validValues: ['alpha', 'beta'] }))).toEqual([]);
+		});
+
+		it('PLN-20: valid types read back without their repeats match the entry that holds them', () => {
+			// Measured: ["Shot","Shot","Asset"] reads back ["Shot","Asset"].
+			const wanted = entry({ dataType: 'entity', validTypes: ['Shot', 'Shot', 'Asset'] });
+			expect(diffEntry(wanted, live({ dataType: 'entity', validTypes: ['Shot', 'Asset'] }))).toEqual([]);
+		});
+
+		it('a difference carries the wanted list without repeats: it is what gets written', () => {
+			const wanted = entry({ dataType: 'list', validValues: ['alpha', 'alpha', 'beta', 'gamma'] });
+			expect(diffEntry(wanted, live({ dataType: 'list', validValues: ['alpha', 'beta'] }))).toEqual([
+				{ setting: 'validValues', live: ['alpha', 'beta'], wanted: ['alpha', 'beta', 'gamma'] }
+			]);
+		});
+
+		it('status list: a code the site stored twice differs from the entry, which never sends a repeat', () => {
+			// Measured: a status list keeps a repeated code, ["na","vwd","apr","na"].
+			const wanted = entry({ dataType: 'status_list', validValues: ['na', 'vwd', 'apr', 'na'] });
+			expect(diffEntry(wanted, live({ dataType: 'status_list', validValues: ['apr', 'na', 'vwd'] }))).toEqual([]);
+			expect(diffEntry(wanted, live({ dataType: 'status_list', validValues: ['na', 'vwd', 'apr', 'na'] }))).toEqual([
+				{ setting: 'validValues', live: ['na', 'vwd', 'apr', 'na'], wanted: ['na', 'vwd', 'apr'] }
+			]);
+		});
+
+		it('status list: two lists of the same size are not equal through their repeats', () => {
+			const wanted = entry({ dataType: 'status_list', validValues: ['na', 'vwd', 'vwd'] });
+			expect(settings(wanted, live({ dataType: 'status_list', validValues: ['na', 'na', 'vwd'] }))).toEqual(['validValues']);
 		});
 	});
 
