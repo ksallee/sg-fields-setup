@@ -10,6 +10,9 @@ Built on [sg-widgets](https://github.com/ksallee/sg-widgets). API behaviour come
 
 - Keeps sets: named, reusable lists of field definitions. They live in this browser. A set exports
   to a file and imports from one.
+  The file carries the address of the site its fields were captured from, each captured field's
+  schema record as the site sent it, and the names of the spreadsheets it was imported from. No
+  token, no person.
 - Fills a set from CSV or XLSX column headers, or by hand. Data rows are read only to guess a data
   type. No row is stored or sent.
 - Shows, per field, whether it is on the connected site and whether it matches.

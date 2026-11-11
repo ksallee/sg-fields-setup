@@ -37,6 +37,10 @@ Under `vite dev`, `POST /live/dev-token` then mints a 600 s bearer from that scr
 connects to that site with no sign-in, and the navbar reads "Dev key". Signing in over it writes as
 yourself. A production build answers that route 404 and always signs in.
 
+`pnpm dev --host` puts the dev server on the network, and the dev token route has no caller check:
+anyone on the LAN could then mint a bearer from the script key. Never use `--host` with a script
+key in `.env.local`.
+
 Every schema write spends a field name for good. Write to the sandbox only, with the corpus's
 throwaway naming.
 
@@ -44,6 +48,17 @@ The browser calls the site itself, writes included. The site answers the preflig
 `PUT` and `DELETE` on `/api/v1/schema/...` with the page's origin and
 `authorization,content-type`. Measured from `localhost` in the drive below. No server route sits
 between the page and the site.
+
+## What a set file carries
+
+An exported set file (`src/lib/pure/set-file.ts`) holds the set and its fields, and with them: the
+address of the site each field was captured from (`snapshotSite`), each captured field's schema
+record as the site sent it (`snapshot`: every property, valid values and status values included),
+and the names of the spreadsheets it was imported from (`originDetails.sourceFiles`). No token, no
+person. The export toast says so when the set has captured fields.
+
+An imported set file is refused over 20 MB, before it is read, and when a snapshot nests more than
+32 deep.
 
 ## Which sites are accepted
 

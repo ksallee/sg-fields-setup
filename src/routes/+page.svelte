@@ -38,7 +38,7 @@
 	} from '$lib/pure/set-list';
 	import { refusalMessage } from '$lib/pure/set-plan';
 	import type { SetSummary } from '$lib/pure/set-query';
-	import { deleteQuestion, duplicatedText, importedText, totalText } from '$lib/pure/set-text';
+	import { deleteQuestion, duplicatedText, exportedNote, importedText, totalText } from '$lib/pure/set-text';
 	import { cn } from '$lib/utils.js';
 
 	const SEARCH_DELAY_MS = 300;
@@ -146,7 +146,8 @@
 			}
 			const { text, fileName } = encodeSetFile(stored.set, stored.entries);
 			downloadText(fileName, text);
-			notify.success(`Exported ${fileName}.`);
+			// What travels with the file, said when it does (the site address, the schema records).
+			notify.success(`Exported ${fileName}.`, exportedNote(stored.entries));
 		});
 	}
 

@@ -61,3 +61,15 @@ export function importedText(done: ImportedSummary): string {
 	if (renamed) parts.push(`The name "${done.askedName.trim()}" was taken.`);
 	return parts.join(' ');
 }
+
+/**
+ * What an exported set file carries beside the fields, said when it does: the address of the
+ * site its fields were captured from, and each captured field's schema record as the site sent
+ * it. Nothing to say for a set with no captured field.
+ */
+export function exportedNote(entries: readonly { snapshotSite: string | null }[]): string | undefined {
+	const sites = [...new Set(entries.map((entry) => entry.snapshotSite).filter((site): site is string => site !== null && site !== ''))];
+	if (sites.length === 0) return undefined;
+	if (sites.length === 1) return `The file carries the site address, ${sites[0]}, and the schema record of each field captured there.`;
+	return `The file carries ${sites.length} site addresses and the schema record of each captured field.`;
+}
