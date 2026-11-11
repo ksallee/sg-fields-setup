@@ -132,7 +132,7 @@
 			</div>
 
 			<div class="flex flex-col gap-1.5">
-				<Label for="{uid}-type">Entity type</Label>
+				<Label id="{uid}-type-label" for={context ? undefined : `${uid}-type`}>Entity type</Label>
 				<TypeField
 					id="{uid}-type"
 					{context}
@@ -140,14 +140,16 @@
 					onchange={(targetEntityType) => onedit({ targetEntityType })}
 					disabled={mirror}
 					invalid={row.targetEntityType.trim() === ''}
-					label="Entity type"
+					labelledby="{uid}-type-label"
 				/>
 			</div>
 
 			<div class="flex flex-col gap-1.5">
-				<Label for="{uid}-data-type">Data type</Label>
+				<!-- The registry pickers take no id for their input (sg-widgets #374): the label names a group. -->
+				<Label id="{uid}-data-type-label">Data type</Label>
 				<DataTypePicker
-					id="{uid}-data-type"
+					role="group"
+					aria-labelledby="{uid}-data-type-label"
 					types={CREATABLE_DATA_TYPES}
 					labels={DATA_TYPE_LABELS}
 					value={row.dataType === '' ? null : row.dataType}
@@ -159,9 +161,12 @@
 
 			{#if !mirror && carries(dataType, 'validTypes')}
 				<div class="flex flex-col gap-1.5 sm:col-span-2">
-					<Label for="{uid}-valid-types">{dataType === 'multi_entity' ? 'Valid type' : 'Valid types'}</Label>
+					<Label id="{uid}-valid-types-label" for={context ? undefined : `${uid}-valid-types`}>
+						{dataType === 'multi_entity' ? 'Valid type' : 'Valid types'}
+					</Label>
 					<ValidTypesField
 						id="{uid}-valid-types"
+						labelledby="{uid}-valid-types-label"
 						{context}
 						single={dataType === 'multi_entity'}
 						value={row.validTypes}
@@ -177,9 +182,10 @@
 
 			{#if !mirror && carries(dataType, 'validValues')}
 				<div class="flex flex-col gap-1.5">
-					<Label for="{uid}-values">Valid values</Label>
+					<Label id="{uid}-values-label">Valid values</Label>
 					<ValidValuesEditor
-						id="{uid}-values"
+						role="group"
+						aria-labelledby="{uid}-values-label"
 						dataType={dataType === 'status_list' ? 'status_list' : 'list'}
 						value={[...row.validValues]}
 						onValueChange={(validValues) => onedit({ validValues })}

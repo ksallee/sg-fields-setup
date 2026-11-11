@@ -76,9 +76,8 @@
 <section class="flex flex-col" data-slot="entry-group" data-type={group.type}>
 	<header class="bg-background border-border sticky top-0 z-10 flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 border-b px-2 py-1.5">
 		<Checkbox
-			bind:checked={() => checkState === 'all', () => {}}
+			bind:checked={() => checkState === 'all', () => ontogglegroup(group.keys)}
 			indeterminate={checkState === 'some'}
-			onclick={() => ontogglegroup(group.keys)}
 			disabled={group.keys.length === 0}
 			aria-label={selectGroupLabel(group.label)}
 			data-slot="group-check"

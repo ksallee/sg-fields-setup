@@ -17,7 +17,8 @@
 		value,
 		onchange,
 		disabled = false,
-		id
+		id,
+		labelledby
 	}: {
 		context: SgContext | null;
 		/** A multi-entity link: exactly one type. */
@@ -25,7 +26,10 @@
 		value: string[];
 		onchange: (value: string[]) => void;
 		disabled?: boolean;
+		/** The typed box's id, for a `<label for>`. */
 		id?: string;
+		/** The id of the visible label. It names the picker's group: the picker takes no `id` (sg-widgets #374). */
+		labelledby?: string;
 	} = $props();
 
 	const parse = (text: string): string[] => (single ? (text.trim() === '' ? [] : [text.trim()]) : parseCommaList(text));
@@ -45,6 +49,8 @@
 		onValueChange={(next) => onchange(next ? [next] : [])}
 		placeholder="Select the entity type"
 		{disabled}
+		role="group"
+		aria-labelledby={labelledby}
 		data-slot="valid-types-field"
 	/>
 {:else if context}
@@ -55,6 +61,8 @@
 		summary="chips"
 		placeholder="Select entity types"
 		{disabled}
+		role="group"
+		aria-labelledby={labelledby}
 		data-slot="valid-types-field"
 	/>
 {:else}

@@ -153,6 +153,9 @@ The editor is the first workbench: one long list edited in place. The install sc
   stretch the page.
 - **Typed fallbacks.** A picker that needs the site gives way to a text box when no site is
   connected. A text box that would move the row under the caret reports on blur or Enter.
+- **Naming a picker.** A text box is named by its `<label for>`. A registry picker takes no `id`
+  for its combobox (sg-widgets #374), so its root is made `role="group"` with `aria-labelledby`
+  on the visible label, or `aria-label` where there is none.
 
 ## Copy
 
@@ -223,6 +226,9 @@ Tests pin each difference.
 - **State.** A `Badge variant="outline"` with an icon, on the right: Pending, In progress, Done,
   Skipped, Failed, Not selected. Colour is on the icon and the word, never a fill.
 - **Counters.** Small dotted-underline words on the right of a row, each a tooltip trigger.
+- **One live region.** The footer's left side, `role="status"`, polite: the run's label and
+  counter, then how it ended. No row is an alert. A failed row is plain text in the destructive
+  tone.
 - **First write.** Install asks first, in a dialog that names the site, what is created and
   updated, that a name is taken for good, and the visibility scope. Leaving while a run is in
   progress asks too. The session starts a run only on the proof it handed out when the dialog

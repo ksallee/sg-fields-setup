@@ -232,6 +232,8 @@
 												onOpenChange={onChooserOpen}
 												placeholder="Fallback entity type"
 												disabled={saving}
+												role="group"
+												aria-label={fallbackLabel(row.bucket.label)}
 											/>
 										{:else}
 											<Input

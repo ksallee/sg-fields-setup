@@ -147,11 +147,8 @@
 		{#if row.reverseFields}<p class="text-muted-foreground text-xs" data-slot="row-reverse">{row.reverseFields}</p>{/if}
 
 		{#if ended && said.length > 0}
-			<p
-				class={cn('flex gap-1.5 text-xs break-words', row.run?.state === 'failed' ? 'text-destructive' : 'text-muted-foreground')}
-				role={row.run?.state === 'failed' ? 'alert' : undefined}
-				data-slot="row-said"
-			>
+			<!-- Plain content: the footer's one live region says how the run went, not each row (docs/design.md). -->
+			<p class={cn('flex gap-1.5 text-xs break-words', row.run?.state === 'failed' ? 'text-destructive' : 'text-muted-foreground')} data-slot="row-said">
 				{#if warning}<TriangleAlert class="text-warning mt-0.5 size-3.5 shrink-0" aria-hidden="true" />{/if}
 				<span class="min-w-0"><Parts parts={said} /></span>
 			</p>

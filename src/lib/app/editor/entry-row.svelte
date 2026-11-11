@@ -57,13 +57,19 @@
 
 	const badges = $derived(rowBadges({ mirror: isMirror(row), incomplete, duplicated, markers: comparison?.markers ?? [] }));
 	const title = $derived(row.displayName.trim());
+	/**
+	 * Whether shift was held when the checkbox was last pressed (EDT-39). The checkbox reports a
+	 * toggle, by mouse or by Space, through its `checked` setter and says nothing of the keys held.
+	 */
+	let shift = false;
 </script>
 
 <li class="border-border border-b" data-slot="entry-row" data-row-key={row.key} data-expanded={expanded ? '' : undefined}>
 	<div class={cn('hover:bg-muted flex items-center gap-2 px-2 py-1', selected && 'bg-muted/60')}>
 		<Checkbox
-			bind:checked={() => selected, () => {}}
-			onclick={(event: MouseEvent) => onselect(row.key, event.shiftKey)}
+			bind:checked={() => selected, () => onselect(row.key, shift)}
+			onpointerdown={(event: PointerEvent) => (shift = event.shiftKey)}
+			onkeydown={(event: KeyboardEvent) => (shift = event.shiftKey)}
 			aria-label={selectRowLabel(row.displayName)}
 			class="select-none"
 			data-slot="row-check"
