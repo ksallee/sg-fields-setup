@@ -1,9 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { strToU8, unzipSync, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
-import lensSet from '../../../fixtures/field-sets/camera-report-lens.json';
-import slateSet from '../../../fixtures/field-sets/camera-report-slate.json';
-import vpSet from '../../../fixtures/field-sets/camera-report-virtual-production.json';
+import reviewNotes from '../../../fixtures/field-sets/review-notes.json';
 import { DEFAULT_SAMPLE_SIZE, readXlsx, type WorkbookResult } from './xlsx';
 
 const fixture = new Uint8Array(readFileSync(new URL('../../../fixtures/source/FlowStudioDemo.xlsx', import.meta.url)));
@@ -90,7 +88,12 @@ describe('readXlsx on the real fixture (IMP-42 to IMP-45)', () => {
 
 	it('holds every header the hand-built sets record', () => {
 		const { headers } = only(result);
-		const recorded = [lensSet, slateSet, vpSet].flatMap((set) => set.entries.map((e) => e.source_header));
+		const sets = [
+			reviewNotes['camera-report-lens.json'],
+			reviewNotes['camera-report-slate.json'],
+			reviewNotes['camera-report-virtual-production.json']
+		];
+		const recorded = sets.flatMap((set) => set.entries.map((e) => e.sourceHeader));
 		expect(recorded.length).toBeGreaterThan(0);
 		for (const header of recorded) expect(headers).toContain(header);
 	});

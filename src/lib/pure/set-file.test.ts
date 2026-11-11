@@ -3,6 +3,7 @@ import lens from '../../../fixtures/field-sets/camera-report-lens.json?raw';
 import slate from '../../../fixtures/field-sets/camera-report-slate.json?raw';
 import virtualProduction from '../../../fixtures/field-sets/camera-report-virtual-production.json?raw';
 import weekly from '../../../fixtures/field-sets/weekly-status-report.json?raw';
+import reviewNotes from '../../../fixtures/field-sets/review-notes.json';
 import type { EntryDraft, FieldSet } from './model';
 import {
 	SET_FILE_FORMAT,
@@ -530,5 +531,15 @@ describe('the hand-built sets are set files', () => {
 		expect(set.entries.length).toBeGreaterThan(0);
 		expect(set.duplicatesDropped).toBe(0);
 		expect(encodeSetFile(set, set.entries).text).toBe(text);
+	});
+
+	it.each([
+		['camera-report-lens.json', lens],
+		['camera-report-slate.json', slate],
+		['camera-report-virtual-production.json', virtualProduction],
+		['weekly-status-report.json', weekly]
+	] as const)('%s has review notes for exactly its entries, in order', (fileName, text) => {
+		const notes = reviewNotes[fileName].entries.map((note) => note.programmaticName);
+		expect(notes).toEqual(decoded(text).entries.map((e) => e.programmaticName));
 	});
 });
