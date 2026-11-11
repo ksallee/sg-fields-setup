@@ -116,3 +116,16 @@ export function nonAsciiNameWarning(row: Pick<EntryDefinition, 'displayName' | '
 	const named = predicted ? `name a new field ${predicted}` : 'name a new field after its data type';
 	return `The display name holds a character outside ASCII. The site would ${named}. Install refuses to create it. Use an ASCII display name.`;
 }
+
+/**
+ * The warning under the programmatic name, when the form shows one. With a site the planner
+ * judges the name and its reason is among the notes above the form (`compare.ts`), so the form
+ * adds nothing. Where the planner has not judged the row (no site, a type the site lacks, fields
+ * still on their way), `planClass` is null and `nonAsciiNameWarning` speaks (G11).
+ */
+export function nameWarningFor(
+	row: Pick<EntryDefinition, 'displayName' | 'dataType'> & { nameMode: NameMode },
+	planClass: string | null | undefined
+): string | null {
+	return planClass == null ? nonAsciiNameWarning(row) : null;
+}

@@ -3,7 +3,8 @@ import statusList from '../pure/fixtures/live-field-status-list.json';
 import listing from '../pure/fixtures/live-schema.json';
 import versionFields from '../pure/fixtures/live-version-fields.json';
 import type { FieldReply } from '../pure/live-field';
-import { COMMON_ENTITY_TYPES, createLiveSchema, type SchemaSource } from './schema';
+import { COMMON_ENTITY_TYPES } from '../pure/common-entity-types';
+import { createLiveSchema, type SchemaSource } from './schema';
 
 /** A promise the test settles by hand. */
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void; reject: (error: unknown) => void } {

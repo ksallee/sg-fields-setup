@@ -109,3 +109,18 @@ export const RESYNC_FAILED_TITLE = 'Could not re-sync from the site';
 
 /** The toast of a re-check whose read failed (CMP-10). */
 export const RECHECK_FAILED = { title: 'Could not re-check the entity types', message: 'The site did not answer. Try again.' } as const;
+
+/** A failed save, in the notice over the list (EDT-47): why, then that nothing typed is lost. */
+export function notSavedText(reason: string): string {
+	return `${reason} Your changes are kept. Save again when ready.`;
+}
+
+/** The name of a row's checkbox (EDT-39). */
+export function selectRowLabel(displayName: string): string {
+	return `Select ${displayName.trim() || 'this field'}`;
+}
+
+/** The name of a group's checkbox (EDT-40). */
+export function selectGroupLabel(groupLabel: string): string {
+	return `Select the fields of ${groupLabel}`;
+}

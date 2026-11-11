@@ -20,6 +20,13 @@ export const IMPORT_MODES = ['automatic', 'worksheet', 'header_prefix'] as const
 
 export type ImportMode = (typeof IMPORT_MODES)[number];
 
+/** The modes as the dialog's tabs name them (IMP-17). */
+export const IMPORT_MODE_LABELS: Record<ImportMode, string> = {
+	automatic: 'Automatic',
+	worksheet: 'Worksheet',
+	header_prefix: 'Header prefix'
+};
+
 function isPluralOf(a: string, b: string): boolean {
 	return a === b + 's' || a === b + 'es';
 }

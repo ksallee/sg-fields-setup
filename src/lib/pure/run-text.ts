@@ -273,3 +273,21 @@ export function summaryText(state: RunState): string | null {
 	if (state.status === 'cancelled') return `Install cancelled. ${counts}${warnings}`;
 	return `${counts[0].toUpperCase()}${counts.slice(1)}${warnings}`;
 }
+
+/**
+ * The tone of the closing notification (RUN-24): an error when a row failed or the run stopped on
+ * one; a warning when it was cancelled or a field's visibility is incomplete (VIS-7); else a
+ * success.
+ */
+export function summaryTone(state: RunState): 'error' | 'warning' | 'success' {
+	const counters = runCounters(state);
+	if (state.error !== null || counters.failed > 0) return 'error';
+	if (state.status === 'cancelled' || counters.visibilityWarnings > 0) return 'warning';
+	return 'success';
+}
+
+/** A row's visibility counter with its name (RUN-22): "Visibility 2 of 5". Null with no visibility to show. */
+export function visibilityProgressText(row: Pick<RunRow, 'visibility'>): string | null {
+	const progress = visibilityProgress(row);
+	return progress === null ? null : `Visibility ${progress}`;
+}

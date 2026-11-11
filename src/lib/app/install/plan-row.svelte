@@ -17,9 +17,9 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
-	import { rowStatus, statusLabel, type RowStatus, type InstallRow } from '$lib/pure/install-view';
-	import { needsVisibilityRetry, type RunState } from '$lib/pure/run';
-	import { rowParts, visibilityProgress } from '$lib/pure/run-text';
+	import { installCheckLabel, rowEnded, rowStatus, rowWarned, showMoreLabel, statusLabel, type RowStatus, type InstallRow } from '$lib/pure/install-view';
+	import type { RunState } from '$lib/pure/run';
+	import { rowParts, visibilityProgressText } from '$lib/pure/run-text';
 	import type { VisibilityCounter } from '$lib/pure/visibility-text';
 	import { cn } from '$lib/utils.js';
 	import Parts from './parts.svelte';
@@ -58,11 +58,11 @@
 
 	const status = $derived(rowStatus(row, run));
 	const badge = $derived(status ? STATUS[status] : null);
-	const progress = $derived(row.run ? visibilityProgress(row.run) : null);
+	const progress = $derived(row.run ? visibilityProgressText(row.run) : null);
 	// What the run says once the row has ended; until then the plan's own reasons.
-	const ended = $derived(row.run !== null && row.run.state !== 'pending' && row.run.state !== 'in_progress');
+	const ended = $derived(rowEnded(row));
 	const said = $derived(row.run && ended ? rowParts(row.run) : []);
-	const warning = $derived(row.run !== null && ended && needsVisibilityRetry(row.run));
+	const warning = $derived(rowWarned(row));
 	const checkId = $props.id();
 	/** The create lines whose whole value is showing. */
 	let whole = $state<Record<string, boolean>>({});
@@ -81,7 +81,7 @@
 				id={checkId}
 				bind:checked={() => ticked, () => ontoggle()}
 				disabled={locked || disabled}
-				aria-label={`Install ${row.displayName}`}
+				aria-label={installCheckLabel(row.displayName)}
 				title={disabled && !locked ? 'Nothing left to do. It matches, and it is visible on every project in scope.' : undefined}
 			/>
 		{/if}
@@ -99,7 +99,7 @@
 			</div>
 			<div class="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
 				<VisibilityCounters {counters} />
-				{#if progress}<span class="text-muted-foreground text-xs tabular-nums" data-slot="visibility-progress">Visibility {progress}</span>{/if}
+				{#if progress}<span class="text-muted-foreground text-xs tabular-nums" data-slot="visibility-progress">{progress}</span>{/if}
 				{#if status && badge}
 					<Badge variant="outline" class={badge.tone} data-slot="row-status">
 						<badge.icon class={cn(badge.spin && 'motion-safe:animate-spin')} aria-hidden="true" />{statusLabel(status)}
@@ -133,7 +133,7 @@
 								type="button"
 								class="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-sm underline decoration-dotted underline-offset-2 outline-none focus-visible:ring-2"
 								aria-expanded={open}
-								aria-label={`${open ? 'Show less' : 'Show all'} of ${line.label.toLowerCase()}`}
+								aria-label={showMoreLabel(open, line.label)}
 								onclick={() => (whole[line.setting] = !open)}
 								data-slot="row-create-more"
 							>

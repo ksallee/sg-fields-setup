@@ -11,6 +11,7 @@ import { liveContext, liveSchema, prepareLive } from '$lib/live';
 import type { SiteData } from '$lib/pure/compare';
 import type { LiveEntityType } from '$lib/pure/live-entity-types';
 import type { LiveField } from '$lib/pure/live-field';
+import { isConnected } from '$lib/pure/site';
 
 export class EditorSite {
 	/** A site is named and can be read. False until `connect` has answered. */
@@ -46,7 +47,7 @@ export class EditorSite {
 	async connect(): Promise<void> {
 		try {
 			const live = await prepareLive();
-			if (live.siteUrl === '' || live.problem !== null) return;
+			if (!isConnected(live)) return;
 			this.siteUrl = live.siteUrl;
 			this.context = liveContext();
 			this.connected = true;

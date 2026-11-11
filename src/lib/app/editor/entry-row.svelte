@@ -13,6 +13,7 @@
 	import type { RowComparison } from '$lib/pure/compare';
 	import { dataTypeLabel, isMirror } from '$lib/pure/data-types';
 	import { rowBadges, type BadgeTone } from '$lib/pure/editor-row';
+	import { selectRowLabel } from '$lib/pure/editor-text';
 	import type { EntryDefinition } from '$lib/pure/model';
 	import type { NameMode, Row } from '$lib/pure/working-copy';
 	import { cn } from '$lib/utils.js';
@@ -63,7 +64,7 @@
 		<Checkbox
 			bind:checked={() => selected, () => {}}
 			onclick={(event: MouseEvent) => onselect(row.key, event.shiftKey)}
-			aria-label="Select {title || 'this field'}"
+			aria-label={selectRowLabel(row.displayName)}
 			class="select-none"
 			data-slot="row-check"
 		/>

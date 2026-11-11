@@ -40,6 +40,7 @@
 	import { refusalMessage } from '$lib/pure/set-plan';
 	import type { SetSummary } from '$lib/pure/set-query';
 	import { createdText, duplicatedText, exportedNote, exportedText, failedTitle, importedText, SET_GONE_TEXT, totalText } from '$lib/pure/set-text';
+	import { isConnected } from '$lib/pure/site';
 	import { cn } from '$lib/utils.js';
 
 	const SEARCH_DELAY_MS = 300;
@@ -186,7 +187,7 @@
 	// SET-25, SET-26: best effort, never awaited, only with a site that can be read.
 	void prepareLive()
 		.then((live) => {
-			if (live.siteUrl !== '' && live.problem === null) void liveSchema().warmUp();
+			if (isConnected(live)) void liveSchema().warmUp();
 		})
 		.catch(() => {});
 </script>

@@ -25,7 +25,7 @@
 		listDefaultValue,
 		missingRequired,
 		missingText,
-		nonAsciiNameWarning,
+		nameWarningFor,
 		type CheckboxDefault
 	} from '$lib/pure/editor-row';
 	import { MIRROR_TEXT, UNIQUE_NOTE } from '$lib/pure/editor-text';
@@ -56,10 +56,7 @@
 	const dataType = $derived(row.dataType.trim());
 	const missing = $derived(missingRequired(row));
 	const follows = $derived(row.nameMode === 'derived');
-	// With a site the planner judges the name, and its reason is among the notes above the form
-	// (`compare.ts`). Where it has not judged the row (no site, a type the site lacks, fields still
-	// on their way), a derived name with a non-ASCII display name is still called out (G11).
-	const warning = $derived(comparison?.planClass == null ? nonAsciiNameWarning(row) : null);
+	const warning = $derived(nameWarningFor(row, comparison?.planClass));
 	// The group says a type is not on the site; the row does not say it again.
 	const notes = $derived((comparison?.notes ?? []).filter((note) => note.kind !== 'type_not_on_site'));
 

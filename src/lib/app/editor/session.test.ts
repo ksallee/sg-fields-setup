@@ -18,7 +18,7 @@ import { writeImportBanner } from '$lib/io/import-banner';
 import { readInstallSelection } from '$lib/io/install-selection';
 import { openSetStore, SetStoreError, type SetStore } from '$lib/io/set-store';
 import type { SiteData } from '$lib/pure/compare';
-import { makeLiveField } from '$lib/pure/fixtures/make-live-field';
+import { makeLiveField } from '$lib/testing/make-live-field';
 import type { LiveField } from '$lib/pure/live-field';
 import type { EntryDraft } from '$lib/pure/model';
 import { EditorSession, type EditorSiteReads } from './session.svelte';
@@ -80,6 +80,14 @@ function memoryStorage(): Storage {
 	};
 }
 
+/**
+ * A clock that moves a second with every write. The store tells a save made elsewhere by the
+ * set's and the entries' `changedAt`, to the millisecond: on the real clock two saves of a test
+ * can share one.
+ */
+let tick = 0;
+const now = (): string => new Date(Date.parse('2026-11-10T09:00:00.000Z') + (tick += 1) * 1000).toISOString();
+
 let idb: IDBFactory;
 let store: SetStore;
 let site: StubSite;
@@ -89,7 +97,8 @@ let toasts: { success: ReturnType<typeof vi.spyOn>; error: ReturnType<typeof vi.
 
 beforeEach(async () => {
 	idb = new IDBFactory();
-	store = await openSetStore({ idb });
+	tick = 0;
+	store = await openSetStore({ idb, now });
 	held.store = store;
 	site = new StubSite();
 	goto = vi.fn(async () => {});
@@ -286,7 +295,7 @@ describe('editing and saving (EDT-3, EDT-4, EDT-44 to EDT-48)', () => {
 		const { session, id } = await opened();
 		const lens = keyOf(session, 'Lens');
 		// The other tab: its own connection to the same database.
-		const tab = await openSetStore({ idb });
+		const tab = await openSetStore({ idb, now });
 		const theirs = new EditorSession({ site, goto, openTab });
 		held.store = tab;
 		await theirs.load(id);

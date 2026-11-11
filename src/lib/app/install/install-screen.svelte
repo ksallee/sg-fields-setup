@@ -17,10 +17,8 @@
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import type { Confirmation } from '$lib/pure/install-confirm';
 	import { SELECTION_LOST } from '$lib/pure/install-entries';
-	import { leaveQuestion } from '$lib/pure/install-text';
-	import { siteHost } from '$lib/pure/site-host';
+	import { disconnectedLine, installTitle, leaveQuestion, planFailedLine, planLoadingLine } from '$lib/pure/install-text';
 	import { CONNECT_PATH, HOME_PATH, setPath } from '$lib/pure/routes';
-	import { fieldCount } from '$lib/pure/set-text';
 	import { rowCounters } from '$lib/pure/visibility-text';
 	import { cn } from '$lib/utils.js';
 	import InstallConfirm from './confirm.svelte';
@@ -80,7 +78,7 @@
 	}
 
 	const load = $derived(session.load);
-	const title = $derived(session.setName === '' ? 'Install' : `Install "${session.setName}"`);
+	const title = $derived(installTitle(session.setName));
 </script>
 
 <svelte:head><title>{title} · SG Fields Setup</title></svelte:head>
@@ -106,17 +104,17 @@
 		<PageState
 			state="loading"
 			title={load.what === 'site' ? 'Connecting to Flow PT…' : 'Checking the live schema…'}
-			line={load.what === 'plan' && session.site ? `Reading ${fieldCount(session.entries.length).toLowerCase()} on ${siteHost(session.site.siteUrl)}.` : undefined}
+			line={load.what === 'plan' && session.site ? planLoadingLine(session.entries.length, session.site.siteUrl) : undefined}
 		/>
 	{:else if load.status === 'disconnected'}
-		<PageState state="empty" title="No site connected" line={`${load.problem} An install needs a site to compare with and to write to.`}>
+		<PageState state="empty" title="No site connected" line={disconnectedLine(load.problem)}>
 			{#snippet action()}
 				<Button variant="outline" href={editor}>Back to the set</Button>
 				<Button href={CONNECT_PATH}>Connect a site</Button>
 			{/snippet}
 		</PageState>
 	{:else if load.status === 'plan-failed'}
-		<PageState state="error" title="The live schema could not be read" line={`${load.message} No plan was made.`}>
+		<PageState state="error" title="The live schema could not be read" line={planFailedLine(load.message)}>
 			{#snippet action()}<Button variant="outline" onclick={() => void session.refresh()}>Try again</Button>{/snippet}
 		</PageState>
 	{:else if session.emptyText !== null}

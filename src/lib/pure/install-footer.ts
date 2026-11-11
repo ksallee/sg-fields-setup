@@ -41,6 +41,16 @@ export type Footer = Record<FooterActionName, FooterAction> & {
 	primary: FooterActionName | null;
 };
 
+/**
+ * What the footer makes of where the screen stands. A refresh re-plans over rows that stay on
+ * screen: that is loading. A plan that loaded with no row has nothing to install: that reads
+ * `failed`, as does every state with no plan, so Install is not offered and Refresh is.
+ */
+export function footerLoad(screen: { refreshing: boolean; status: string; items: number }): FooterInput['load'] {
+	if (screen.refreshing || screen.status === 'loading') return 'loading';
+	return screen.status === 'loaded' && screen.items > 0 ? 'loaded' : 'failed';
+}
+
 export function footerActions(input: FooterInput): Footer {
 	const { run } = input;
 	const running = run.status === 'running';

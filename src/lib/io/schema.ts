@@ -23,14 +23,9 @@
  * - `fieldForPlan` is for the install plan and the run. It reads one field from the site every
  *   time, answers "absent" as a value, and throws every other failure (PLN-3, PLN-4).
  */
+import { COMMON_ENTITY_TYPES } from '$lib/pure/common-entity-types';
 import { readEntityTypes, type LiveEntityType } from '$lib/pure/live-entity-types';
 import { readFieldReply, readFields, type FieldReply, type LiveField, type LiveFieldRead } from '$lib/pure/live-field';
-
-/**
- * The types whose fields are read ahead (SET-25), in the order the import's inference tries them
- * (IMP-15). Fixed: the warm-up never reads every type (SET-26).
- */
-export const COMMON_ENTITY_TYPES = ['Shot', 'Asset', 'Sequence', 'Task', 'Version', 'Note', 'Project'] as const;
 
 /**
  * The three reads, as raw as the site sends them. `coreSchemaSource` (`./core-schema-source`)

@@ -13,6 +13,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { explanationText, type RowComparison } from '$lib/pure/compare';
+	import { selectGroupLabel } from '$lib/pure/editor-text';
 	import { groupCountText, type EditorGroup } from '$lib/pure/editor-view';
 	import type { LiveField } from '$lib/pure/live-field';
 	import type { EntryDefinition } from '$lib/pure/model';
@@ -79,7 +80,7 @@
 			indeterminate={checkState === 'some'}
 			onclick={() => ontogglegroup(group.keys)}
 			disabled={group.keys.length === 0}
-			aria-label="Select the fields of {group.label}"
+			aria-label={selectGroupLabel(group.label)}
 			data-slot="group-check"
 		/>
 		<Glyph class="text-muted-foreground ml-0.5 size-4 shrink-0" aria-hidden="true" />

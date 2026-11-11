@@ -74,6 +74,9 @@ A set that is gone is a `PageState`: "Set not found", one line, a button back to
   closes the dialog, then a toast.
 - Labels over controls. An optional field says "optional" beside its label. Enter in a one-line
   field submits.
+- A dialog that owns its flow may call the store itself: `create-set-dialog` and `import-dialog`
+  do. Threading callbacks through the page would add wiring and no test. What they decide is
+  still in `$lib/pure`, and their site reads in `$lib/io/import-site`.
 
 ## Toasts
 
@@ -116,6 +119,17 @@ Two kinds of error, two readers, nothing else:
 
 The editor is the first workbench: one long list edited in place. The install screen follows.
 
+- **Thin.** `routes/sets/[id]/+page.svelte` is markup over `app/editor/session.svelte.ts`, as the
+  install screen is over its session. The session holds the state and calls `$lib/pure`. It is
+  tested against the real store. The page wires what needs the page: the route's id, the
+  navigation guard, Ctrl+S, focus.
+- **One thing at a time.** While a save is on its way the pane takes no input and keeps its
+  focus (`app/block-input.ts`, never `inert`). While a re-sync is on its way Save waits and says
+  why. A re-sync whose answer finds the set edited meanwhile is dropped, with a warning.
+- **Focus.** Deleting a row, or the selected rows, moves focus to the next row of the group, else
+  the previous, else the group's "Add field" (`focusAfterRemoval` in `$lib/pure/editor-session`).
+  After a save, focus is on the control it was on, in the row as stored.
+
 - **Status.** The page header's context line starts with the state of the work: "Saving…",
   "Unsaved changes", "Saved", "Not saved". A dot or a glyph in its tone, then the words.
 - **Disabled with a reason.** A header action that cannot run says why on hover and on focus:
@@ -152,7 +166,8 @@ filler. Sentence case everywhere, no capitals for labels.
 - Errors say what happened and what to do. They do not apologise.
 - Quote a set's name: `"Lens"`.
 - Words that a screen shows live in a pure module with tests, not in markup, once they take an
-  argument.
+  argument. That holds for an `aria-label` and a `title` too. No `.svelte` file and no page
+  script builds a sentence.
 
 ## Names across the seams
 
@@ -219,9 +234,10 @@ Tests pin each difference.
 
 `src/lib/app/`: `app-shell`, `page-header`, `page-state`, `notice`, `confirm-dialog`,
 `icon-button`, `relative-time`, `toast.ts`, `create-set-dialog`, `import-dialog`, `file-drop`,
-`set-list/`, `editor/` (toolbar, group, row, entry form, bulk bar, reference panel, the fields of
-the form), `install/` (screen, session, plan group, plan row, summary, picker panel, footer,
-confirm).
+`delete-set.svelte.ts` (deleting a set, shared by the list and the editor), `block-input.ts`,
+`set-list/`, `editor/` (session, toolbar, group, row, entry form, bulk bar, reference panel, the
+fields of the form), `install/` (screen, session, plan group, plan row, summary, picker panel,
+footer, confirm).
 
 `src/lib/components/ui/` (shadcn-svelte, added with its CLI): alert-dialog, badge, button,
 checkbox, collapsible, dialog, dropdown-menu, hover-card, input, label, progress, scroll-area,

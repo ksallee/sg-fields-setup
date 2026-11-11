@@ -38,7 +38,7 @@
 	import PageState from '$lib/app/page-state.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { blockText } from '$lib/pure/editor-reasons';
-	import { duplicateLabel, installLabel, STATUS_TEXT } from '$lib/pure/editor-text';
+	import { duplicateLabel, installLabel, notSavedText, STATUS_TEXT } from '$lib/pure/editor-text';
 	import { importBannerText } from '$lib/pure/import-build';
 	import { HOME_PATH } from '$lib/pure/routes';
 	import { groupCheckState } from '$lib/pure/selection';
@@ -176,7 +176,7 @@
 			{#if session.banner !== null || session.saveError !== null}
 				<div class="flex flex-col gap-3 px-6">
 					{#if session.saveError !== null}
-						<Notice tone="destructive" title="Not saved." data-slot="save-error">{session.saveError} Your changes are kept. Save again when ready.</Notice>
+						<Notice tone="destructive" title="Not saved." data-slot="save-error">{notSavedText(session.saveError)}</Notice>
 					{/if}
 					{#if session.banner !== null}
 						<Notice tone="info" data-slot="import-banner">
