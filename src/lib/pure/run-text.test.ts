@@ -28,15 +28,15 @@ function state(more: Partial<RunState>, states: RunRow['state'][] = []): RunStat
 
 describe('row notes (RUN-21)', () => {
 	it('never carries HTML: a server message stays plain text in one text part', () => {
-		const parts = noteParts(row(), { code: 'refused', action: 'create', status: 400, message: '<b>No</b> <a href="x">way</a>', partial: false });
+		const parts = noteParts(row(), { code: 'refused', action: 'create', status: 400, message: '<b>No</b> <a href="x">way</a>' });
 		expect(parts).toEqual([
 			{ kind: 'text', text: 'Install could not create "Lens" (Version.sg_lens). The site answered 400: <b>No</b> <a href="x">way</a>' }
 		]);
 	});
 
-	it('says when earlier requests of an update were written', () => {
-		expect(words({ code: 'refused', action: 'update', status: 400, message: 'No.', partial: true })).toBe(
-			'Install could not update "Lens" (Version.sg_lens). The site answered 400: No. Earlier settings of this update were written.'
+	it('RUN-27, finding 121: a refused update says the status and the message, and nothing of a half-written update', () => {
+		expect(words({ code: 'refused', action: 'update', status: 400, message: 'No.' })).toBe(
+			'Install could not update "Lens" (Version.sg_lens). The site answered 400: No.'
 		);
 	});
 

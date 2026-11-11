@@ -103,10 +103,8 @@ export type RowNote =
 			action: RunAction;
 			/** The error status, or null when no answer came. */
 			status: number | null;
-			/** The server's message (RUN-27). */
+			/** The server's message (RUN-27). An update is one request, applied whole or not at all (finding 121). */
 			message: string;
-			/** True when earlier requests of the same update were written. */
-			partial: boolean;
 	  }
 	| ({ code: 'retired-other-type'; liveDataType: string; trashPageUrl: string | null } & Retrash)
 	| ({ code: 'retired-blocked'; reasons: PlanReason[]; trashPageUrl: string | null } & Retrash)

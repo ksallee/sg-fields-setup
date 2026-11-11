@@ -87,7 +87,7 @@ describe('the valid types guard (corpus finding 121)', () => {
 		const result = await applyItem(
 			ctx,
 			wanted,
-			item(wanted, { class: 'update', update: { requests: [{ properties: [{ property_name: 'valid_types', value: ['shot'] }] }] } })
+			item(wanted, { class: 'update', update: { properties: [{ property_name: 'valid_types', value: ['shot'] }] } })
 		);
 		expect(result).toMatchObject({ state: 'failed', note: { code: 'unknown-valid-types', names: ['shot'] } });
 		expect(site.calls).toHaveLength(before);

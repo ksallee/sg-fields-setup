@@ -207,7 +207,7 @@ describe('an update at its turn (RUN-7, RUN-15, RUN-27)', () => {
 		]);
 	});
 
-	it('RUN-7, RUN-15: sends every request of the update, in the order planned, and ends matching', async () => {
+	it('RUN-7, RUN-15, finding 121: sends the one request of the update, as planned, and ends matching', async () => {
 		const site = createFakeSite().seed('Version', 'sg_state', {
 			displayName: 'State',
 			dataType: 'status_list',
@@ -216,14 +216,12 @@ describe('an update at its turn (RUN-7, RUN-15, RUN-27)', () => {
 		});
 		const wantedState = entry({ programmaticName: 'sg_state', displayName: 'State', dataType: 'status_list', validValues: ['vwd', 'apr'], defaultValue: 'vwd' });
 		// What the planner asks for: the values and the default together, which the site checks as a whole (finding 121).
-		const requests = (await replan(deps(site), [wantedState])).items[0].update?.requests ?? [];
-		expect(requests.length).toBeGreaterThan(0);
+		const request = (await replan(deps(site), [wantedState])).items[0].update;
+		expect(request?.properties.map((property) => property.property_name)).toEqual(['valid_values', 'default_value']);
 
 		const state = await engine(site).start([wantedState]);
 		expect(row(state).state).toBe('done');
-		expect(site.writes().map((call) => [call.op, call.outcome, call.body])).toEqual(
-			requests.map((request) => ['updateField', 'ok', request.properties])
-		);
+		expect(site.writes().map((call) => [call.op, call.outcome, call.body])).toEqual([['updateField', 'ok', request?.properties]]);
 		expect(site.get('Version', 'sg_state')).toMatchObject({ validValues: ['vwd', 'apr'], defaultValue: 'vwd' });
 	});
 
