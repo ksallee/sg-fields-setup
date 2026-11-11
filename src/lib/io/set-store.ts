@@ -80,11 +80,6 @@ const MESSAGES: Record<SetStoreErrorKind, string> = {
 	failed: 'The browser could not read or write the sets. Try again.'
 };
 
-/** The plain sentence shown for a storage fault. */
-export function storageMessage(kind: SetStoreErrorKind): string {
-	return MESSAGES[kind];
-}
-
 /**
  * The only error this module throws. `message` is plain and ready to show; `kind` lets a screen
  * react; `cause` keeps the browser's own error for the console.
@@ -155,7 +150,7 @@ export interface SetStore {
 	 * Saves the editor's request (`saveRequest` in `working-copy-save.ts`) in one transaction
 	 * (EDT-44 to EDT-48): name and description, removals, changes, additions. On success the
 	 * result is the set as reloaded from storage (EDT-46), and `added`: the stored entries made
-	 * for `request.added`, in the same order, to pair with `addedKeys`. Refuses `blank_name`,
+	 * for `request.added`, in the same order, which `keysAfterSave` pairs with the rows. Refuses `blank_name`,
 	 * `name_taken`, `duplicate_entries`, `set_missing`, `entry_missing` and `stale`: the set was
 	 * saved in another tab since the request's working copy was loaded, and this save would write
 	 * over that one. The read, the check and the write are one transaction, so no save slips

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
 	EMPTY_SELECTION,
-	clearSelection,
 	clickRow,
 	deselect,
 	groupCheckState,
@@ -146,7 +145,6 @@ describe('group checkbox', () => {
 
 describe('clear, prune and select all', () => {
 	it('EDT-41: clear empties the selection and the anchor', () => {
-		expect(clearSelection()).toEqual(EMPTY_SELECTION);
 		expect(EMPTY_SELECTION).toEqual({ selected: new Set(), anchor: null });
 	});
 

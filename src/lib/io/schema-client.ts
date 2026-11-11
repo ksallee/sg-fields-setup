@@ -187,13 +187,9 @@ async function lookUpTrashPage(client: PageLister, siteUrl: string): Promise<{ u
 
 /**
  * The address of the site's "Trash - Fields" page, `<site>/page/<id>`, or null when the site has
- * none or the lookup fails (RUN-21). A read. Never rejects.
+ * none or the lookup fails (RUN-21). A read. Never rejects. Looked up once a session; a lookup
+ * that failed is asked again the next time.
  */
-export async function readTrashPageUrl(client: PageLister, siteUrl: string): Promise<string | null> {
-	return (await lookUpTrashPage(client, siteUrl)).url;
-}
-
-/** The same, looked up once a session. A lookup that failed is asked again the next time. */
 export function createTrashPage(client: PageLister, siteUrl: string): () => Promise<string | null> {
 	let held: Promise<{ url: string | null; failed: boolean }> | null = null;
 	return async () => {

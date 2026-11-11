@@ -33,7 +33,7 @@ export interface SaveRequest {
 	 * row never re-synced it is the saved one.
 	 */
 	changed: Entry[];
-	/** The added rows as cleaned drafts, in row order. `addedKeys` gives their row keys. */
+	/** The added rows as cleaned drafts, in row order. `keysAfterSave` pairs them with their row keys. */
 	added: EntryDraft[];
 	/**
 	 * What the working copy was loaded from, so the store can tell a save made elsewhere since
@@ -108,11 +108,6 @@ export function saveRequest(workingCopy: WorkingCopy): SaveRequest {
 	};
 }
 
-/** The row keys of `saveRequest(workingCopy).added`, in the same order. */
-export function addedKeys(workingCopy: WorkingCopy): string[] {
-	return workingCopy.rows.filter((row) => row.entryId === null).map((row) => row.key);
-}
-
 /**
  * After a successful save and reload (EDT-46): a clean working copy on the stored state, as
  * `openWorkingCopy` builds it. Every row is stored, so every row is in manual mode (EDT-25).
@@ -120,30 +115,6 @@ export function addedKeys(workingCopy: WorkingCopy): string[] {
  */
 export function afterSave(_workingCopy: WorkingCopy, storedSet: FieldSet, storedEntries: readonly Entry[]): WorkingCopy {
 	return openWorkingCopy(storedSet, storedEntries);
-}
-
-/**
- * Marks added rows as stored, given the entries the store created for them by row key (EDT-47):
- * for a save whose additions were stored but whose reload failed. Each such row keeps its key,
- * its edits and its name mode, takes the entry's id, and the entry joins the saved state, so a
- * retry sends it as a change if edited since and never adds it again. Keys that are not added
- * rows are ignored. Nothing else moves: a retry sends the details, removals and changes again,
- * which the store applies idempotently.
- */
-export function adoptStored(workingCopy: WorkingCopy, stored: ReadonlyMap<string, Entry>): WorkingCopy {
-	const adopted: Entry[] = [];
-	const rows = workingCopy.rows.map((row) => {
-		const entry = row.entryId === null ? stored.get(row.key) : undefined;
-		if (!entry) return row;
-		adopted.push(entry);
-		return { ...row, entryId: entry.id, isNew: false };
-	});
-	if (adopted.length === 0) return workingCopy;
-	return {
-		...workingCopy,
-		saved: { ...workingCopy.saved, entries: [...workingCopy.saved.entries, ...adopted] },
-		rows
-	};
 }
 
 function pick(workingCopy: WorkingCopy, keys: readonly string[] | undefined): readonly Row[] {

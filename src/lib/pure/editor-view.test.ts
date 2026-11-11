@@ -4,7 +4,6 @@ import {
 	UNASSIGNED_LABEL,
 	buildEditorView,
 	groupCountText,
-	matchesSearch,
 	type EditorViewInput,
 	type ViewRow
 } from './editor-view';
@@ -104,12 +103,15 @@ describe('grouping', () => {
 	});
 });
 
-describe('matchesSearch', () => {
+describe('the search on one row', () => {
 	const shot = row('a', 'CustomEntity01', 'Lens Serial', 'sg_lens_serial');
+	/** Whether the row stays in the view under the search. Its type shows on the site as "Vendor". */
+	const matchesSearch = (one: ViewRow, search: string) =>
+		buildEditorView(input([one], { search })).groups.some((group) => group.keys.includes(one.key));
 
 	it('EDT-34: a blank search matches everything', () => {
-		expect(matchesSearch(shot, '', undefined)).toBe(true);
-		expect(matchesSearch(shot, '   ', undefined)).toBe(true);
+		expect(matchesSearch(shot, '')).toBe(true);
+		expect(matchesSearch(shot, '   ')).toBe(true);
 	});
 
 	it.each([
@@ -118,15 +120,15 @@ describe('matchesSearch', () => {
 		['target entity type', 'customentity'],
 		['the type display name shown on the header', 'vend']
 	])('EDT-34: matches on %s, case-insensitive substring', (_what, query) => {
-		expect(matchesSearch(shot, query, 'Vendor')).toBe(true);
+		expect(matchesSearch(shot, query)).toBe(true);
 	});
 
 	it('EDT-34: the query is trimmed', () => {
-		expect(matchesSearch(shot, '  lens ', undefined)).toBe(true);
+		expect(matchesSearch(shot, '  lens ')).toBe(true);
 	});
 
 	it('EDT-34: no field containing the query is no match', () => {
-		expect(matchesSearch(shot, 'focus', 'Vendor')).toBe(false);
+		expect(matchesSearch(shot, 'focus')).toBe(false);
 	});
 });
 

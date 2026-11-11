@@ -221,17 +221,14 @@ export interface VisibilityWriter {
 	updateField(entityType: string, field: string, properties: VisibleWrite, projectId: number): Promise<unknown>;
 }
 
-export const WRITE_NOT_WIRED = 'Visibility writes are not wired yet.';
-
 /**
  * The port the executor runs on (`createApplyVisibility`). The read is the schema source's
- * one-field read (`coreSchemaSource(...)`, or core's schema client). The writer is core's schema
- * client once a release has it. Without one every write rejects and nothing reaches the site.
+ * one-field read (`coreSchemaSource(...)`). The writer is core's schema client
+ * (`visibilityWriter` in `schema-client.ts`).
  */
-export function visibilityPort(reader: Pick<SchemaSource, 'readField'>, writer: VisibilityWriter | null = null): VisibilityPort {
+export function visibilityPort(reader: Pick<SchemaSource, 'readField'>, writer: VisibilityWriter): VisibilityPort {
 	return {
 		readField: (entityType, field, projectId) => reader.readField(entityType, field, projectId),
-		updateField: (entityType, field, properties, projectId) =>
-			writer ? writer.updateField(entityType, field, properties, projectId) : Promise.reject(new Error(WRITE_NOT_WIRED))
+		updateField: (entityType, field, properties, projectId) => writer.updateField(entityType, field, properties, projectId)
 	};
 }

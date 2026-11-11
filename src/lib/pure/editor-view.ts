@@ -122,6 +122,11 @@ function normalizeQuery(search: string): string {
 	return search.trim().toLowerCase();
 }
 
+/**
+ * Whether a row matches a search (EDT-34): case-insensitive substring of its display name,
+ * programmatic name, target entity type, or the type's site display name when given. A blank
+ * query matches every row. The query comes trimmed and lowercased (`normalizeQuery`).
+ */
 function matchesQuery(row: ViewRow, query: string, typeLabel: string | undefined): boolean {
 	if (query === '') return true;
 	return (
@@ -130,15 +135,6 @@ function matchesQuery(row: ViewRow, query: string, typeLabel: string | undefined
 		row.targetEntityType.toLowerCase().includes(query) ||
 		(typeLabel !== undefined && typeLabel.toLowerCase().includes(query))
 	);
-}
-
-/**
- * Whether a row matches a search (EDT-34): case-insensitive substring of its display name,
- * programmatic name, target entity type, or the type's site display name when given. A blank
- * search matches every row.
- */
-export function matchesSearch(row: ViewRow, search: string, typeLabel: string | undefined): boolean {
-	return matchesQuery(row, normalizeQuery(search), typeLabel);
 }
 
 /** A group header's count text (EDT-17): `3`, or `1 of 3` when a search or filter hides some. */

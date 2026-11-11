@@ -23,8 +23,8 @@ export type NameMode = 'derived' | 'manual';
 export interface Row extends EntryDefinition, EntrySnapshot {
 	/**
 	 * Stable for the life of the working copy. The stored entry's id for a row loaded from
-	 * storage; the caller's client key for a row added here. It does not change when an added
-	 * row is stored (`adoptStored`).
+	 * storage; the caller's client key for a row added here. After a save every row is keyed by
+	 * its entry id (`keysAfterSave` in `editor-session.ts`).
 	 */
 	key: string;
 	/** The stored entry's id, or null while the row is not stored. */
@@ -57,19 +57,6 @@ export interface WorkingCopy {
 	/** In the order they were loaded and added. */
 	rows: readonly Row[];
 }
-
-/** The nine keys of a definition, the part dirtiness and the save compare (EDT-3). */
-export const DEFINITION_KEYS = [
-	'targetEntityType',
-	'programmaticName',
-	'displayName',
-	'dataType',
-	'validTypes',
-	'validValues',
-	'defaultValue',
-	'description',
-	'uniquePerProject'
-] as const satisfies readonly (keyof EntryDefinition)[];
 
 /** Just the definition of an entry or a row, as a fresh object. Lists are shared, not copied. */
 export function definitionOf(source: EntryDefinition): EntryDefinition {

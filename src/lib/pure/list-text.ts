@@ -3,19 +3,6 @@
  * comma-separated list when no site is connected (EDT-27). Data in, data out.
  */
 
-/** One value per line: lines trimmed, blanks dropped, order and repeats kept (EDT-28). */
-export function parseLines(text: string): string[] {
-	return text
-		.split(/\r?\n/)
-		.map((line) => line.trim())
-		.filter((line) => line !== '');
-}
-
-/** A list as the text box shows it: one value per line (EDT-28). */
-export function linesText(values: readonly string[]): string {
-	return values.join('\n');
-}
-
 /** A comma-separated list: items trimmed, blanks dropped, order kept (EDT-27). */
 export function parseCommaList(text: string): string[] {
 	return text

@@ -53,8 +53,6 @@ export interface SchemaSource {
 export interface LiveSchema {
 	/** The site's entity types, in the listing's order. Read once (CMP-1). Rejects when the read fails. */
 	entityTypes(): Promise<readonly LiveEntityType[]>;
-	/** The type list if it is held, else null. Never reads. */
-	cachedEntityTypes(): readonly LiveEntityType[] | null;
 	/** Reads the type list again and keeps the new one: the re-check of CMP-10. Rejects when the read fails. */
 	refreshEntityTypes(): Promise<readonly LiveEntityType[]>;
 
@@ -152,7 +150,6 @@ export function createLiveSchema(source: SchemaSource): LiveSchema {
 
 	return {
 		entityTypes: () => (types ?? loadTypes()).promise,
-		cachedEntityTypes: () => types?.value ?? null,
 		refreshEntityTypes: () => loadTypes().promise,
 
 		fields,

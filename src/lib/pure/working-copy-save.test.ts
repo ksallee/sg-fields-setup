@@ -11,7 +11,8 @@ import {
 	setDescription,
 	setName
 } from './working-copy';
-import { addedKeys, adoptStored, afterSave, draftsOf, installEntries, saveRequest } from './working-copy-save';
+import { afterSave, draftsOf, installEntries, saveRequest } from './working-copy-save';
+import { keysAfterSave } from './editor-session';
 
 const SET: FieldSet = {
 	id: 'set-1',
@@ -151,7 +152,8 @@ describe('saveRequest', () => {
 				snapshotTime: null
 			}
 		]);
-		expect(addedKeys(wc)).toEqual(['new-1', 'new-2']);
+		// The store answers one entry per added draft, in this order; the editor pairs them back by row order.
+		expect(keysAfterSave(wc, [{ id: 'e1' }, { id: 'e2' }])).toEqual(new Map([['a', 'a'], ['b', 'b'], ['c', 'c'], ['new-1', 'e1'], ['new-2', 'e2']]));
 	});
 
 	it('EDT-44: deleting an entry and adding one with the same pair sends both', () => {
@@ -173,41 +175,6 @@ describe('afterSave', () => {
 			['a', 'manual'],
 			['n1', 'manual']
 		]);
-	});
-});
-
-describe('adoptStored', () => {
-	it('EDT-47: an added row once stored is treated as existing, so a retry does not create it twice', () => {
-		let wc = editRow(addRow(open(), 'new-1', 'Shot'), 'new-1', { displayName: 'Lens' });
-		wc = setName(wc, 'Lens data');
-		const draft = saveRequest(wc).added[0];
-		const created: Entry = {
-			...draft,
-			id: 'e9',
-			setId: 'set-1',
-			createdAt: '2026-11-10T09:00:00.000Z',
-			changedAt: '2026-11-10T09:00:00.000Z'
-		};
-		const adopted = adoptStored(wc, new Map([['new-1', created]]));
-		const row = rowByKey(adopted, 'new-1');
-		expect(row).toMatchObject({ key: 'new-1', entryId: 'e9', isNew: false, nameMode: 'derived' });
-		const retry = saveRequest(adopted);
-		expect(retry.added).toEqual([]);
-		expect(retry.changed).toEqual([]);
-		expect(retry.details).toEqual({ name: 'Lens data', description: 'Camera data' });
-	});
-
-	it('EDT-47: an adopted row edited after is sent as a change', () => {
-		const wc = addRow(open(), 'new-1', 'Shot');
-		const created = { ...saveRequest(wc).added[0], id: 'e9', setId: 'set-1', createdAt: 't', changedAt: 't' };
-		const edited = editRow(adoptStored(wc, new Map([['new-1', created]])), 'new-1', { displayName: 'Lens' });
-		expect(saveRequest(edited).changed.map((entry) => entry.id)).toEqual(['e9']);
-		expect(saveRequest(edited).added).toEqual([]);
-	});
-
-	it('keys that are not added rows are ignored', () => {
-		const wc = open();
-		expect(adoptStored(wc, new Map([['a', storedEntry('zz')]]))).toBe(wc);
 	});
 });
 
