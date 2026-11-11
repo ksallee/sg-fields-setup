@@ -10,6 +10,7 @@
 	import SearchX from '@lucide/svelte/icons/search-x';
 	import Sheet from '@lucide/svelte/icons/sheet';
 	import ConfirmDialog from '$lib/app/confirm-dialog.svelte';
+	import { DeleteSet } from '$lib/app/delete-set.svelte';
 	import CreateSetDialog from '$lib/app/create-set-dialog.svelte';
 	import ImportDialog from '$lib/app/import-dialog.svelte';
 	import PageHeader from '$lib/app/page-header.svelte';
@@ -38,7 +39,7 @@
 	} from '$lib/pure/set-list';
 	import { refusalMessage } from '$lib/pure/set-plan';
 	import type { SetSummary } from '$lib/pure/set-query';
-	import { deleteQuestion, duplicatedText, exportedNote, importedText, totalText } from '$lib/pure/set-text';
+	import { createdText, duplicatedText, exportedNote, exportedText, failedTitle, importedText, SET_GONE_TEXT, totalText } from '$lib/pure/set-text';
 	import { cn } from '$lib/utils.js';
 
 	const SEARCH_DELAY_MS = 300;
@@ -130,7 +131,7 @@
 		return act(row.set.id, async () => {
 			const result = await (await sharedSetStore()).duplicateSet(row.set.id);
 			if (result.ok) notify.success(duplicatedText(result.set.name));
-			else notify.error(refusalMessage(result), `Could not duplicate "${row.set.name}"`);
+			else notify.error(refusalMessage(result), failedTitle('duplicate', row.set.name));
 			await reload();
 		});
 	}
@@ -140,63 +141,21 @@
 		return act(row.set.id, async () => {
 			const stored = await (await sharedSetStore()).getSet(row.set.id);
 			if (!stored) {
-				notify.error('This set no longer exists.', `Could not export "${row.set.name}"`);
+				notify.error(SET_GONE_TEXT, failedTitle('export', row.set.name));
 				await reload();
 				return;
 			}
 			const { text, fileName } = encodeSetFile(stored.set, stored.entries);
 			downloadText(fileName, text);
 			// What travels with the file, said when it does (the site address, the schema records).
-			notify.success(`Exported ${fileName}.`, exportedNote(stored.entries));
+			notify.success(exportedText(fileName), exportedNote(stored.entries));
 		});
 	}
 
-	/* Delete (SET-22 to SET-24). */
+	/* Delete (SET-22 to SET-24): the flow the editor shares. The row goes from the list once its set is gone. */
 
-	let skipDeleteConfirm = $state(false);
-	let deleting = $state<SetSummary | null>(null);
-	let deleteOpen = $state(false);
-	let deleteBusy = $state(false);
-	let deleteError = $state<string | null>(null);
-
-	async function removeSet(row: SetSummary): Promise<void> {
-		await (await sharedSetStore()).deleteSet(row.set.id);
-		list = removeRow(list, row.set.id);
-		notify.success(`Deleted "${row.set.name}".`);
-	}
-
-	function askDelete(row: SetSummary): void {
-		if (skipDeleteConfirm) {
-			void act(row.set.id, () => removeSet(row));
-			return;
-		}
-		deleting = row;
-		deleteError = null;
-		deleteOpen = true;
-	}
-
-	async function confirmDelete(remember: boolean): Promise<void> {
-		const row = deleting;
-		if (!row || deleteBusy) return;
-		deleteBusy = true;
-		deleteError = null;
-		try {
-			await removeSet(row);
-			deleteBusy = false;
-			deleteOpen = false;
-		} catch (error) {
-			deleteError = errorMessage(error);
-			return;
-		} finally {
-			deleteBusy = false;
-		}
-		if (!remember) return;
-		skipDeleteConfirm = true;
-		// The set is gone either way; a preference that did not stick only means one more question.
-		void sharedSetStore()
-			.then((store) => store.setPreference('skipDeleteSetConfirm', true))
-			.catch(() => {});
-	}
+	const deleting = new DeleteSet((target) => void (list = removeRow(list, target.id)));
+	void deleting.loadPreference();
 
 	/* Create, the spreadsheet import, and set files (SET-1, SET-14 to SET-17, D1). */
 
@@ -208,7 +167,7 @@
 		const files = [...(fileInput?.files ?? [])];
 		if (fileInput) fileInput.value = '';
 		for (const file of files) {
-			const title = `Could not import ${file.name}`;
+			const title = failedTitle('import', file.name);
 			try {
 				const result = await importSetFileFrom(await sharedSetStore(), file);
 				if (result.ok) notify.success(importedText(result));
@@ -220,14 +179,9 @@
 		if (files.length > 0) await reload();
 	}
 
-	/* On entering: the first page, the remembered preference, and the schema warm-up. */
+	/* On entering: the first page and the schema warm-up. */
 
 	void send(startLoad(initialSetList()));
-
-	void sharedSetStore()
-		.then((store) => store.getPreferences())
-		.then((preferences) => (skipDeleteConfirm = preferences.skipDeleteSetConfirm))
-		.catch(() => {});
 
 	// SET-25, SET-26: best effort, never awaited, only with a site that can be read.
 	void prepareLive()
@@ -285,10 +239,10 @@
 				{#each list.rows as row (row.set.id)}
 					<SetRow
 						{row}
-						busy={busyIds.has(row.set.id)}
+						busy={busyIds.has(row.set.id) || deleting.inFlight.has(row.set.id)}
 						onduplicate={() => duplicate(row)}
 						onexport={() => exportFile(row)}
-						ondelete={() => askDelete(row)}
+						ondelete={() => deleting.ask({ id: row.set.id, name: row.set.name, entryCount: row.entryCount })}
 					/>
 				{/each}
 			</ul>
@@ -302,7 +256,7 @@
 <CreateSetDialog
 	bind:open={createOpen}
 	oncreated={(set) => {
-		notify.success(`Created "${set.name}".`);
+		notify.success(createdText(set.name));
 		void goto(setPath(set.id));
 	}}
 />
@@ -310,13 +264,13 @@
 <ImportDialog bind:open={importOpen} oncreated={(setId) => void goto(setPath(setId))} />
 
 <ConfirmDialog
-	bind:open={deleteOpen}
+	bind:open={deleting.open}
 	title="Delete this set?"
-	message={deleting ? deleteQuestion(deleting.set.name, deleting.entryCount) : ''}
+	message={deleting.question}
 	confirmLabel="Delete set"
 	destructive
 	rememberLabel="Do not ask again when deleting a set"
-	busy={deleteBusy}
-	error={deleteError}
-	onconfirm={({ remember }) => confirmDelete(remember)}
+	busy={deleting.busy}
+	error={deleting.error}
+	onconfirm={({ remember }) => deleting.confirm(remember)}
 />

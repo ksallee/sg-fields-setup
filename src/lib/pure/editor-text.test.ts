@@ -8,6 +8,8 @@ import {
 	resyncedText,
 	RESYNC_NONE_TEXT,
 	savedText,
+	editorTitle,
+	RESYNC_DROPPED_TEXT,
 	selectionText,
 	STATUS_TEXT
 } from './editor-text';
@@ -76,5 +78,19 @@ describe('bulk reports (EDT-41, EDT-42)', () => {
 describe('savedText (EDT-46)', () => {
 	it('EDT-46: the confirmation names the set', () => {
 		expect(savedText('Lens')).toBe('Saved "Lens".');
+	});
+});
+
+describe('editorTitle (EDT-1)', () => {
+	it('EDT-1: the set name as typed, trimmed; a blank one reads "Untitled set"; "Set" before it loads', () => {
+		expect(editorTitle(' Lens kit ')).toBe('Lens kit');
+		expect(editorTitle('   ')).toBe('Untitled set');
+		expect(editorTitle(null)).toBe('Set');
+	});
+});
+
+describe('a re-sync whose answer came too late (EDT-42, audit M2)', () => {
+	it('EDT-42: says nothing was re-synced and what to do', () => {
+		expect(RESYNC_DROPPED_TEXT).toBe('The set changed while the site was read. Nothing was re-synced. Try again.');
 	});
 });
