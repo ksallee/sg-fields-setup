@@ -4,7 +4,8 @@
 
 	The button is the keyboard's way in; the zone itself is not focusable. While files are dragged
 	over it the zone is marked (`data-dragging`). A file dropped beside the zone is swallowed, so
-	the browser does not open it in place of the app.
+	the browser does not open it in place of the app. With `anywhere`, a file dropped beside the
+	zone is taken too, and the zone is marked while files are over the window.
 
 	    <FileDrop accept=".csv,.xlsx" title="Drop CSV or XLSX files here" onfiles={add} />
 -->
@@ -22,6 +23,7 @@
 		disabled = false,
 		busy = false,
 		compact = false,
+		anywhere = false,
 		browseLabel = 'Browse files',
 		class: className,
 		...rest
@@ -39,6 +41,8 @@
 		busy?: boolean;
 		/** One line, for a zone that has already been used. */
 		compact?: boolean;
+		/** The whole window takes the drop. For a dialog, where a miss beside the zone is still meant for it. */
+		anywhere?: boolean;
 		browseLabel?: string;
 		class?: string;
 		[key: `data-${string}`]: string | undefined;
@@ -56,12 +60,13 @@
 	function enter(event: DragEvent): void {
 		if (!carriesFiles(event)) return;
 		event.preventDefault();
-		depth += 1;
+		// With `anywhere` the window counts, and this one reaches it too.
+		if (!anywhere) depth += 1;
 	}
 
 	function leave(event: DragEvent): void {
 		if (!carriesFiles(event)) return;
-		depth = Math.max(0, depth - 1);
+		if (!anywhere) depth = Math.max(0, depth - 1);
 	}
 
 	function over(event: DragEvent): void {
@@ -75,6 +80,10 @@
 		event.preventDefault();
 		event.stopPropagation();
 		depth = 0;
+		take(event);
+	}
+
+	function take(event: DragEvent): void {
 		if (disabled) return;
 		const files = [...(event.dataTransfer?.files ?? [])];
 		if (files.length > 0) onfiles(multiple ? files : files.slice(0, 1));
@@ -87,16 +96,27 @@
 		if (files.length > 0) onfiles(files);
 	}
 
-	/** A miss beside the zone must not navigate away from the app. */
-	function swallow(event: DragEvent): void {
+	/** A miss beside the zone must not navigate away from the app. With `anywhere` it is no miss. */
+	function beside(event: DragEvent): void {
 		if (!carriesFiles(event)) return;
 		event.preventDefault();
-		if (event.type === 'dragover' && event.dataTransfer) event.dataTransfer.dropEffect = 'none';
-		if (event.type === 'drop') depth = 0;
+		const taken = anywhere && !disabled;
+		if (event.type === 'dragover' && event.dataTransfer) event.dataTransfer.dropEffect = taken ? 'copy' : 'none';
+		if (event.type !== 'drop') return;
+		depth = 0;
+		if (taken) take(event);
+	}
+
+	function windowEnter(event: DragEvent): void {
+		if (anywhere && carriesFiles(event)) depth += 1;
+	}
+
+	function windowLeave(event: DragEvent): void {
+		if (anywhere && carriesFiles(event)) depth = Math.max(0, depth - 1);
 	}
 </script>
 
-<svelte:window ondragover={swallow} ondrop={swallow} />
+<svelte:window ondragenter={windowEnter} ondragleave={windowLeave} ondragover={beside} ondrop={beside} />
 
 <div
 	role="group"

@@ -37,6 +37,7 @@
 		type SetListRequest,
 		type SetListState
 	} from '$lib/pure/set-list';
+	import { splitListDrop } from '$lib/pure/list-drop';
 	import { refusalMessage } from '$lib/pure/set-plan';
 	import type { SetSummary } from '$lib/pure/set-query';
 	import { createdText, duplicatedText, exportedNote, exportedText, failedTitle, importedText, SET_GONE_TEXT, totalText } from '$lib/pure/set-text';
@@ -164,9 +165,13 @@
 	let importOpen = $state(false);
 	let fileInput = $state<HTMLInputElement | null>(null);
 
-	async function importFiles(): Promise<void> {
+	function pickedSetFiles(): void {
 		const files = [...(fileInput?.files ?? [])];
 		if (fileInput) fileInput.value = '';
+		void importSetFiles(files);
+	}
+
+	async function importSetFiles(files: File[]): Promise<void> {
 		for (const file of files) {
 			const title = failedTitle('import', file.name);
 			try {
@@ -180,6 +185,36 @@
 		if (files.length > 0) await reload();
 	}
 
+	/* A drop anywhere on the list (IMP-1, D1). With a dialog open the drop is the dialog's. */
+
+	let importDialog = $state<ReturnType<typeof ImportDialog> | null>(null);
+	/** Enter and leave fire for every element crossed: the window is left when the count is back to zero. */
+	let dragDepth = $state(0);
+	const takesDrop = $derived(!importOpen && !createOpen && !deleting.open);
+
+	function carriesFiles(event: DragEvent): boolean {
+		return event.dataTransfer?.types.includes('Files') ?? false;
+	}
+
+	function dragMoved(event: DragEvent): void {
+		if (!takesDrop || !carriesFiles(event)) return;
+		if (event.type === 'dragenter') dragDepth += 1;
+		else if (event.type === 'dragleave') dragDepth = Math.max(0, dragDepth - 1);
+		else {
+			event.preventDefault();
+			if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+		}
+	}
+
+	function dropped(event: DragEvent): void {
+		if (!takesDrop || !carriesFiles(event)) return;
+		event.preventDefault();
+		dragDepth = 0;
+		const drop = splitListDrop([...(event.dataTransfer?.files ?? [])]);
+		if (drop.setFiles.length > 0) void importSetFiles(drop.setFiles);
+		if (drop.spreadsheets.length > 0) importDialog?.openWith(drop.spreadsheets);
+	}
+
 	/* On entering: the first page and the schema warm-up. */
 
 	void send(startLoad(initialSetList()));
@@ -191,6 +226,8 @@
 		})
 		.catch(() => {});
 </script>
+
+<svelte:window ondragenter={dragMoved} ondragleave={dragMoved} ondragover={dragMoved} ondrop={dropped} />
 
 <svelte:head><title>Sets · SG Fields Setup</title></svelte:head>
 
@@ -214,7 +251,7 @@
 	{/if}
 </PageHeader>
 
-<input bind:this={fileInput} type="file" accept=".json,application/json" multiple hidden onchange={importFiles} data-slot="set-file-input" />
+<input bind:this={fileInput} type="file" accept=".json,application/json" multiple hidden onchange={pickedSetFiles} data-slot="set-file-input" />
 
 <div bind:this={scroller} class="flex min-h-0 flex-1 flex-col overflow-y-auto" data-slot="set-list-pane">
 	{#if view === 'loading'}
@@ -262,7 +299,16 @@
 	}}
 />
 
-<ImportDialog bind:open={importOpen} oncreated={(setId) => void goto(setPath(setId))} />
+{#if takesDrop && dragDepth > 0}
+	<div
+		class="bg-background/80 border-ring text-foreground pointer-events-none fixed inset-3 z-50 flex items-center justify-center rounded-lg border-2 border-dashed text-sm font-medium"
+		data-slot="list-drop"
+	>
+		Drop a spreadsheet or a set file to import it
+	</div>
+{/if}
+
+<ImportDialog bind:this={importDialog} bind:open={importOpen} oncreated={(setId) => void goto(setPath(setId))} />
 
 <ConfirmDialog
 	bind:open={deleting.open}
