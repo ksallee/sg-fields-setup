@@ -4,7 +4,8 @@ sg-widgets' default theme (`src/app.css`) and its `docs/design-rules.md` bind ev
 tokens only, its spacing and size ladders, no new palette, no new font. Layout, hierarchy and copy
 are this app's. It reads as sg-task-templates' sibling. Every screen is held to this file.
 
-Written with the set list (#15). The import dialog, the editor and the install screen follow it.
+Written with the set list (#15), extended with the editor (#17). The import dialog and the install
+screen follow it.
 
 ## Routes
 
@@ -81,6 +82,8 @@ A set that is gone is a `PageState`: "Set not found", one line, a button back to
   says what failed, the message why. It stays 10 s. Pass the thrown error as it is:
   `errorMessage` turns a `SetStoreError` into its plain sentence and anything else into a
   fallback. A raw error text never shows.
+- `notify.warning('None of the selected fields exist on the site.')` for an action that ran and
+  found nothing, or only part of what was asked. It stays 10 s.
 - A failure while a dialog is open shows in the dialog, not as a toast.
 - No toast for something the screen already shows.
 
@@ -95,6 +98,34 @@ A set that is gone is a `PageState`: "Set not found", one line, a button back to
   under the rows.
 - **Inline.** `Notice`: bordered, tinted `bg-<tone>/10`, an icon, one sentence, an optional action.
   Tones: warning, destructive, info. Never raw colour classes.
+
+## Workbench
+
+The editor is the first workbench: one long list edited in place. The install screen follows.
+
+- **Status.** The page header's context line starts with the state of the work: "Saving…",
+  "Unsaved changes", "Saved", "Not saved". A dot or a glyph in its tone, then the words.
+- **Disabled with a reason.** A header action that cannot run says why on hover and on focus:
+  `HeaderAction` (`app/editor/header-action.svelte`). The reason is one sentence from a pure
+  module, first match wins.
+- **Groups.** A group header is `text-sm font-semibold`, sticks to the top of the scrolling pane,
+  and carries the group's checkbox, glyph, count and its one action. `gap-4` between groups.
+- **Rows.** One line, `py-1`: checkbox, chevron, title, API name in mono, type, markers on the
+  right, one row action. Under 640 px the API name, type and markers fold into a second line and
+  a marker keeps its dot and drops its label. A row opens in place; its form sits under it on
+  `bg-muted/40`, one column of `max-w-3xl`, two fields a row from 640 px.
+- **Markers.** `Badge variant="outline"` with a dot in the marker's tone: success for fine,
+  warning for what the site will object to, destructive for what blocks a save, muted for a
+  fact. The words explaining a marker are a `Notice` at the top of the open row.
+- **Long lists.** A row in a list that can reach hundreds names its action with `title`, not a
+  `Tooltip`: 500 tooltips cost more to mount than the rows. Forms mount only while a row is open.
+- **Bulk bar.** Shows while rows are selected, stuck to the bottom of the pane: the count first,
+  the actions, "Clear selection" on the right. A pick in it is an action, so its controls go back
+  to their placeholder.
+- **Scroll pane.** `relative overflow-y-auto`, so screen-reader-only text inside it cannot
+  stretch the page.
+- **Typed fallbacks.** A picker that needs the site gives way to a text box when no site is
+  connected. A text box that would move the row under the caret reports on blur or Enter.
 
 ## Copy
 
@@ -114,7 +145,14 @@ filler. Sentence case everywhere, no capitals for labels.
 
 `src/lib/app/`: `app-shell`, `page-header`, `page-state`, `notice`, `confirm-dialog`,
 `icon-button`, `relative-time`, `toast.ts`, `create-set-dialog`, `import-dialog`, `file-drop`,
-`set-list/`.
+`set-list/`, `editor/` (toolbar, group, row, entry form, bulk bar, reference panel, the fields of
+the form).
+
+`src/lib/components/` (sg-widgets registry copies, added with the shadcn-svelte CLI from
+`https://sg-widgets.vercel.app/r/svelte/<name>.json`): `entity-type-picker`,
+`entity-type-multi-picker`, `entity-glyphs`, `state-line`, and what they bring (`picker-control`,
+`picker-classes`, `leaf-classes`). The registry's `checkbox` replaces shadcn's: it draws the mixed
+state.
 
 `src/lib/components/ui/` (shadcn-svelte, added with its CLI): alert-dialog, badge, button,
 checkbox, collapsible, dialog, dropdown-menu, input, label, progress, scroll-area, select,
