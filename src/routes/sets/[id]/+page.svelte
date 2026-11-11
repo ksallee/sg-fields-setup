@@ -599,6 +599,8 @@
 							notOnSite={comparison.notOnSite.has(group.type)}
 							rechecking={site.rechecking}
 							context={site.context}
+							referenceFields={site.fieldsOf(group.type)}
+							onloadfields={site.loadFields}
 							onadd={addField}
 							ontogglegroup={selectGroup}
 							onrecheck={recheck}

@@ -1,29 +1,40 @@
 <!--
 	The fields that already exist on one entity type of the site (EDT-21): custom, then standard,
-	each sorted by display name. Collapsed until asked for; the listing is read when it opens, from
-	the session's schema cache.
+	each sorted by display name. Collapsed until asked for. The listing is the editor's own
+	(`EditorSite`), the one the comparison reads: it is asked for when the panel opens and it is
+	not held yet, and it follows a re-sync.
 -->
 <script lang="ts">
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import StateLine from '$lib/components/state-line.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { liveSchema } from '$lib/live';
 	import { dataTypeLabel } from '$lib/pure/data-types';
 	import { splitFields, type LiveField } from '$lib/pure/live-field';
 	import { countText } from '$lib/pure/set-text';
 	import { cn } from '$lib/utils.js';
 
-	let { type, label }: { type: string; label: string } = $props();
+	let {
+		type,
+		label,
+		fields,
+		onload
+	}: {
+		type: string;
+		label: string;
+		/** The type's fields as the editor holds them; null while not read. */
+		fields: readonly LiveField[] | null;
+		/** Reads them. Rejects when the read fails. */
+		onload: (type: string) => Promise<void>;
+	} = $props();
 
 	let open = $state(false);
-	let fields = $state.raw<readonly LiveField[] | null>(null);
 	let failed = $state(false);
 	const split = $derived(fields ? splitFields(fields) : null);
 
 	async function load(): Promise<void> {
 		failed = false;
 		try {
-			fields = await liveSchema().fields(type);
+			await onload(type);
 		} catch {
 			failed = true;
 		}
@@ -61,7 +72,7 @@
 	</Button>
 	{#if open}
 		<div class="border-border mt-1 mb-2 max-h-72 overflow-y-auto rounded-lg border px-3 py-2">
-			{#if failed}
+			{#if failed && split === null}
 				<StateLine state="error" label="The fields of {label} did not load." pad="none">
 					<Button variant="outline" size="xs" onclick={load}>Try again</Button>
 				</StateLine>

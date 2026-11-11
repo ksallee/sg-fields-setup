@@ -18,7 +18,8 @@
  * then until a refresh (RUN-25), so retry and resume apply the same scope.
  *
  * The analysis runs in the background and blocks nothing (VIS-8, VIS-12). It is asked again after
- * every plan and after every run (RUN-26).
+ * every plan and after every run (RUN-26). The end of a run, however it ends, and Refresh both call
+ * `site.clear()`: the schema cache and the widgets' context are dropped (`$lib/io/site-cache`).
  */
 import type { EntityRef } from 'sg-widgets-core';
 import { errorMessage, notify } from '$lib/app/toast';
@@ -324,11 +325,12 @@ export class InstallSession {
 		} catch (error) {
 			if (!this.#disposed) notify.error(siteErrorMessage(error), undefined, ABOVE_FOOTER);
 		} finally {
-			if (!this.#disposed && this.site) {
-				// New fields exist now, and visibility changed.
-				this.site.analyser.clear();
-				this.#analyse();
-			}
+			// A write may have happened, however the run ended: finished, cancelled, failed, or left
+			// behind by a person who went back to the editor. What was read before it is dropped, here
+			// and in the widgets, so the editor compares with the site as it is now.
+			this.site?.clear();
+			// New fields exist now, and visibility changed (RUN-26).
+			if (!this.#disposed) this.#analyse();
 		}
 	}
 

@@ -95,3 +95,53 @@ describe('the plan the screen shows', () => {
 		expect(session.emptyText).toBeNull();
 	});
 });
+
+describe('what was read is dropped when a write may have happened (audit finding 1)', () => {
+	const SLOW = new URL('http://localhost/sets/s1/install?fake&delay=2&faults=0');
+	const two = [definition(), definition({ programmaticName: 'sg_focal', displayName: 'Focal' })];
+
+	it('RUN-26: a run that finished', async () => {
+		const session = await opened(two);
+		const cleared = vi.spyOn(session.site!, 'clear');
+		await session.apply();
+		expect(session.run.status).toBe('finished');
+		expect(session.run.rows.map((row) => row.state)).toEqual(['done', 'done']);
+		expect(cleared).toHaveBeenCalledTimes(1);
+	});
+
+	it('RUN-18: a run that was cancelled', async () => {
+		const session = await opened(two, SLOW);
+		const cleared = vi.spyOn(session.site!, 'clear');
+		const running = session.apply();
+		session.cancel();
+		await running;
+		expect(session.run.status).toBe('cancelled');
+		expect(cleared).toHaveBeenCalledTimes(1);
+	});
+
+	it('RUN-17: a run that failed outside any item', async () => {
+		const session = await opened(two);
+		const cleared = vi.spyOn(session.site!, 'clear');
+		vi.spyOn(session.site!.reader, 'entityTypes').mockRejectedValueOnce(new TypeError('Failed to fetch'));
+		await session.apply();
+		expect(session.run).toMatchObject({ status: 'finished', error: 'Failed to fetch' });
+		expect(cleared).toHaveBeenCalledTimes(1);
+	});
+
+	it('a run the person walked away from: the page is gone, the writes are not', async () => {
+		const session = await opened(two, SLOW);
+		const cleared = vi.spyOn(session.site!, 'clear');
+		const running = session.apply();
+		session.dispose();
+		await running;
+		expect(cleared).toHaveBeenCalledTimes(1);
+	});
+
+	it('RUN-5 footer: Refresh', async () => {
+		const session = await opened(two);
+		const cleared = vi.spyOn(session.site!, 'clear');
+		await session.refresh();
+		expect(cleared).toHaveBeenCalledTimes(1);
+		expect(session.load).toEqual({ status: 'loaded' });
+	});
+});
