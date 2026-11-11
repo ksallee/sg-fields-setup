@@ -5,9 +5,11 @@
  * field come from its `RestSchemaClient` (`readRawFields`, `readField`), which answers the
  * wrapped records the snapshots need. No request is built here.
  *
- * The type list has no raw read in core 0.4.0. `RestClient.entityTypes()` answers display names
- * only, so that one read runs through a core client whose `fetch` keeps a copy of the body, and
- * answers that body.
+ * The type list has no raw read in core 0.4.0. `RestClient.entityTypes()` answers `{ name,
+ * displayName }` with the display name untrimmed, and fails on an entry with no wrapped name.
+ * `readEntityTypes` reads the listing itself (trimmed, the API name when there is none), so that
+ * one read runs through a core client whose `fetch` keeps a copy of the body, and answers that
+ * body.
  *
  * "Does not exist" is core's `missing` result: a 404 whose detail reads `Field '<Type>.<field>'
  * does not exist.`, which is what `isFieldMissing` holds. A type the site does not have is a 404

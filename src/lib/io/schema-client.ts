@@ -1,5 +1,5 @@
 /**
- * The schema writes of the connected site, as the install run takes them (issues #18, #19).
+ * The schema writes of the connected site, as the install run takes them.
  *
  * This is the one module that turns a planned write into a request. Everything it sends is
  * measured in the corpus (`endpoints/*schema_type_fields*`, findings 115, 119, 120):

@@ -4,20 +4,9 @@
  *
  * The run never imports a client. It is handed these two interfaces:
  *
- * - `SchemaWritePort`: the only calls that change a site. sg-widgets core's `SchemaClient` fits
- *   after a few lines of adapting (issue #18):
- *
- *   ```ts
- *   const port: SchemaWritePort = {
- *   	createField: (type, payload) => {
- *   		const [name, ...properties] = payload.properties; // `name` is always first (PLN-13)
- *   		return client.createField(type, { dataType: payload.data_type, displayName: String(name.value), properties });
- *   	},
- *   	updateField: (type, field, properties) => client.updateField(type, field, [...properties]),
- *   	retireField: (type, field) => client.retireField(type, field),
- *   	reviveField: (type, field) => client.reviveField(type, field)
- *   };
- *   ```
+ * - `SchemaWritePort`: the only calls that change a site. `schemaWritePort` in
+ *   `$lib/io/schema-client` adapts sg-widgets core's `SchemaClient` to it, and refuses a
+ *   malformed request before it leaves.
  *
  * - `RunReader`: the reads, each one fresh from the site. `LiveSchema` fits: `refreshEntityTypes`,
  *   `refreshFields` and `fieldForPlan`.

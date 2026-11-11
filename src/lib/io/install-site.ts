@@ -1,5 +1,5 @@
 /**
- * What the install screen needs from a site, and the one place it gets it (issues #18, #19).
+ * What the install screen needs from a site, and the one place it gets it.
  *
  * The screen never builds a client. It asks `installSite(url)` once and is handed an
  * `InstallSite`: the run's writes and reads, the trash page, the project list, the visibility

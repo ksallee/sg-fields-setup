@@ -1,5 +1,5 @@
 /**
- * The site calls of per-project visibility (issue #19). Thin: every rule is in `$lib/pure`.
+ * The site calls of per-project visibility. Thin: every rule is in `$lib/pure`.
  *
  * | call                                         | here                    | for                         |
  * |----------------------------------------------|-------------------------|-----------------------------|

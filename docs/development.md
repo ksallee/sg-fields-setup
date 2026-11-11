@@ -9,10 +9,16 @@ Open the URL Vite prints. Name the site on the connect page and sign in through 
 Launcher. One site at a time. The navbar shows it; click it to change site or sign out.
 
     pnpm check
+    pnpm lint
     pnpm test
     pnpm build
 
-`.github/workflows/gates.yml` runs those three on every pull request and on pushes to `dev` and
+`pnpm lint` is oxlint (`.oxlintrc.json`). Beside its default rules it holds the layers: `pure`
+imports no `io`, `app`, `$lib/live`, `$app`, `$env`, svelte, node or `$lib/testing`, and uses no
+node global; `io` imports no `app`, node or `$lib/testing`; nothing outside tests and the dev-only
+fake imports `$lib/testing`.
+
+`.github/workflows/gates.yml` runs those four on every pull request and on pushes to `dev` and
 `main`, then `pnpm check:build`: it fails when the built output holds dev-only code (the dev token
 route, the script key's variable names, the fake site). Run it after a `pnpm build`.
 
