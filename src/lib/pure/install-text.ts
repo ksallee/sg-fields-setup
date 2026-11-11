@@ -4,6 +4,7 @@
  * of a run in `run-text`, of visibility in `visibility-text` and `visibility-scope`.
  */
 import type { PlanClass } from './plan';
+import { fileSlug } from './set-file';
 import { countText, fieldCount } from './set-text';
 
 /** A plan row as the summary needs it. */
@@ -125,11 +126,10 @@ export function leaveQuestion(): string {
 	return 'An install is running. If you leave now it stops after the step in flight and the rest is not applied.';
 }
 
-/** The file name of a run's report: the set and the day. `at` is an ISO time; pure code never reads the clock. */
+/**
+ * The file name of a run's report: the set, as its own file names it (`fileSlug`, any script),
+ * and the day. `at` is an ISO time; pure code never reads the clock.
+ */
 export function reportFileName(setName: string, at: string): string {
-	const slug = setName
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '');
-	return ['install-report', slug, at.slice(0, 10)].filter((part) => part !== '').join('-') + '.txt';
+	return ['install-report', fileSlug(setName), at.slice(0, 10)].filter((part) => part !== '').join('-') + '.txt';
 }

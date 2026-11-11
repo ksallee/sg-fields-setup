@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { setFileName } from './set-file';
 import { confirmText, installSummary, leaveQuestion, planContext, reportFileName, summaryItems } from './install-text';
 
 const ROWS = [
@@ -97,5 +98,17 @@ describe('small texts', () => {
 	it('names the report file after the set and the day', () => {
 		expect(reportFileName('Camera Report: Lens / A', '2026-11-10T18:04:05.000Z')).toBe('install-report-camera-report-lens-a-2026-11-10.txt');
 		expect(reportFileName('  ', '2026-11-10T18:04:05.000Z')).toBe('install-report-2026-11-10.txt');
+	});
+
+	it('keeps a set name in any script, as the set file does', () => {
+		expect(reportFileName('レンズ', '2026-11-10T18:04:05.000Z')).toBe('install-report-レンズ-2026-11-10.txt');
+		expect(reportFileName('Caméra / Объектив 2', '2026-11-10T18:04:05.000Z')).toBe('install-report-caméra-объектив-2-2026-11-10.txt');
+		// The same slug as the set's own file, so the two sit together in a folder.
+		expect(reportFileName('Caméra / Объектив 2', '2026-11-10T18:04:05.000Z')).toContain(setFileName('Caméra / Объектив 2').replace('.fieldset.json', ''));
+	});
+
+	it('caps a long set name as the set file does', () => {
+		const name = reportFileName('a'.repeat(200), '2026-11-10T18:04:05.000Z');
+		expect(name).toBe(`install-report-${'a'.repeat(80)}-2026-11-10.txt`);
 	});
 });
