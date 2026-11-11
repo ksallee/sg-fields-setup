@@ -13,7 +13,9 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { explanationText, type RowComparison } from '$lib/pure/compare';
-	import { carries, CREATABLE_DATA_TYPES, isMirror } from '$lib/pure/data-types';
+	import DataTypePicker from '$lib/components/data-type-picker.svelte';
+	import ValidValuesEditor from '$lib/components/valid-values-editor.svelte';
+	import { carries, CREATABLE_DATA_TYPES, DATA_TYPE_LABELS, isMirror } from '$lib/pure/data-types';
 	import {
 		CHECKBOX_DEFAULT_LABELS,
 		CHECKBOX_DEFAULTS,
@@ -29,10 +31,8 @@
 	import { MIRROR_TEXT, UNIQUE_NOTE } from '$lib/pure/editor-text';
 	import type { EntryDefinition } from '$lib/pure/model';
 	import type { NameMode, Row } from '$lib/pure/working-copy';
-	import DataTypeField from './data-type-field.svelte';
 	import TypeField from './type-field.svelte';
 	import ValidTypesField from './valid-types-field.svelte';
-	import ValidValuesField from './valid-values-field.svelte';
 
 	let {
 		row,
@@ -155,9 +155,10 @@
 
 			<div class="flex flex-col gap-1.5">
 				<Label for="{uid}-data-type">Data type</Label>
-				<DataTypeField
+				<DataTypePicker
 					id="{uid}-data-type"
 					types={CREATABLE_DATA_TYPES}
+					labels={DATA_TYPE_LABELS}
 					value={row.dataType === '' ? null : row.dataType}
 					onValueChange={(next) => onedit({ dataType: next ?? '' })}
 					readonly={mirror}
@@ -186,15 +187,19 @@
 			{#if !mirror && carries(dataType, 'validValues')}
 				<div class="flex flex-col gap-1.5">
 					<Label for="{uid}-values">Valid values</Label>
-					<ValidValuesField
+					<ValidValuesEditor
 						id="{uid}-values"
 						dataType={dataType === 'status_list' ? 'status_list' : 'list'}
-						value={row.validValues}
+						value={[...row.validValues]}
 						onValueChange={(validValues) => onedit({ validValues })}
 						context={context ?? undefined}
 					/>
 					<p class="text-muted-foreground text-xs">
-						{dataType === 'status_list' ? 'Status short codes, one per line.' : 'One value per line.'}
+						{dataType === 'status_list'
+							? context
+								? 'Statuses of this site.'
+								: 'Status short codes. Connect a site to pick from its statuses.'
+							: 'In drop-down order. Drag to reorder. A paste of several lines adds one value each.'}
 					</p>
 				</div>
 			{/if}
