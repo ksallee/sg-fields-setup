@@ -148,17 +148,12 @@ filler. Sentence case everywhere, no capitals for labels.
 `set-list/`, `editor/` (toolbar, group, row, entry form, bulk bar, reference panel, the fields of
 the form).
 
-`src/lib/components/` (sg-widgets registry copies, added with the shadcn-svelte CLI from
-`https://sg-widgets.vercel.app/r/svelte/<name>.json`): `entity-type-picker`,
-`entity-type-multi-picker`, `entity-glyphs`, `state-line`, and what they bring (`picker-control`,
-`picker-classes`, `leaf-classes`). The registry's `checkbox` replaces shadcn's: it draws the mixed
-state.
-
 `src/lib/components/ui/` (shadcn-svelte, added with its CLI): alert-dialog, badge, button,
 checkbox, collapsible, dialog, dropdown-menu, input, label, progress, scroll-area, select,
 separator, skeleton, sonner, tabs, textarea, tooltip. `sonner` is edited to follow `$lib/theme`
 in place of mode-watcher. `Tooltip.Provider` is in the root layout.
 
 `src/lib/components/` (sg-widgets registry copies, added with the same CLI from
-`https://sg-widgets.vercel.app/r/svelte/<name>.json`, never edited here): entity-type-picker and what
-it installs with it.
+`https://sg-widgets.vercel.app/r/svelte/<name>.json`, never edited here): entity-type-picker,
+entity-type-multi-picker, entity-glyphs, state-line, and what they install with them. The
+registry's `checkbox` replaces shadcn's: it draws the mixed state.
