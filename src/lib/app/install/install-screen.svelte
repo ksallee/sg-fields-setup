@@ -15,6 +15,7 @@
 	import PageState from '$lib/app/page-state.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
+	import type { Confirmation } from '$lib/pure/install-confirm';
 	import { SELECTION_LOST } from '$lib/pure/install-entries';
 	import { leaveQuestion, siteHost } from '$lib/pure/install-text';
 	import { CONNECT_PATH, HOME_PATH, setPath } from '$lib/pure/routes';
@@ -38,7 +39,14 @@
 	onMount(() => void session.open(id, url));
 	onDestroy(() => session.dispose());
 
+	/* The confirmation before the first write. The session hands out its proof and takes it back. */
 	let confirmOpen = $state(false);
+	let confirmation = $state.raw<Confirmation | null>(null);
+
+	function askConfirm(): void {
+		confirmation = session.askConfirm();
+		confirmOpen = confirmation !== null;
+	}
 
 	/* Leaving while a run is in progress (in-app navigation and the tab). */
 	let leaveOpen = $state(false);
@@ -62,7 +70,7 @@
 	}
 
 	function act(name: 'refresh' | 'apply' | 'cancel' | 'retry' | 'resume' | 'report'): void {
-		if (name === 'apply') confirmOpen = true;
+		if (name === 'apply') askConfirm();
 		else if (name === 'refresh') void session.refresh();
 		else if (name === 'cancel') session.cancel();
 		else if (name === 'retry') void session.retry();
@@ -180,6 +188,8 @@
 	{/if}
 {/if}
 
-<InstallConfirm bind:open={confirmOpen} text={session.confirm} onconfirm={() => void session.apply()} />
+{#if confirmation}
+	<InstallConfirm bind:open={confirmOpen} text={confirmation.text} onconfirm={() => void session.apply(confirmation)} />
+{/if}
 
 <ConfirmDialog bind:open={leaveOpen} title="Leave the install?" message={leaveQuestion()} confirmLabel="Leave" cancelLabel="Stay" destructive onconfirm={leave} />

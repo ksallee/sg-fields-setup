@@ -10,6 +10,7 @@
  * | scope, notes                 | `visibility-scope` (`resolveScope`, no site read, VIS-11)|
  * | counters, nothing left to do | `visibility-analysis`, `visibility-text`                |
  * | summary, confirmation        | `install-text`, `visibility-text.visibilityCount`       |
+ * | proof of the confirmation    | `install-confirm`                                       |
  * | footer                       | `install-footer`                                        |
  * | the run                      | `run-driver.createRun`, `visibility-run`                |
  *
@@ -18,26 +19,28 @@
  * then until a refresh (RUN-25), so retry and resume apply the same scope.
  *
  * The analysis runs in the background and blocks nothing (VIS-8, VIS-12). It is asked again after
- * every plan and after every run (RUN-26).
+ * every plan and after every run (RUN-26). The end of a run, however it ends, and Refresh both call
+ * `site.clear()`: the schema cache and the widgets' context are dropped (`$lib/io/site-cache`).
  */
 import type { EntityRef } from 'sg-widgets-core';
-import { notify } from '$lib/app/toast';
+import { errorMessage, notify } from '$lib/app/toast';
 import { downloadText } from '$lib/io/download';
 import { readInstallSelection } from '$lib/io/install-selection';
 import { installSite, type InstallSite } from '$lib/io/install-site';
 import { sharedSetStore } from '$lib/io/set-store';
+import { CONFIRM_CHANGED_TEXT, mintConfirmation, redeemConfirmation, type Confirmation, type ConfirmSubject } from '$lib/pure/install-confirm';
 import { installEntries } from '$lib/pure/install-entries';
 import { footerActions, type Footer } from '$lib/pure/install-footer';
-import { confirmText, installSummary, planContext, reportFileName, summaryItems, type ConfirmText, type SummaryItem } from '$lib/pure/install-text';
+import { confirmText, installSummary, planContext, reportFileName, screenSummary, type ConfirmText, type SummaryItem } from '$lib/pure/install-text';
 import { analysisRows, groupRows, viewRows, type ViewGroup, type ViewRow } from '$lib/pure/install-view';
 import type { LiveEntityType } from '$lib/pure/live-entity-types';
 import { emptyPlanText, type PlanEntry, type PlanItem } from '$lib/pure/plan';
 import { ALL_TICKED, ranSelectAllState, selectAllState, setAllTicked, tickedIds, toggleTick, type PlanSelection, type SelectAllState, type TickRow } from '$lib/pure/plan-selection';
 import { INITIAL_RUN_STATE, runCounters, type RunState } from '$lib/pure/run';
 import { createRun, replan, type Run } from '$lib/pure/run-driver';
-import { errorMessage } from '$lib/pure/run-port';
 import { reportIsEmpty, reportText, runReport } from '$lib/pure/run-report';
 import { summaryText } from '$lib/pure/run-text';
+import { siteErrorMessage } from '$lib/pure/site-error';
 import { analysisStatus, rowVisibility, type RowVisibility, type VisibilityAnalysis } from '$lib/pure/visibility-analysis';
 import { createApplyVisibility, retryVisibility } from '$lib/pure/visibility-run';
 import { analysisProjects, resolveScope, scopeNotes, scopeSummary, type ProjectsRead, type VisibilityScope } from '$lib/pure/visibility-scope';
@@ -82,6 +85,10 @@ export class InstallSession {
 	#runner: Run | null = null;
 	#stopListening: (() => void) | null = null;
 	#trashPageUrl: string | null = null;
+	/** Moves with every plan read from the site: a confirmation is for one plan. */
+	#planSerial = 0;
+	/** The confirmation the dialog was last opened with, until it is spent. */
+	#pending: Confirmation | null = null;
 	/** Which analysis may still write to `analysis`: an older one is ignored. */
 	#asked = 0;
 	#disposed = false;
@@ -112,7 +119,8 @@ export class InstallSession {
 	/** Checkboxes and the picker are locked while running and after finishing (RUN-25). */
 	readonly locked: boolean = $derived(this.run.status !== 'idle' || this.refreshing);
 	readonly running: boolean = $derived(this.run.status === 'running');
-	readonly summary: SummaryItem[] = $derived(summaryItems(this.#summary()));
+	/** The plan's counts, then the run's once there is one (`install-text.screenSummary`). */
+	readonly summary: SummaryItem[] = $derived(screenSummary(this.#summary(), this.run));
 	readonly scopeText: string = $derived(scopeSummary(this.resolved));
 	readonly scopeNotes: string[] = $derived(scopeNotes(this.resolved));
 	readonly visibilityCount: VisibilityCount = $derived(
@@ -165,6 +173,7 @@ export class InstallSession {
 			this.whole = taken.kind === 'whole';
 			this.entries = taken.entries;
 		} catch (error) {
+			// A store error: its own plain sentence, or the fallback. Never the raw text (docs/design.md).
 			this.load = { status: 'set-failed', message: errorMessage(error) };
 			return;
 		}
@@ -178,7 +187,7 @@ export class InstallSession {
 			}
 			this.site = result.site;
 		} catch (error) {
-			this.load = { status: 'disconnected', problem: errorMessage(error) };
+			this.load = { status: 'disconnected', problem: siteErrorMessage(error) };
 			return;
 		}
 		await this.#plan();
@@ -201,17 +210,18 @@ export class InstallSession {
 				site.loadProjects()
 			]);
 			if (this.#disposed) return;
-			const mirrorsLeftOut = this.entries.length - planned.items.length;
+			this.#planSerial += 1;
 			this.projects = projects;
 			this.entityTypes = planned.site.entityTypes;
-			this.items = planned.items;
-			this.emptyText = emptyPlanText({ empty: planned.items.length > 0 ? null : mirrorsLeftOut > 0 ? 'only-mirrors' : 'no-entries', mirrorsLeftOut });
+			this.items = planned.plan.items;
+			// Why it is empty is the plan's to say (PLN-10): nothing is counted again here.
+			this.emptyText = emptyPlanText(planned.plan);
 			this.load = { status: 'loaded' };
 			this.#analyse();
 		} catch (error) {
 			if (this.#disposed) return;
 			this.items = [];
-			this.load = { status: 'plan-failed', message: errorMessage(error) };
+			this.load = { status: 'plan-failed', message: siteErrorMessage(error) };
 		} finally {
 			this.refreshing = false;
 		}
@@ -268,10 +278,40 @@ export class InstallSession {
 
 	/* The run. */
 
-	/** Starts the run for the ticked rows, in plan order (RUN-6). Call after the person confirmed. */
-	async apply(): Promise<void> {
+	/** What a confirmation is for, as things stand now (`install-confirm`). */
+	#subject(): ConfirmSubject {
+		const ticked = this.ticked;
+		return {
+			planSerial: this.#planSerial,
+			entryIds: this.entries.filter((entry) => ticked.has(entry.id)).map((entry) => entry.id),
+			scope: { kind: this.resolved.scope.kind, projectIds: this.resolved.scope.projects.map((project) => project.id) },
+			text: this.confirm
+		};
+	}
+
+	/**
+	 * The dialog is opening: the proof of the confirmation it asks for, with the words to show.
+	 * Null when Install is not on offer. Only the last one handed out counts.
+	 */
+	askConfirm(): Confirmation | null {
+		this.#pending = this.site && this.footer.apply.enabled ? mintConfirmation(this.#subject()) : null;
+		return this.#pending;
+	}
+
+	/**
+	 * Starts the run for the ticked rows, in plan order (RUN-6), when `confirmation` is the proof
+	 * `askConfirm` last handed out and nothing changed since: the plan, the ticks, the scope, the
+	 * words. Otherwise nothing is written. `install-confirm` holds the rule.
+	 */
+	async apply(confirmation: Confirmation | null): Promise<void> {
 		const site = this.site;
 		if (!site || !this.footer.apply.enabled) return;
+		const verdict = redeemConfirmation(this.#pending, confirmation, this.#subject());
+		this.#pending = null;
+		if (verdict !== 'confirmed') {
+			if (verdict !== 'missing') notify.warning(CONFIRM_CHANGED_TEXT, undefined, ABOVE_FOOTER);
+			return;
+		}
 		const wanted = this.ticked;
 		const selected = this.entries.filter((entry) => wanted.has(entry.id));
 		// The scope as it stands now. The picker is locked from here on.
@@ -321,13 +361,14 @@ export class InstallSession {
 			else if (state.status === 'cancelled' || counters.visibilityWarnings > 0) notify.warning(text, undefined, ABOVE_FOOTER);
 			else notify.success(text, undefined, ABOVE_FOOTER);
 		} catch (error) {
-			if (!this.#disposed) notify.error(errorMessage(error), undefined, ABOVE_FOOTER);
+			if (!this.#disposed) notify.error(siteErrorMessage(error), undefined, ABOVE_FOOTER);
 		} finally {
-			if (!this.#disposed && this.site) {
-				// New fields exist now, and visibility changed.
-				this.site.analyser.clear();
-				this.#analyse();
-			}
+			// A write may have happened, however the run ended: finished, cancelled, failed, or left
+			// behind by a person who went back to the editor. What was read before it is dropped, here
+			// and in the widgets, so the editor compares with the site as it is now.
+			this.site?.clear();
+			// New fields exist now, and visibility changed (RUN-26).
+			if (!this.#disposed) this.#analyse();
 		}
 	}
 

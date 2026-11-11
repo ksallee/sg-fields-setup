@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { asRefusal, errorMessage, isRetiredNameRefusal, readRevive, retiredNameIn } from './run-port';
+import { asRefusal, isRetiredNameRefusal, readRevive, retiredNameIn } from './run-port';
 
 describe('asRefusal', () => {
 	it('reads any thrown value with a numeric status as the site refusing, class or not', () => {
@@ -13,15 +13,6 @@ describe('asRefusal', () => {
 		expect(asRefusal({ status: '500', message: 'x' })).toBeNull();
 		expect(asRefusal('boom')).toBeNull();
 		expect(asRefusal(null)).toBeNull();
-	});
-});
-
-describe('errorMessage', () => {
-	it('gives the message of whatever was thrown', () => {
-		expect(errorMessage(new Error('A.'))).toBe('A.');
-		expect(errorMessage({ message: 'B.' })).toBe('B.');
-		expect(errorMessage('C.')).toBe('C.');
-		expect(errorMessage(undefined)).toBe('Unknown error.');
 	});
 });
 

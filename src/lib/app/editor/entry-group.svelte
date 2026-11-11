@@ -14,6 +14,7 @@
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { explanationText, type RowComparison } from '$lib/pure/compare';
 	import { groupCountText, type ViewGroup } from '$lib/pure/editor-view';
+	import type { LiveField } from '$lib/pure/live-field';
 	import type { EntryDefinition } from '$lib/pure/model';
 	import type { GroupCheckState } from '$lib/pure/selection';
 	import type { NameMode, Row } from '$lib/pure/working-copy';
@@ -32,6 +33,8 @@
 		notOnSite,
 		rechecking,
 		context,
+		referenceFields,
+		onloadfields,
 		onadd,
 		ontogglegroup,
 		onrecheck,
@@ -53,6 +56,9 @@
 		notOnSite: boolean;
 		rechecking: boolean;
 		context: SgContext | null;
+		/** This type's fields on the site as the editor holds them, for the reference panel (EDT-21). */
+		referenceFields: readonly LiveField[] | null;
+		onloadfields: (type: string) => Promise<void>;
 		onadd: (type: string) => void;
 		ontogglegroup: (keys: string[]) => void;
 		onrecheck: () => void;
@@ -104,7 +110,7 @@
 	{/if}
 
 	{#if context && !group.unassigned && !notOnSite}
-		<div class="pt-1"><ReferencePanel type={group.type} label={group.label} /></div>
+		<div class="pt-1"><ReferencePanel type={group.type} label={group.label} fields={referenceFields} onload={onloadfields} /></div>
 	{/if}
 
 	{#if group.emptyHint}

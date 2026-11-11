@@ -4,6 +4,8 @@
  * of a run in `run-text`, of visibility in `visibility-text` and `visibility-scope`.
  */
 import type { PlanClass } from './plan';
+import { runCounters, type RunCounters, type RunState } from './run';
+import { fileSlug } from './set-file';
 import { countText, fieldCount } from './set-text';
 
 /** A plan row as the summary needs it. */
@@ -44,7 +46,8 @@ export function installSummary(rows: readonly SummaryRow[]): InstallSummary {
 }
 
 export interface SummaryItem {
-	key: 'creates' | 'updates' | 'alreadyMatching' | 'conflicts' | 'blocked';
+	/** The first five are the plan's. The last four are a run's. */
+	key: 'creates' | 'updates' | 'alreadyMatching' | 'conflicts' | 'blocked' | 'applied' | 'skipped' | 'failed' | 'notStarted';
 	count: number;
 	/** "2 to create". */
 	text: string;
@@ -60,6 +63,30 @@ export function summaryItems(summary: InstallSummary): SummaryItem[] {
 		{ key: 'conflicts', count: summary.conflicts, text: countText(summary.conflicts, 'conflict'), skipped: true },
 		{ key: 'blocked', count: summary.blocked, text: `${summary.blocked} blocked`, skipped: true }
 	];
+}
+
+/**
+ * What a run did, in the words of its closing toast (RUN-24, `run-text.summaryText`): applied,
+ * skipped, failed, and what was not started while any is left.
+ */
+export function runSummaryItems(counters: Pick<RunCounters, 'done' | 'skipped' | 'failed' | 'pending'>): SummaryItem[] {
+	const items: SummaryItem[] = [
+		{ key: 'applied', count: counters.done, text: `${counters.done} applied`, skipped: false },
+		{ key: 'skipped', count: counters.skipped, text: `${counters.skipped} skipped`, skipped: true },
+		{ key: 'failed', count: counters.failed, text: `${counters.failed} failed`, skipped: false }
+	];
+	if (counters.pending > 0) items.push({ key: 'notStarted', count: counters.pending, text: `${counters.pending} not started`, skipped: false });
+	return items;
+}
+
+/**
+ * The summary line at the top of the install screen (RUN-5). Before a run it counts the plan:
+ * what Install would do. Once a run exists those counts describe what a retry would do, which is
+ * not what the person wants to read there. So from the first step of a run until Refresh it
+ * counts the run: what Install did.
+ */
+export function screenSummary(plan: InstallSummary, run: RunState): SummaryItem[] {
+	return run.status === 'idle' ? summaryItems(plan) : runSummaryItems(runCounters(run));
 }
 
 /** The site as a person names it: its host. A text that is no address shows as it is. */
@@ -125,11 +152,10 @@ export function leaveQuestion(): string {
 	return 'An install is running. If you leave now it stops after the step in flight and the rest is not applied.';
 }
 
-/** The file name of a run's report: the set and the day. `at` is an ISO time; pure code never reads the clock. */
+/**
+ * The file name of a run's report: the set, as its own file names it (`fileSlug`, any script),
+ * and the day. `at` is an ISO time; pure code never reads the clock.
+ */
 export function reportFileName(setName: string, at: string): string {
-	const slug = setName
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '');
-	return ['install-report', slug, at.slice(0, 10)].filter((part) => part !== '').join('-') + '.txt';
+	return ['install-report', fileSlug(setName), at.slice(0, 10)].filter((part) => part !== '').join('-') + '.txt';
 }

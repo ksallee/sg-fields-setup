@@ -26,6 +26,7 @@
  */
 import type { FieldReply } from './live-field';
 import type { PlanScope } from './plan';
+import { siteErrorMessage } from './site-error';
 import type { ScopeProject } from './visibility-scope';
 import { planVisibilitySteps, type VisibilityStep } from './visibility-steps';
 import type { ApplyVisibility, FieldOrigin, VisibilityFailure, VisibilityHooks, VisibilityOutcome } from './visibility-types';
@@ -61,30 +62,8 @@ export interface FieldRef {
 export const NOT_EDITABLE_MESSAGE = 'Flow PT does not let this field be shown or hidden.';
 export const NOT_APPLIED_MESSAGE = 'Flow PT accepted the change and did not apply it.';
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-/**
- * What to show for a failure: the server's words when the error carries its reply (the first
- * error's `detail`, else its `title`, where the corpus found them), else the error's own message.
- */
-export function errorMessage(error: unknown): string {
-	if (isRecord(error)) {
-		const body = error['body'];
-		const errors = isRecord(body) ? body['errors'] : null;
-		const first: unknown = Array.isArray(errors) ? errors[0] : null;
-		if (isRecord(first)) {
-			for (const key of ['detail', 'title']) {
-				const said = first[key];
-				if (typeof said === 'string' && said.trim() !== '') return said;
-			}
-		}
-	}
-	if (error instanceof Error && error.message.trim() !== '') return error.message;
-	if (typeof error === 'string' && error.trim() !== '') return error;
-	return 'The step failed.';
-}
+/** What a step that failed without a word shows. */
+export const STEP_FAILED_MESSAGE = 'The step failed.';
 
 class StepFailure extends Error {}
 
@@ -137,7 +116,7 @@ export async function runVisibilitySteps(
 			if (await runStep(port, field, step)) written += 1;
 			done += 1;
 		} catch (error) {
-			failures.push({ projectId: step.projectId, projectName: step.projectName, message: errorMessage(error) });
+			failures.push({ projectId: step.projectId, projectName: step.projectName, message: siteErrorMessage(error, STEP_FAILED_MESSAGE) });
 		}
 		finished += 1;
 		try {

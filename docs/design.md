@@ -90,6 +90,16 @@ A set that is gone is a `PageState`: "Set not found", one line, a button back to
 - A failure while a dialog is open shows in the dialog, not as a toast.
 - No toast for something the screen already shows.
 
+Two kinds of error, two readers, nothing else:
+
+- **Store errors** (the sets in the browser) go through `errorMessage` in `app/toast.ts`, on every
+  screen, the install screen included. A `SetStoreError` shows its own plain sentence. Anything
+  else is logged and shows the fallback.
+- **Site errors** (a read, a write or the sign-in that Flow PT refused or that never arrived) go
+  through `siteErrorMessage` in `$lib/pure/site-error.ts`: the site's own words, the first error's
+  detail, else its title, else the error's message, else a fallback.
+- A raw error text never shows. No screen reads `error.message` itself.
+
 ## States
 
 - **Whole pane.** `PageState`: an icon in a muted circle, one title, one line, the actions. Loading
@@ -171,7 +181,9 @@ filler. Sentence case everywhere, no capitals for labels.
 - **Counters.** Small dotted-underline words on the right of a row, each a tooltip trigger.
 - **First write.** Install asks first, in a dialog that names the site, what is created and
   updated, that a name is taken for good, and the visibility scope. Leaving while a run is in
-  progress asks too.
+  progress asks too. The session starts a run only on the proof it handed out when the dialog
+  opened (`$lib/pure/install-confirm`): a refresh, a tick or a pick in between spends it, and
+  the screen says the plan changed.
 - **No HTML.** Reasons and errors are rendered from parts, text and links. Never `{@html}`.
 
 ## Shared pieces

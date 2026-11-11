@@ -63,7 +63,7 @@ const FAST = new URLSearchParams('fake&delay=0');
 describe('the install drive set against the fake site', () => {
 	it('plans every class', async () => {
 		const site = fakeInstallSite(FAST);
-		const { items } = await replan({ reader: site.reader, site: { siteUrl: site.siteUrl, trashPageUrl: await site.trashPageUrl() } }, driveEntries());
+		const { items } = (await replan({ reader: site.reader, site: { siteUrl: site.siteUrl, trashPageUrl: await site.trashPageUrl() } }, driveEntries())).plan;
 		expect(Object.fromEntries(items.map((item) => [`${item.entityType}.${item.programmaticName}`, item.class]))).toEqual({
 			'Shot.sg_drive_new_text': 'create',
 			'Shot.sg_drive_link': 'create',

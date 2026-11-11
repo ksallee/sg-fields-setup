@@ -1,6 +1,6 @@
 /**
  * What one row of the editor shows beyond its own values (EDT-20, EDT-25, EDT-29): its badges,
- * the required values it lacks, the default value's inputs and the warning on a typed name.
+ * the required values it lacks, the default value's inputs and the hint on a derived name.
  * Pure: the row component draws what these return.
  */
 import type { RowMarker } from './compare';
@@ -27,6 +27,7 @@ const BADGES: Record<RowBadgeKind, Omit<RowBadge, 'kind'>> = {
 	on_site: { label: 'On site', tone: 'success' },
 	type_mismatch: { label: 'Type mismatch', tone: 'warning' },
 	cannot_update: { label: 'Cannot update', tone: 'warning' },
+	cannot_create: { label: 'Cannot create', tone: 'warning' },
 	label_taken: { label: 'Label taken', tone: 'warning' }
 };
 
@@ -98,30 +99,20 @@ export function listDefaultValue(text: string): DefaultValue {
 }
 
 /**
- * The warning on a programmatic name typed by hand (EDT-25, B2, Q3): the site derives a new
- * field's name from its display name, so a typed name it would not derive cannot be created and
- * the plan refuses it (PLN-15). Null when the name is the derived one, when the field already
- * exists on the site (`nameExists`: nothing is created), on a mirror row, or while either name
- * is blank.
+ * The hint on a derived name whose display name holds a non-ASCII character (EDT-25, G11): the
+ * site names such a field `sg_<data_type>` and the plan refuses to create it (PLN-15,
+ * findings/117). Null on a typed name, on a mirror row and on an ASCII display name.
  *
- * A display name with a non-ASCII character is warned in either mode: the site names such a
- * field `sg_<data_type>` and the plan refuses it (G11, PLN-15, findings/117).
+ * Only for a row the planner has not judged: no site, a type the site lacks, a listing still on
+ * its way. With a site the comparison asks the planner, and the open row shows the planner's own
+ * reason for this and for a typed name the site would not derive (`compare.ts`). A typed name is
+ * left alone here: without the site's fields it may be a field that exists, such as `code`.
  */
-export function nameWarning(
-	row: Pick<EntryDefinition, 'programmaticName' | 'displayName' | 'dataType'> & { nameMode: NameMode },
-	nameExists: boolean
-): string | null {
-	if (nameExists || isMirror(row)) return null;
+export function nonAsciiNameWarning(row: Pick<EntryDefinition, 'displayName' | 'dataType'> & { nameMode: NameMode }): string | null {
+	if (row.nameMode !== 'derived' || isMirror(row)) return null;
 	const display = row.displayName.trim();
-	const dataType = row.dataType.trim() || undefined;
-	if (hasNonAscii(display)) {
-		const predicted = predictFieldName(display, dataType);
-		const named = predicted ? `name a new field ${predicted}` : 'name a new field after its data type';
-		return `The display name holds a character outside ASCII. The site would ${named}. Install refuses to create it. Use an ASCII display name.`;
-	}
-	if (row.nameMode !== 'manual') return null;
-	const name = row.programmaticName.trim();
-	const predicted = predictFieldName(display, dataType);
-	if (name === '' || !predicted || predicted === name) return null;
-	return `The site would name a new field ${predicted}. Install refuses to create it under another name.`;
+	if (!hasNonAscii(display)) return null;
+	const predicted = predictFieldName(display, row.dataType.trim() || undefined);
+	const named = predicted ? `name a new field ${predicted}` : 'name a new field after its data type';
+	return `The display name holds a character outside ASCII. The site would ${named}. Install refuses to create it. Use an ASCII display name.`;
 }

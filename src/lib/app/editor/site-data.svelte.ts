@@ -2,9 +2,11 @@
  * The connected site as the editor reads it for one session (CMP-1 to CMP-4, CMP-10, CMP-11):
  * whether there is one, its entity types, and the fields of the types in use, each read once in
  * the background through `liveSchema()`. Holds the reads and the state; what they mean is
- * `$lib/pure/compare`.
+ * `$lib/pure/compare`. The one place the editor reads the site: its components take what this
+ * holds. When the cache is read past is in `$lib/io/site-cache`.
  */
 import type { SgContext } from 'sg-widgets-core';
+import { freshFieldsOrEmpty, recheckEntityTypes } from '$lib/io/site-cache';
 import { liveContext, liveSchema, prepareLive } from '$lib/live';
 import type { SiteData } from '$lib/pure/compare';
 import type { LiveEntityType } from '$lib/pure/live-entity-types';
@@ -76,21 +78,41 @@ export class EditorSite {
 		}
 	}
 
-	/** The fields of each given type, read if not held: what re-sync matches against (EDT-42). */
+	/**
+	 * The fields of each given type, read from the site now, past the cache: what re-sync matches
+	 * against (EDT-42). The comparison then reads the same new listings.
+	 */
 	async fieldsByType(types: readonly string[]): Promise<Map<string, readonly LiveField[]>> {
-		const schema = liveSchema();
-		const lists = await Promise.all(types.map((type) => schema.fieldsOrEmpty(type)));
+		const fields = await freshFieldsOrEmpty(liveSchema(), types);
 		for (const type of types) this.#asked.add(type);
 		this.#arrivals += 1;
-		return new Map(types.map((type, i) => [type, lists[i]]));
+		return fields;
 	}
 
-	/** Reads the type list again (CMP-10). Rejects when the read fails; the list held stays. */
+	/** A type's fields as held, for the reference panel (EDT-21): null until read. Follows every arrival. */
+	fieldsOf = (type: string): readonly LiveField[] | null => this.data?.fieldsOf(type) ?? null;
+
+	/** Reads a type's fields for the reference panel if they are not held. Rejects when the read fails, so the panel can say so. */
+	loadFields = async (type: string): Promise<void> => {
+		this.#asked.add(type);
+		try {
+			await liveSchema().fields(type);
+		} finally {
+			this.#arrivals += 1;
+		}
+	};
+
+	/**
+	 * Reads the type list again (CMP-10) and has the pickers read theirs again, so a type just
+	 * enabled shows with no reload. Rejects when the read fails; the list held stays.
+	 */
 	async recheck(): Promise<void> {
 		if (!this.connected || this.rechecking) return;
 		this.rechecking = true;
 		try {
-			this.entityTypes = await liveSchema().refreshEntityTypes();
+			const answer = await recheckEntityTypes({ schema: liveSchema(), context: this.context });
+			this.entityTypes = answer.entityTypes;
+			this.context = answer.context;
 		} finally {
 			this.rechecking = false;
 		}
