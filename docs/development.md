@@ -111,6 +111,39 @@ install screen's fake provider, `makeLiveField`. Only tests and the dev-only bra
 `src/lib/io/install-site.ts` import it (`pnpm lint` holds that). JSON samples shaped like the
 corpus stay in `src/lib/pure/fixtures/`.
 
+## Refreshing registry copies
+
+`src/lib/components/` holds copies of sg-widgets' registry widgets, and `src/lib/components/ui/`
+the shadcn-svelte components. Neither is edited here. Refresh them on every `sg-widgets-core`
+bump, so the widgets match the core they run on.
+
+The items the app adds (each brings what it needs with it):
+
+    R=https://sg-widgets.vercel.app/r/svelte
+    pnpm exec shadcn-svelte add $R/data-type-picker.json $R/entity-glyphs.json \
+      $R/entity-type-multi-picker.json $R/entity-type-picker.json $R/project-multi-picker.json \
+      $R/state-line.json $R/valid-values-editor.json -o -y --no-deps-install
+
+and the shadcn ones:
+
+    pnpm exec shadcn-svelte add alert-dialog badge button collapsible dialog dropdown-menu \
+      hover-card input label progress scroll-area select separator skeleton switch tabs \
+      textarea tooltip -o -y --no-deps-install
+
+The CLI asks before it overwrites unless given `-o -y`, and wants a terminal. From an agent, run
+it in a scratch copy of the repo and bring the changed files over.
+
+- Never re-add `sonner`: `ui/sonner/` follows `$lib/theme` in place of mode-watcher, by hand
+  (`docs/design.md`). sg-widgets has no sonner item.
+- `ui/checkbox/` is sg-widgets' checkbox, which draws the mixed state. A shadcn `checkbox` would
+  replace it; the registry widgets bring theirs back.
+- Leave `package.json` as it is unless a widget needs a newer dependency than the one installed.
+
+`src/lib/registry-copies.test.ts` checks every copy against sg-widgets at the tag of the installed
+core (`v0.4.0`): the same file with `$lib/registry/components/` read as `$lib/components/`. It
+runs where `../sg-widgets` (or `../../sg-widgets`, from a worktree) is checked out with its tags,
+and is skipped elsewhere, as in CI.
+
 ## The sandbox
 
 The sandbox is the site `.env.local` names. It is the one sg-groundtruth probes

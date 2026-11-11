@@ -224,12 +224,13 @@ the form), `install/` (screen, session, plan group, plan row, summary, picker pa
 confirm).
 
 `src/lib/components/ui/` (shadcn-svelte, added with its CLI): alert-dialog, badge, button,
-checkbox, collapsible, dialog, dropdown-menu, input, label, progress, scroll-area, select,
-separator, skeleton, sonner, tabs, textarea, tooltip. `sonner` is edited to follow `$lib/theme`
+checkbox, collapsible, dialog, dropdown-menu, hover-card, input, label, progress, scroll-area,
+select, separator, skeleton, sonner, switch, tabs, textarea, tooltip. `sonner` is edited to follow `$lib/theme`
 in place of mode-watcher. `Tooltip.Provider` is in the root layout.
 
 `src/lib/components/` (sg-widgets registry copies, added with the same CLI from
 `https://sg-widgets.vercel.app/r/svelte/<name>.json`, never edited here): entity-type-picker,
-entity-type-multi-picker, entity-glyphs, state-line, data-type-picker, valid-values-editor, and
-what they install with them. The editor's data type and valid values are those two widgets. The
+entity-type-multi-picker, project-multi-picker, entity-glyphs, state-line, data-type-picker,
+valid-values-editor, and what they install with them. `docs/development.md` says how to refresh
+them. The editor's data type and valid values are those two widgets. The
 registry's `checkbox` replaces shadcn's: it draws the mixed state.
