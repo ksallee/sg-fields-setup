@@ -13,7 +13,3 @@ vite.config.ts.timestamp-*
 
 # OS
 .DS_Store
-
-# Python
-__pycache__/
-.pytest_cache/

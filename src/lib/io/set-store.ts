@@ -31,7 +31,7 @@
  * with a plain message: the UI never shows a raw DOMException (MOD-2).
  */
 import { setNameKey } from '$lib/pure/copy-name';
-import type { Entry, EntryDraft, FieldSet, Timestamp } from '$lib/pure/model';
+import type { Entry, FieldSet, Timestamp } from '$lib/pure/model';
 import {
 	orderEntries,
 	planCreate,

@@ -1,0 +1,104 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	// As sg-widgets: oxlint's default categories (correctness), with the TypeScript and oxc rules.
+	"plugins": ["typescript", "oxc", "unicorn"],
+	"ignorePatterns": [
+		"**/.svelte-kit/**",
+		".vercel/**",
+		"build/**",
+		// Registry copies from sg-widgets and shadcn-svelte. They are linted where they are written,
+		// and a fix here would make the copy drift (docs/development.md, "Refreshing registry copies").
+		"src/lib/components/**"
+	],
+	"rules": {
+		// `new Array(n)` sizes a results array that is then filled by index (run-capped.ts). That is
+		// the intent, and `Array.from({ length: n })` would only say it longer.
+		"unicorn/no-new-array": "off",
+		// The layer rules (CLAUDE.md, Layout). Test support code is for tests and the dev-only fake.
+		"no-restricted-imports": [
+			"error",
+			{
+				"patterns": [
+					{ "regex": "^\\$lib/testing(/|$)", "message": "Test support code is for tests and the dev-only fake site." }
+				]
+			}
+		]
+	},
+	"overrides": [
+		{
+			// I/O may not reach into the app, and runs in the browser: no node. tsconfig cannot keep
+			// node's types from it (one generated config covers the app, the server routes and the
+			// tests), so these two rules do.
+			"files": ["src/lib/io/**"],
+			"rules": {
+				"no-restricted-globals": [
+					"error",
+					{ "name": "process", "message": "Browser code: no node globals." },
+					{ "name": "Buffer", "message": "Browser code: no node globals." },
+					{ "name": "require", "message": "Browser code: no node globals." },
+					{ "name": "global", "message": "Browser code: no node globals." },
+					{ "name": "__dirname", "message": "Browser code: no node globals." },
+					{ "name": "__filename", "message": "Browser code: no node globals." }
+				],
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{ "regex": "^\\$lib/testing(/|$)", "message": "Test support code is for tests and the dev-only fake site." },
+							{ "regex": "^(\\$lib/app|\\.\\./app)(/|$)", "message": "io may not import from app." },
+							{ "regex": "^node:", "message": "io runs in the browser: no node." }
+						]
+					}
+				]
+			}
+		},
+		{
+			// Pure modules: no I/O, no app, no framework, no node.
+			"files": ["src/lib/pure/**"],
+			"rules": {
+				"no-restricted-globals": [
+					"error",
+					{ "name": "process", "message": "Browser code: no node globals." },
+					{ "name": "Buffer", "message": "Browser code: no node globals." },
+					{ "name": "require", "message": "Browser code: no node globals." },
+					{ "name": "global", "message": "Browser code: no node globals." },
+					{ "name": "__dirname", "message": "Browser code: no node globals." },
+					{ "name": "__filename", "message": "Browser code: no node globals." }
+				],
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{ "regex": "^\\$lib/testing(/|$)", "message": "Test support code is for tests and the dev-only fake site." },
+							{ "regex": "^(\\$lib/(io|app|live|theme)|\\.\\./(io|app|live|theme))(/|\\.|$)", "message": "pure may not import io, app or live state." },
+							{ "regex": "^\\$(app|env)/", "message": "pure may not import SvelteKit's $app or $env." },
+							{ "regex": "^svelte(/|$)", "message": "pure may not import svelte." },
+							{ "regex": "^node:", "message": "pure may not import node." }
+						]
+					}
+				]
+			}
+		},
+		{
+			// The one importer of the fake site outside tests: a dynamic import behind
+			// `import.meta.env.DEV` (src/lib/io/install-site.test.ts holds its shape).
+			"files": ["src/lib/io/install-site.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{ "regex": "^(\\$lib/app|\\.\\./app)(/|$)", "message": "io may not import from app." },
+							{ "regex": "^node:", "message": "io runs in the browser: no node." }
+						]
+					}
+				]
+			}
+		},
+		{
+			// Tests and the test support code itself may import anything.
+			"files": ["**/*.test.ts", "**/*.spec.ts", "src/lib/testing/**", "e2e/**"],
+			"rules": { "no-restricted-imports": "off", "no-restricted-globals": "off" }
+		}
+	]
+}

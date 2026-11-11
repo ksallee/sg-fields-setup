@@ -39,7 +39,6 @@ import { readFieldReply, readFields, type FieldReply } from '$lib/pure/live-fiel
 import { predictFieldName } from '$lib/pure/field-name';
 import type { CreatePayload, PropertyWrite } from '$lib/pure/plan';
 import type { ReviveAnswer, RunReader, SchemaWritePort } from '$lib/pure/run-port';
-import { isRecord } from '$lib/pure/is-record';
 
 export const FAKE_OPS = [
 	'readRawEntityTypes',

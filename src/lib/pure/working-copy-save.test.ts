@@ -7,7 +7,6 @@ import {
 	openWorkingCopy,
 	removeRow,
 	replaceDefinition,
-	rowByKey,
 	setDescription,
 	setName
 } from './working-copy';

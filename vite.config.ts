@@ -27,8 +27,6 @@ export default defineConfig(({ mode }) => {
 		],
 		test: {
 			expect: { requireAssertions: true },
-			// Later issues add the pure modules; a run with no test file still passes.
-			passWithNoTests: true,
 			projects: [
 				{
 					extends: './vite.config.ts',
