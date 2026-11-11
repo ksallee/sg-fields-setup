@@ -19,7 +19,7 @@
 	import { errorMessage, notify } from '$lib/app/toast';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { downloadText } from '$lib/io/download';
-	import { importSetFile } from '$lib/io/import-set-file';
+	import { importSetFileFrom } from '$lib/io/import-set-file';
 	import { sharedSetStore } from '$lib/io/set-store';
 	import { liveSchema, prepareLive } from '$lib/live';
 	import { setPath } from '$lib/pure/routes';
@@ -38,7 +38,7 @@
 	} from '$lib/pure/set-list';
 	import { refusalMessage } from '$lib/pure/set-plan';
 	import type { SetSummary } from '$lib/pure/set-query';
-	import { deleteQuestion, duplicatedText, importedText, totalText } from '$lib/pure/set-text';
+	import { deleteQuestion, duplicatedText, exportedNote, importedText, totalText } from '$lib/pure/set-text';
 	import { cn } from '$lib/utils.js';
 
 	const SEARCH_DELAY_MS = 300;
@@ -146,7 +146,8 @@
 			}
 			const { text, fileName } = encodeSetFile(stored.set, stored.entries);
 			downloadText(fileName, text);
-			notify.success(`Exported ${fileName}.`);
+			// What travels with the file, said when it does (the site address, the schema records).
+			notify.success(`Exported ${fileName}.`, exportedNote(stored.entries));
 		});
 	}
 
@@ -209,7 +210,7 @@
 		for (const file of files) {
 			const title = `Could not import ${file.name}`;
 			try {
-				const result = await importSetFile(await sharedSetStore(), await file.text());
+				const result = await importSetFileFrom(await sharedSetStore(), file);
 				if (result.ok) notify.success(importedText(result));
 				else notify.error(result.message, title);
 			} catch (error) {

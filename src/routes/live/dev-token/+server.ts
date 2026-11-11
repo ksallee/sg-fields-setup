@@ -7,10 +7,15 @@
  * leaves the server; what crosses the wire is a 600s bearer
  * (post_auth_access_token). Rows read this way are the script user's: what it
  * has read, what it follows, and what is addressed to it are not a person's.
+ *
+ * The site in `.env.local` passes the same rule as a site a caller names (`checkSite`), so the
+ * key is only ever posted to a Flow PT host, and the call follows no redirect.
  */
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import { json, type RequestHandler } from '@sveltejs/kit';
+import { checkSite, extraSuffixes, siteRefusalText } from '$lib/pure/site-host';
+import { LAUNCHER_TIMEOUT_MS } from '../_launcher';
 
 function fromEnv(name: string): string | undefined {
 	const value = env[name];
@@ -21,17 +26,27 @@ const notFound = (): Response => new Response('Not found', { status: 404 });
 
 export const POST: RequestHandler = async () => {
 	if (!dev) return notFound();
-	const siteUrl = fromEnv('FPT_API_SITE_URL')?.replace(/\/+$/, '');
+	const named = fromEnv('FPT_API_SITE_URL');
 	const clientId = fromEnv('FPT_API_SCRIPT_NAME');
 	const clientSecret = fromEnv('FPT_API_API_KEY');
-	if (!siteUrl || !clientId || !clientSecret) return notFound();
+	if (!named || !clientId || !clientSecret) return notFound();
+	const site = checkSite(named, { extraSuffixes: extraSuffixes(env.FPT_EXTRA_SITE_SUFFIXES) });
+	if (!site.ok) return json({ message: `FPT_API_SITE_URL: ${siteRefusalText(site.reason)}` }, { status: 400 });
+	const siteUrl = site.origin;
 
 	// Form-encoded is the one content type the token endpoint accepts; JSON is 415.
-	const res = await fetch(`${siteUrl}/api/v1/auth/access_token`, {
-		method: 'POST',
-		headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-		body: new URLSearchParams({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret }).toString()
-	});
+	let res: Response;
+	try {
+		res = await fetch(`${siteUrl}/api/v1/auth/access_token`, {
+			method: 'POST',
+			headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+			body: new URLSearchParams({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret }).toString(),
+			redirect: 'error',
+			signal: AbortSignal.timeout(LAUNCHER_TIMEOUT_MS)
+		});
+	} catch {
+		return json({ message: 'Could not reach the site.' }, { status: 502 });
+	}
 	const body = (await res.json().catch(() => null)) as { access_token?: string; expires_in?: number } | null;
 	if (!res.ok || !body?.access_token) {
 		return json({ message: 'Flow PT refused the script key.' }, { status: res.status === 200 ? 502 : res.status });

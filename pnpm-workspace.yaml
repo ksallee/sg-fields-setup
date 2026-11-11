@@ -1,5 +1,7 @@
 allowBuilds:
   esbuild: true
+# pnpm 12 installs no version published less than a day ago (its default minimumReleaseAge, not set
+# here, as in sg-task-templates). A release of ours that is needed the day it ships is named here,
+# and comes off the list once it is a day old.
 minimumReleaseAgeExclude:
-  - sg-widgets-core@0.3.1
   - sg-widgets-core@0.4.0

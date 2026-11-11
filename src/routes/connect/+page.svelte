@@ -14,18 +14,25 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { prepareLive, setSiteUrl, signIn, signOut, suggestedSiteUrl, type LiveState } from '$lib/live';
+	import { siteRefusalText } from '$lib/pure/site-host';
 
 	let editingSite = $state(false);
 	let siteDraft = $state(suggestedSiteUrl());
 	let approving = $state(false);
 	let refusal = $state<string | null>(null);
+	let siteRefusal = $state<string | null>(null);
 
 	const live = prepareLive();
 
 	function useSite(): void {
 		const value = siteDraft.trim();
 		if (!value) return;
-		setSiteUrl(value);
+		// Only an https origin is stored. A refused address stays in the box with the reason under it.
+		const named = setSiteUrl(value);
+		if (!named.ok) {
+			siteRefusal = siteRefusalText(named.reason);
+			return;
+		}
 		location.reload();
 	}
 
@@ -76,8 +83,11 @@
 								placeholder="https://studio.shotgrid.autodesk.com"
 								bind:value={siteDraft}
 								onkeydown={(event) => event.key === 'Enter' && useSite()}
+								oninput={() => (siteRefusal = null)}
 								aria-label="Site URL"
+								aria-invalid={siteRefusal !== null}
 							/>
+							{#if siteRefusal}<p class="text-destructive text-xs" role="alert" data-slot="connect-site-refusal">{siteRefusal}</p>{/if}
 						{:else}
 							<span class="truncate text-sm font-medium" title={state.siteUrl}>{state.siteUrl}</span>
 						{/if}
@@ -85,7 +95,7 @@
 					{#if editing}
 						<Button size="sm" onclick={useSite}>Use site</Button>
 						{#if state.siteUrl}
-							<Button size="sm" variant="ghost" onclick={() => (editingSite = false)}>Cancel</Button>
+							<Button size="sm" variant="ghost" onclick={() => ((editingSite = false), (siteRefusal = null))}>Cancel</Button>
 						{/if}
 					{:else}
 						<Button size="sm" variant="outline" onclick={() => ((siteDraft = state.siteUrl), (editingSite = true))}>Change site</Button>

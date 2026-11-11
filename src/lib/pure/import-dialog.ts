@@ -21,7 +21,8 @@ import { parseCsv } from './csv';
 import { bucketFromCsv, bucketsFromWorkbook, canConfirm, defaultSetName, type ImportBucket } from './import-build';
 import type { ImportMode } from './import-entity-type';
 import { DEFAULT_DELIMITER } from './import-header';
-import { DEFAULT_SAMPLE_SIZE, readXlsx } from './xlsx';
+import { MAX_COLUMNS } from './table';
+import { DEFAULT_SAMPLE_SIZE, readXlsx, XLSX_MAX_SHEETS, XLSX_PART_CAP_BYTES, XLSX_WORKBOOK_CAP_BYTES } from './xlsx';
 
 /* Files. */
 
@@ -46,8 +47,22 @@ export function exceedsSizeCap(size: number, capBytes: number = IMPORT_SIZE_CAP_
 	return size > capBytes;
 }
 
-/** Why a file is refused (IMP-2 to IMP-5). */
-export type FileProblem = 'unsupported' | 'too-large' | 'unreadable' | 'no-header';
+/**
+ * Why a file is refused (IMP-2 to IMP-5). The last four are the bounds on what a file may hold
+ * once read (IMP-3, the note of 2026-11-10): a workbook that unpacks too large, in one part or
+ * in all, one with too many sheets, a table with too many columns.
+ */
+export type FileProblem =
+	| 'unsupported'
+	| 'too-large'
+	| 'unreadable'
+	| 'no-header'
+	| 'part-too-large'
+	| 'workbook-too-large'
+	| 'too-many-sheets'
+	| 'too-many-columns';
+
+const megabytes = (bytes: number): number => Math.round(bytes / (1024 * 1024));
 
 /** The sentence for a refused file, naming it (IMP-2 to IMP-5). */
 export function fileProblemText(problem: FileProblem, fileName: string, capBytes: number = IMPORT_SIZE_CAP_BYTES): string {
@@ -55,18 +70,26 @@ export function fileProblemText(problem: FileProblem, fileName: string, capBytes
 		case 'unsupported':
 			return `"${fileName}" is not a CSV or XLSX file.`;
 		case 'too-large':
-			return `"${fileName}" is over ${Math.round(capBytes / (1024 * 1024))} MB.`;
+			return `"${fileName}" is over ${megabytes(capBytes)} MB.`;
 		case 'unreadable':
 			return `"${fileName}" could not be read.`;
 		case 'no-header':
 			return `"${fileName}" has no header row.`;
+		case 'part-too-large':
+			return `"${fileName}" holds a part over ${megabytes(XLSX_PART_CAP_BYTES)} MB once unpacked.`;
+		case 'workbook-too-large':
+			return `"${fileName}" is over ${megabytes(XLSX_WORKBOOK_CAP_BYTES)} MB once unpacked.`;
+		case 'too-many-sheets':
+			return `"${fileName}" has more than ${XLSX_MAX_SHEETS.toLocaleString('en-US')} sheets.`;
+		case 'too-many-columns':
+			return `"${fileName}" has more than ${MAX_COLUMNS.toLocaleString('en-US')} columns.`;
 	}
 }
 
 /** A file as read: the text of a CSV, the bytes of a workbook. */
 export type FileContent = { kind: 'csv'; text: string } | { kind: 'xlsx'; bytes: Uint8Array };
 
-export type FileBuckets = { ok: true; buckets: ImportBucket[] } | { ok: false; problem: 'unreadable' | 'no-header' };
+export type FileBuckets = { ok: true; buckets: ImportBucket[] } | { ok: false; problem: Exclude<FileProblem, 'unsupported' | 'too-large'> };
 
 /** A read file as its buckets: one for a CSV, one per worksheet with a header (IMP-4 to IMP-6). */
 export function bucketsFromFile(fileName: string, content: FileContent): FileBuckets {

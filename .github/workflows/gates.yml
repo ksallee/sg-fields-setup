@@ -20,15 +20,18 @@ jobs:
     name: check, test and build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      # Actions are pinned by commit, the tag beside it. The token is not left in the checkout.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       # package.json names no packageManager, so the version is here: the one the lockfile was
       # written with.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
           version: 12.5.1
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
           cache: pnpm
@@ -40,4 +43,8 @@ jobs:
       - run: pnpm test
 
       - run: pnpm build
+
+      # The build carries no dev-only code: no dev token route body, no script key name, no fake
+      # site. Fails on the first match (scripts/check-build.mjs).
+      - run: pnpm check:build
 

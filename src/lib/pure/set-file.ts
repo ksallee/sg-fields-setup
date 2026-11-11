@@ -57,6 +57,26 @@ export const SET_FILE_FORMAT = 'sg-fields-setup/set';
 /** The newest file version this app writes and reads. */
 export const SET_FILE_VERSION = 1;
 
+/** The largest set file that is read. A set of a thousand fields with their snapshots is a few megabytes. */
+export const SET_FILE_SIZE_CAP_BYTES = 20 * 1024 * 1024;
+
+/** Whether a file of this size is refused unread. */
+export function exceedsSetFileCap(size: number, capBytes: number = SET_FILE_SIZE_CAP_BYTES): boolean {
+	return size > capBytes;
+}
+
+/** The sentence for a file over the cap, naming it. */
+export function setFileTooLargeText(fileName: string, capBytes: number = SET_FILE_SIZE_CAP_BYTES): string {
+	return `"${fileName}" is over ${Math.round(capBytes / (1024 * 1024))} MB.`;
+}
+
+/**
+ * How deep a snapshot may nest: objects and lists inside one another. A field's schema record
+ * nests three deep. Deeper than this is no schema record, and far deeper overflows the stack of
+ * whatever copies it later, the store first.
+ */
+export const SNAPSHOT_MAX_DEPTH = 32;
+
 /** The suffix of a suggested set file name. */
 export const SET_FILE_SUFFIX = '.fieldset.json';
 
@@ -100,6 +120,7 @@ export type SetFileRefusal =
 	| { kind: 'badSetValue'; key: string; expected: Expected; found: Found }
 	| { kind: 'entryNotObject'; entry: number; found: Found }
 	| { kind: 'entryKeyMissing'; entry: number; programmaticName: string | null; key: RequiredEntryKey }
+	| { kind: 'snapshotTooDeep'; entry: number; programmaticName: string | null; max: number }
 	| {
 			kind: 'badEntryValue';
 			entry: number;
@@ -135,15 +156,43 @@ export function setFileName(name: string): string {
 	return `${stem}${SET_FILE_SUFFIX}`;
 }
 
-/** A copy of a JSON value with object keys sorted at every depth. */
-function sortKeys(value: unknown): unknown {
-	if (Array.isArray(value)) return value.map(sortKeys);
-	if (value !== null && typeof value === 'object') {
-		const sorted: Record<string, unknown> = {};
-		for (const key of Object.keys(value).sort()) sorted[key] = sortKeys((value as Record<string, unknown>)[key]);
-		return sorted;
+function isContainer(value: unknown): value is object {
+	return value !== null && typeof value === 'object';
+}
+
+/**
+ * A copy of a JSON value with object keys sorted at every depth. It walks with a list of its
+ * own, so no depth overflows the stack, and it defines each key, so one named `__proto__` is
+ * kept as a key and never sets a prototype.
+ */
+export function sortKeys(value: unknown): unknown {
+	if (!isContainer(value)) return value;
+	const empty = (source: object): object => (Array.isArray(source) ? [] : {});
+	const root = empty(value);
+	const pending: [source: object, copy: object][] = [[value, root]];
+	for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+		const [source, copy] = next;
+		const keys = Array.isArray(source) ? source.map((_, index) => String(index)) : Object.keys(source).sort();
+		for (const key of keys) {
+			const item: unknown = (source as Record<string, unknown>)[key];
+			const kept = isContainer(item) ? empty(item) : item;
+			if (isContainer(item)) pending.push([item, kept as object]);
+			Object.defineProperty(copy, key, { value: kept, enumerable: true, writable: true, configurable: true });
+		}
 	}
-	return value;
+	return root;
+}
+
+/** Whether a JSON value nests deeper than `max` containers. Walks with a list of its own. */
+function deeperThan(value: unknown, max: number): boolean {
+	const pending: [value: unknown, depth: number][] = [[value, 1]];
+	for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+		const [item, depth] = next;
+		if (!isContainer(item)) continue;
+		if (depth > max) return true;
+		for (const child of Object.values(item)) if (isContainer(child)) pending.push([child, depth + 1]);
+	}
+	return false;
 }
 
 /** The entry as a file writes it: cleaned, the file's keys only, in the model's order. */
@@ -311,6 +360,9 @@ function readEntry(value: unknown, position: number): EntryDraft {
 	if (!(snapshot === undefined || snapshot === null || isObject(snapshot))) {
 		refuse('snapshot', 'objectOrNone', snapshot);
 	}
+	if (deeperThan(snapshot, SNAPSHOT_MAX_DEPTH)) {
+		throw new Refused({ kind: 'snapshotTooDeep', entry: position, programmaticName, max: SNAPSHOT_MAX_DEPTH });
+	}
 
 	return cleanEntry({
 		targetEntityType: read.text('targetEntityType'),
@@ -454,6 +506,8 @@ export function refusalMessage(refusal: SetFileRefusal): string {
 			return `Entry ${refusal.entry} is ${FOUND[refusal.found]}. It should be an object.`;
 		case 'entryKeyMissing':
 			return `${entryLabel(refusal.entry, refusal.programmaticName)} has no "${refusal.key}".`;
+		case 'snapshotTooDeep':
+			return `${entryLabel(refusal.entry, refusal.programmaticName)}: "snapshot" is nested more than ${refusal.max} deep.`;
 		case 'badEntryValue':
 			return `${entryLabel(refusal.entry, refusal.programmaticName)}: ${wrongValue(refusal.key, refusal.expected, refusal.found)}`;
 	}

@@ -2,7 +2,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import { encodeSetFile } from '$lib/pure/set-file';
-import { importSetFile } from './import-set-file';
+import { SET_FILE_SIZE_CAP_BYTES } from '$lib/pure/set-file';
+import { importSetFile, importSetFileFrom } from './import-set-file';
 import { openSetStore, type SetStore } from './set-store';
 
 async function open(): Promise<SetStore> {
@@ -85,5 +86,37 @@ describe('importSetFile (D1)', () => {
 			expect(result, name).toMatchObject({ ok: true, duplicatesDropped: 0 });
 		}
 		expect((await store.listSets()).total).toBe(4);
+	});
+});
+
+describe('importSetFileFrom (B6 of the security audit)', () => {
+	const source = (name: string, text: string, size = text.length) => {
+		const calls = { text: 0 };
+		return { calls, file: { name, size, text: async () => ((calls.text += 1), text) } };
+	};
+
+	it('reads a file under the cap and stores its set', async () => {
+		const store = await open();
+		const { file: lens, calls } = source('lens.fieldset.json', file('Lens'));
+		const result = await importSetFileFrom(store, lens);
+		expect(result).toMatchObject({ ok: true, name: 'Lens', entryCount: 1 });
+		expect(calls.text).toBe(1);
+	});
+
+	it('refuses a file over the cap before reading it, naming it and the cap', async () => {
+		const store = await open();
+		const { file: big, calls } = source('big.fieldset.json', file('Big'), SET_FILE_SIZE_CAP_BYTES + 1);
+		expect(await importSetFileFrom(store, big)).toEqual({ ok: false, message: '"big.fieldset.json" is over 20 MB.' });
+		expect(calls.text).toBe(0);
+		expect((await store.listSets()).total).toBe(0);
+	});
+
+	it('refuses a snapshot nested too deep and stores nothing', async () => {
+		const store = await open();
+		const deep = `${'{"a":'.repeat(5000)}1${'}'.repeat(5000)}`;
+		const text = file('Deep').replace('"snapshot":null', `"snapshot":${deep}`);
+		const result = await importSetFileFrom(store, source('deep.fieldset.json', text).file);
+		expect(result.ok).toBe(false);
+		expect((await store.listSets()).total).toBe(0);
 	});
 });
