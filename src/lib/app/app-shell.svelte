@@ -10,6 +10,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { isDark, setMode } from '$lib/theme';
 	import { prepareLive, type LiveState } from '$lib/live';
+	import { siteTitle, siteWho } from '$lib/pure/site';
 	import { siteHost } from '$lib/pure/site-host';
 
 	let { children }: { children: Snippet } = $props();
@@ -49,19 +50,14 @@
 				<a
 					href="/connect"
 					class="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex max-w-64 min-w-0 items-center gap-1.5 truncate rounded-md px-1.5 py-1 outline-none focus-visible:ring-2"
-					title={live.siteUrl ? `${live.siteUrl}${live.session ? ` · ${live.session.login}` : live.devToken ? ' · dev key' : ''}` : 'Connect a site'}
+					title={siteTitle(live)}
 					data-slot="site-who"
 				>
 					{#if live.siteUrl}
+						{@const who = siteWho(live)}
 						<span class="text-xs">Site</span>
 						<span class="text-foreground truncate">{siteHost(live.siteUrl)}</span>
-						{#if live.session}
-							<span aria-hidden="true">·</span><span class="truncate">{live.session.login}</span>
-						{:else if live.devToken}
-							<span aria-hidden="true">·</span><span class="text-xs">Dev key</span>
-						{:else}
-							<span aria-hidden="true">·</span><span class="text-xs">Not signed in</span>
-						{/if}
+						<span aria-hidden="true">·</span><span class={who.kind === 'person' ? 'truncate' : 'text-xs'}>{who.text}</span>
 					{:else}
 						<span>No site connected</span>
 					{/if}

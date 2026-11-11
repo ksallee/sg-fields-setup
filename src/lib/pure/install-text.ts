@@ -151,3 +151,23 @@ export function leaveQuestion(): string {
 export function reportFileName(setName: string, at: string): string {
 	return ['install-report', fileSlug(setName), at.slice(0, 10)].filter((part) => part !== '').join('-') + '.txt';
 }
+
+/** The page's title: the set by name once it is read. */
+export function installTitle(setName: string): string {
+	return setName === '' ? 'Install' : `Install "${setName}"`;
+}
+
+/** Under "Checking the live schema…": how much is read, and where (RUN-1). */
+export function planLoadingLine(entries: number, siteUrl: string): string {
+	return `Reading ${fieldCount(entries).toLowerCase()} on ${siteHost(siteUrl)}.`;
+}
+
+/** Under "No site connected": the problem, then why the screen needs a site. */
+export function disconnectedLine(problem: string): string {
+	return `${problem} An install needs a site to compare with and to write to.`;
+}
+
+/** Under "The live schema could not be read": the site's words, then that nothing was planned (RUN-1, PLN-3). */
+export function planFailedLine(message: string): string {
+	return `${message} No plan was made.`;
+}

@@ -40,6 +40,13 @@ const empty = () => openWorkingCopy(SET, []);
 const broken = () => editRow(addRow(addRow(open(), 'n1', 'Shot'), 'n2', 'Shot'), 'b', { programmaticName: 'sg_a' });
 
 describe('saveBlock', () => {
+	it('EDT-42, EDT-44: no save while a re-sync is on its way, whatever else holds (audit M2)', () => {
+		expect(saveBlock(setName(open(), 'Lens data'), { resyncing: true })).toEqual({ reason: 'resyncing' });
+		expect(saveBlock(open(), { resyncing: true })).toEqual({ reason: 'nothing_to_save' });
+		expect(saveBlock(setName(open(), 'Lens data'), { resyncing: false })).toBe(null);
+		expect(blockText({ reason: 'resyncing' })).toBe('Wait for the re-sync to finish.');
+	});
+
 	it('EDT-11: a dirty, valid set can be saved', () => {
 		expect(saveBlock(setName(open(), 'Lens data'))).toBe(null);
 	});

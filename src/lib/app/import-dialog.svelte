@@ -23,18 +23,16 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { writeImportBanner } from '$lib/io/import-banner';
 	import { readSpreadsheet } from '$lib/io/read-spreadsheet';
-	import { COMMON_ENTITY_TYPES } from '$lib/io/schema';
+	import { commonFields, readImportSite } from '$lib/io/import-site';
 	import { sharedSetStore } from '$lib/io/set-store';
 	import { liveContext, liveSchema, prepareLive } from '$lib/live';
+	import { COMMON_ENTITY_TYPES } from '$lib/pure/common-entity-types';
 	import {
 		bucketColumnCount,
 		buildEntries,
 		importFooterText,
 		importSuccessText,
-		inferFallback,
-		resolvedEntityTypes,
-		type ImportBucket,
-		type ImportSite
+		inferFallback
 	} from '$lib/pure/import-build';
 	import {
 		acceptFile,
@@ -44,6 +42,7 @@
 		confirmEnabled,
 		finishAdding,
 		failSaving,
+		fallbackLabel,
 		IMPORT_ACCEPT,
 		initialImportDialog,
 		NO_COLUMNS_TEXT,
@@ -56,9 +55,10 @@
 		TYPES_UNREAD_TEXT,
 		type BucketRow
 	} from '$lib/pure/import-dialog';
-	import { IMPORT_MODES, importModeHint, type ImportMode } from '$lib/pure/import-entity-type';
+	import { IMPORT_MODE_LABELS, IMPORT_MODES, importModeHint, type ImportMode } from '$lib/pure/import-entity-type';
 	import { refusalMessage } from '$lib/pure/set-plan';
 	import { countText } from '$lib/pure/set-text';
+	import { isConnected } from '$lib/pure/site';
 	import FileDrop from './file-drop.svelte';
 	import IconButton from './icon-button.svelte';
 	import Notice from './notice.svelte';
@@ -68,12 +68,6 @@
 		open = $bindable(false),
 		oncreated
 	}: { open?: boolean; oncreated?: (setId: string) => void } = $props();
-
-	const MODE_LABELS: Record<ImportMode, string> = {
-		automatic: 'Automatic',
-		worksheet: 'Worksheet',
-		header_prefix: 'Header prefix'
-	};
 
 	let dialog = $state.raw(initialImportDialog());
 	/** The site's URL when it can be read, else null: no matching, no inference, typed fallbacks (IMP-52). */
@@ -105,7 +99,7 @@
 			const session = dialog.session;
 			void prepareLive().then((live) => {
 				if (dialog.session !== session) return;
-				site = live.siteUrl !== '' && live.problem === null ? live.siteUrl : null;
+				site = isConnected(live) ? live.siteUrl : null;
 				// Ahead of the confirm, which needs the type list. A failure waits for the confirm to say so.
 				if (site !== null) void liveSchema().entityTypes().catch(() => {});
 			});
@@ -138,10 +132,7 @@
 
 	/** Pre-fills the new buckets' fallbacks from the common types' fields, when they answer (IMP-15, IMP-16). */
 	async function infer(rows: readonly BucketRow[], session: number): Promise<void> {
-		const schema = liveSchema();
-		const fieldsByType = new Map(
-			await Promise.all(COMMON_ENTITY_TYPES.map(async (type) => [type as string, await schema.fieldsOrEmpty(type)] as const))
-		);
+		const fieldsByType = await commonFields(liveSchema());
 		for (const row of rows) {
 			const inferred = inferFallback(row.bucket, fieldsByType, COMMON_ENTITY_TYPES, dialog.delimiter);
 			dialog = applyInferredFallback(dialog, session, row.id, inferred);
@@ -149,19 +140,6 @@
 	}
 
 	/* Confirm (IMP-11, IMP-29, IMP-49 to IMP-51). */
-
-	/**
-	 * The connected site as the build needs it: its types, and the fields of the types this import
-	 * resolves to and no others (IMP-29). Null when the type list cannot be read.
-	 */
-	async function readSite(url: string, from: readonly ImportBucket[], mode: ImportMode, delimiter: string): Promise<ImportSite | null> {
-		const schema = liveSchema();
-		const entityTypes = await schema.entityTypes().catch(() => null);
-		if (entityTypes === null) return null;
-		const resolved = resolvedEntityTypes(from, mode, delimiter, entityTypes);
-		const fieldsByType = new Map(await Promise.all(resolved.map(async (type) => [type, await schema.fieldsOrEmpty(type)] as const)));
-		return { url, entityTypes, fieldsByType };
-	}
 
 	async function confirm(event: SubmitEvent): Promise<void> {
 		event.preventDefault();
@@ -174,7 +152,8 @@
 			dialog = failSaving(dialog, session, message);
 		};
 		try {
-			const live = site === null ? null : await readSite(site, from, mode, delimiter);
+			// The site's types, and the fields of the types this import resolves to and no others (IMP-29).
+			const live = site === null ? null : await readImportSite(liveSchema(), site, from, mode, delimiter);
 			if (site !== null && live === null) return fail(TYPES_UNREAD_TEXT);
 			const built = buildEntries({ buckets: from, mode, delimiter, site: live, importedAt: new Date().toISOString() });
 			if (built.entries.length === 0) return fail(NO_COLUMNS_TEXT);
@@ -253,13 +232,15 @@
 												onOpenChange={onChooserOpen}
 												placeholder="Fallback entity type"
 												disabled={saving}
+												role="group"
+												aria-label={fallbackLabel(row.bucket.label)}
 											/>
 										{:else}
 											<Input
 												value={row.bucket.fallback}
 												oninput={(event) => (dialog = setFallback(dialog, row.id, event.currentTarget.value))}
 												placeholder="Fallback entity type"
-												aria-label={`Fallback entity type of ${row.bucket.label}`}
+												aria-label={fallbackLabel(row.bucket.label)}
 												autocomplete="off"
 												spellcheck={false}
 												disabled={saving}
@@ -291,7 +272,7 @@
 					<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
 						<Tabs.List aria-labelledby="import-mode-label">
 							{#each IMPORT_MODES as mode (mode)}
-								<Tabs.Trigger value={mode} disabled={saving} class="px-2.5">{MODE_LABELS[mode]}</Tabs.Trigger>
+								<Tabs.Trigger value={mode} disabled={saving} class="px-2.5">{IMPORT_MODE_LABELS[mode]}</Tabs.Trigger>
 							{/each}
 						</Tabs.List>
 						{#if dialog.mode !== 'worksheet'}

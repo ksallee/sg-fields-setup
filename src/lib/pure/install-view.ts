@@ -20,8 +20,11 @@ import { entityTypeDisplayName, type LiveEntityType } from './live-entity-types'
 import type { PlanClass, PlanItem, PropertyName } from './plan';
 import type { DiffSetting, Difference } from './plan-diff';
 import { formatValue, reasonParts, reverseFieldsText, settingLabel, type ReasonPart } from './plan-reason';
-import type { RowState, RunRow, RunState } from './run';
-import type { AnalysisRow } from './visibility-analysis';
+import type { SummaryRow } from './install-text';
+import type { TickRow } from './plan-selection';
+import { needsVisibilityRetry, type RowState, type RunRow, type RunState } from './run';
+import type { AnalysisRow, VisibilityForecast } from './visibility-analysis';
+import { nothingLeftToDo } from './visibility-text';
 
 export type GroupId = 'conflicts' | 'blocked' | 'create' | 'update' | 'already-matches';
 
@@ -257,4 +260,48 @@ export function analysisRows(items: readonly PlanItem[], run: Pick<RunState, 'ro
 		const live = runRow !== undefined && (runRow.state === 'done' || (runRow.state === 'skipped' && runRow.note?.code === 'already-exists'));
 		return { entryId: item.entryId, class: live ? 'already-matches' : item.class, entityType: item.entityType, programmaticName: item.programmaticName };
 	});
+}
+
+/**
+ * The rows as the ticks take them (RUN-4): a row whose visibility has nothing left to do is
+ * disabled. A row the analysis says nothing about yet is not.
+ */
+export function tickRowsOf(rows: readonly Pick<InstallRow, 'entryId' | 'selectable'>[], visibility: ReadonlyMap<string, VisibilityForecast>): TickRow[] {
+	return rows.map((row) => {
+		const own = visibility.get(row.entryId);
+		return { entryId: row.entryId, selectable: row.selectable, disabled: own !== undefined && nothingLeftToDo(own) };
+	});
+}
+
+/**
+ * The rows as the summary counts them (RUN-5): each row's class as it shows, whether it is
+ * ticked, and the entity types its plan item makes reverse fields on (corpus finding 121).
+ */
+export function summaryRows(
+	rows: readonly Pick<InstallRow, 'entryId' | 'class'>[],
+	ticked: ReadonlySet<string>,
+	items: readonly Pick<PlanItem, 'entryId' | 'reverseFieldTypes'>[]
+): SummaryRow[] {
+	const byId = new Map(items.map((item) => [item.entryId, item]));
+	return rows.map((row) => ({ class: row.class, ticked: ticked.has(row.entryId), reverseFieldTypes: byId.get(row.entryId)?.reverseFieldTypes ?? [] }));
+}
+
+/** The run has finished with this row: done, skipped or failed. From then on the row shows what the run says (RUN-21). */
+export function rowEnded(row: Pick<InstallRow, 'run'>): boolean {
+	return row.run !== null && row.run.state !== 'pending' && row.run.state !== 'in_progress';
+}
+
+/** An ended row whose visibility needs another go: it carries the warning and its retry (VIS-7). */
+export function rowWarned(row: Pick<InstallRow, 'run'>): boolean {
+	return row.run !== null && rowEnded(row) && needsVisibilityRetry(row.run);
+}
+
+/** The name of a row's checkbox (RUN-4). */
+export function installCheckLabel(displayName: string): string {
+	return `Install ${displayName}`;
+}
+
+/** The name of the button that shows the whole of a long value, or cuts it again (RUN-3). */
+export function showMoreLabel(open: boolean, settingLabel: string): string {
+	return `${open ? 'Show less' : 'Show all'} of ${settingLabel.toLowerCase()}`;
 }

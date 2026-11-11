@@ -3,7 +3,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import type { Entry, EntryDraft } from '$lib/pure/model';
 import { refusalMessage } from '$lib/pure/set-plan';
 import { editRow, openWorkingCopy, removeRow, setDescription, type WorkingCopy } from '$lib/pure/working-copy';
-import { afterSave, draftsOf, saveRequest, type SaveRequest } from '$lib/pure/working-copy-save';
+import { draftsOf, saveRequest, type SaveRequest } from '$lib/pure/working-copy-save';
 import {
 	DB_NAME,
 	DB_VERSION,
@@ -643,7 +643,7 @@ describe('two tabs on one set (audit H1, M3)', () => {
 		]);
 		// The tab reloads from what was stored, so its next save is on the new state.
 		if (!result.ok) return;
-		const next = afterSave(tabB, result.set, result.entries);
+		const next = openWorkingCopy(result.set, result.entries);
 		const again = await b.saveSet(set.id, saveRequest(editRow(next, key(next, 'sg_lens'), { description: 'Which lens.' })));
 		expect(again).toMatchObject({ ok: true });
 	});

@@ -41,6 +41,7 @@
 		filters={ELIGIBLE_PROJECT_FILTERS}
 		placeholder="All eligible projects"
 		{disabled}
+		role="group"
 		aria-labelledby={labelId}
 	/>
 	{#each notes as note (note)}

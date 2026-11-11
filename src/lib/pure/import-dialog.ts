@@ -268,3 +268,8 @@ export const NO_COLUMNS_TEXT = 'These files have no column to import.';
 
 /** With a site connected, its entity types could not be read, so no column can be resolved (IMP-21). */
 export const TYPES_UNREAD_TEXT = 'Could not read the entity types of the site. Try again.';
+
+/** The name of a bucket's typed fallback box, which has no visible label of its own (IMP-8). */
+export function fallbackLabel(bucketLabel: string): string {
+	return `Fallback entity type of ${bucketLabel}`;
+}

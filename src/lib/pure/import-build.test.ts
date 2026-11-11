@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { COMMON_ENTITY_TYPES } from '$lib/io/schema';
+import { COMMON_ENTITY_TYPES } from './common-entity-types';
 import { IMPORT_MODES } from './import-entity-type';
 import { makeLiveField } from '$lib/testing/make-live-field';
 import {

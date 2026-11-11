@@ -25,7 +25,7 @@
 		listDefaultValue,
 		missingRequired,
 		missingText,
-		nonAsciiNameWarning,
+		nameWarningFor,
 		type CheckboxDefault
 	} from '$lib/pure/editor-row';
 	import { MIRROR_TEXT, UNIQUE_NOTE } from '$lib/pure/editor-text';
@@ -56,10 +56,7 @@
 	const dataType = $derived(row.dataType.trim());
 	const missing = $derived(missingRequired(row));
 	const follows = $derived(row.nameMode === 'derived');
-	// With a site the planner judges the name, and its reason is among the notes above the form
-	// (`compare.ts`). Where it has not judged the row (no site, a type the site lacks, fields still
-	// on their way), a derived name with a non-ASCII display name is still called out (G11).
-	const warning = $derived(comparison?.planClass == null ? nonAsciiNameWarning(row) : null);
+	const warning = $derived(nameWarningFor(row, comparison?.planClass));
 	// The group says a type is not on the site; the row does not say it again.
 	const notes = $derived((comparison?.notes ?? []).filter((note) => note.kind !== 'type_not_on_site'));
 
@@ -135,7 +132,7 @@
 			</div>
 
 			<div class="flex flex-col gap-1.5">
-				<Label for="{uid}-type">Entity type</Label>
+				<Label id="{uid}-type-label" for={context ? undefined : `${uid}-type`}>Entity type</Label>
 				<TypeField
 					id="{uid}-type"
 					{context}
@@ -143,14 +140,16 @@
 					onchange={(targetEntityType) => onedit({ targetEntityType })}
 					disabled={mirror}
 					invalid={row.targetEntityType.trim() === ''}
-					label="Entity type"
+					labelledby="{uid}-type-label"
 				/>
 			</div>
 
 			<div class="flex flex-col gap-1.5">
-				<Label for="{uid}-data-type">Data type</Label>
+				<!-- The registry pickers take no id for their input (sg-widgets #374): the label names a group. -->
+				<Label id="{uid}-data-type-label">Data type</Label>
 				<DataTypePicker
-					id="{uid}-data-type"
+					role="group"
+					aria-labelledby="{uid}-data-type-label"
 					types={CREATABLE_DATA_TYPES}
 					labels={DATA_TYPE_LABELS}
 					value={row.dataType === '' ? null : row.dataType}
@@ -162,9 +161,12 @@
 
 			{#if !mirror && carries(dataType, 'validTypes')}
 				<div class="flex flex-col gap-1.5 sm:col-span-2">
-					<Label for="{uid}-valid-types">{dataType === 'multi_entity' ? 'Valid type' : 'Valid types'}</Label>
+					<Label id="{uid}-valid-types-label" for={context ? undefined : `${uid}-valid-types`}>
+						{dataType === 'multi_entity' ? 'Valid type' : 'Valid types'}
+					</Label>
 					<ValidTypesField
 						id="{uid}-valid-types"
+						labelledby="{uid}-valid-types-label"
 						{context}
 						single={dataType === 'multi_entity'}
 						value={row.validTypes}
@@ -180,9 +182,10 @@
 
 			{#if !mirror && carries(dataType, 'validValues')}
 				<div class="flex flex-col gap-1.5">
-					<Label for="{uid}-values">Valid values</Label>
+					<Label id="{uid}-values-label">Valid values</Label>
 					<ValidValuesEditor
-						id="{uid}-values"
+						role="group"
+						aria-labelledby="{uid}-values-label"
 						dataType={dataType === 'status_list' ? 'status_list' : 'list'}
 						value={[...row.validValues]}
 						onValueChange={(validValues) => onedit({ validValues })}

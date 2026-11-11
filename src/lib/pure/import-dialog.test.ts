@@ -361,3 +361,10 @@ describe('confirming (IMP-11, IMP-13, IMP-51)', () => {
 		expect(TYPES_UNREAD_TEXT).toBe('Could not read the entity types of the site. Try again.');
 	});
 });
+
+describe('fallbackLabel (IMP-8)', () => {
+	it('IMP-8: the typed fallback box is named after its file or sheet', async () => {
+		const { fallbackLabel } = await import('./import-dialog');
+		expect(fallbackLabel('shots.csv')).toBe('Fallback entity type of shots.csv');
+	});
+});

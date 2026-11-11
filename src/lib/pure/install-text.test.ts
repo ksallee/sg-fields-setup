@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { setFileName } from './set-file';
-import { confirmText, installSummary, leaveQuestion, planContext, reportFileName, screenSummary, summaryItems } from './install-text';
+import {
+	confirmText,
+	disconnectedLine,
+	installSummary,
+	installTitle,
+	leaveQuestion,
+	planContext,
+	planFailedLine,
+	planLoadingLine,
+	reportFileName,
+	screenSummary,
+	summaryItems
+} from './install-text';
 import { INITIAL_RUN_STATE, type RowState, type RunState } from './run';
 
 const ROWS = [
@@ -147,5 +159,23 @@ describe('small texts', () => {
 	it('caps a long set name as the set file does', () => {
 		const name = reportFileName('a'.repeat(200), '2026-11-10T18:04:05.000Z');
 		expect(name).toBe(`install-report-${'a'.repeat(80)}-2026-11-10.txt`);
+	});
+});
+
+describe('the screen before it has a plan (RUN-1)', () => {
+	it('the title names the set once it is read', () => {
+		expect(installTitle('')).toBe('Install');
+		expect(installTitle('Lens kit')).toBe('Install "Lens kit"');
+	});
+
+	it('RUN-1: reading the plan says how many fields, on which site', () => {
+		expect(planLoadingLine(3, 'https://studio.shotgrid.autodesk.com')).toBe('Reading 3 fields on studio.shotgrid.autodesk.com.');
+		expect(planLoadingLine(1, 'https://studio.shotgrid.autodesk.com')).toBe('Reading 1 field on studio.shotgrid.autodesk.com.');
+		expect(planLoadingLine(0, 'https://studio.shotgrid.autodesk.com')).toBe('Reading no fields on studio.shotgrid.autodesk.com.');
+	});
+
+	it('RUN-1: no site, and a plan that could not be read, each say what happened and what follows', () => {
+		expect(disconnectedLine('Sign in again.')).toBe('Sign in again. An install needs a site to compare with and to write to.');
+		expect(planFailedLine('The site answered 503.')).toBe('The site answered 503. No plan was made.');
 	});
 });

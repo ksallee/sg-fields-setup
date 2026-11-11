@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { countText, deleteQuestion, duplicatedText, fieldCount, importedText, ORIGIN_LABELS, SORT_LABELS, totalText, exportedNote } from './set-text';
+import {
+	countText,
+	createdText,
+	deletedText,
+	deleteQuestion,
+	duplicatedText,
+	exportedNote,
+	exportedText,
+	failedTitle,
+	fieldCount,
+	importedText,
+	ORIGIN_LABELS,
+	SET_GONE_TEXT,
+	SORT_LABELS,
+	totalText
+} from './set-text';
 
 describe('countText', () => {
 	it('picks the singular for one and the plural for the rest', () => {
@@ -81,5 +96,27 @@ describe('exportedNote (B9 of the security audit)', () => {
 		expect(exportedNote([entry('https://a.shotgrid.autodesk.com'), entry('https://b.shotgrid.autodesk.com')])).toBe(
 			'The file carries 2 site addresses and the schema record of each captured field.'
 		);
+	});
+});
+
+describe('toasts of the actions on a set (docs/design.md, Toasts)', () => {
+	it('SET-1, SET-23: created and deleted name the set, quoted', () => {
+		expect(createdText('Lens')).toBe('Created "Lens".');
+		expect(deletedText('Lens')).toBe('Deleted "Lens".');
+	});
+
+	it('D1: exported names the file', () => {
+		expect(exportedText('lens.fieldset.json')).toBe('Exported lens.fieldset.json.');
+	});
+
+	it('a failure\'s title says what failed, the set quoted, a file by its name', () => {
+		expect(failedTitle('duplicate', 'Lens')).toBe('Could not duplicate "Lens"');
+		expect(failedTitle('export', 'Lens')).toBe('Could not export "Lens"');
+		expect(failedTitle('import', 'lens.json')).toBe('Could not import lens.json');
+		expect(failedTitle('delete')).toBe('Could not delete the set');
+	});
+
+	it('SET-21: a set that went while its row was on screen', () => {
+		expect(SET_GONE_TEXT).toBe('This set no longer exists.');
 	});
 });

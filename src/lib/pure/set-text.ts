@@ -73,3 +73,28 @@ export function exportedNote(entries: readonly { snapshotSite: string | null }[]
 	if (sites.length === 1) return `The file carries the site address, ${sites[0]}, and the schema record of each field captured there.`;
 	return `The file carries ${sites.length} site addresses and the schema record of each captured field.`;
 }
+
+/** The confirmation after a set was created (SET-1). */
+export function createdText(name: string): string {
+	return `Created "${name}".`;
+}
+
+/** The confirmation after a set was deleted (SET-23, EDT-8). */
+export function deletedText(name: string): string {
+	return `Deleted "${name}".`;
+}
+
+/** The confirmation after a set file was written (D1). */
+export function exportedText(fileName: string): string {
+	return `Exported ${fileName}.`;
+}
+
+/** What a failure's toast is titled: the action that failed and the set, or the file, it was for. */
+export function failedTitle(action: 'duplicate' | 'export' | 'import' | 'delete', name?: string): string {
+	if (action === 'delete') return 'Could not delete the set';
+	// A set is quoted. A file goes by its name as it is.
+	return action === 'import' ? `Could not import ${name ?? 'the file'}` : `Could not ${action} "${name ?? ''}"`;
+}
+
+/** A row whose set was deleted elsewhere while it showed (SET-21). */
+export const SET_GONE_TEXT = 'This set no longer exists.';
