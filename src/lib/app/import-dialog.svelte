@@ -42,6 +42,7 @@
 		bucketsFromFile,
 		bucketsOf,
 		confirmEnabled,
+		finishAdding,
 		failSaving,
 		IMPORT_ACCEPT,
 		initialImportDialog,
@@ -75,8 +76,6 @@
 	};
 
 	let dialog = $state.raw(initialImportDialog());
-	/** Files being read, so the drop zone can say so. */
-	let reading = $state(0);
 	/** The site's URL when it can be read, else null: no matching, no inference, typed fallbacks (IMP-52). */
 	let site = $state<string | null>(null);
 
@@ -119,7 +118,6 @@
 		if (dialog.saving) return;
 		dialog = startAdding(dialog);
 		const session = dialog.session;
-		reading += 1;
 		try {
 			for (const file of files) {
 				const read = await readSpreadsheet(file);
@@ -134,7 +132,7 @@
 				if (site !== null) void infer(accepted.added, session);
 			}
 		} finally {
-			reading -= 1;
+			dialog = finishAdding(dialog, session);
 		}
 	}
 
@@ -221,7 +219,7 @@
 					hint="One set from all of them. Only the headers and a few rows are read."
 					accept={IMPORT_ACCEPT}
 					compact={buckets.length > 0}
-					busy={reading > 0}
+					busy={dialog.reading > 0}
 					disabled={saving}
 					onfiles={(files) => void addFiles(files)}
 				/>

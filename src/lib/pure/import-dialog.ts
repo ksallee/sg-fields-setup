@@ -105,6 +105,8 @@ export interface ImportDialogState {
 	/** The messages of the latest drop, or the one of the last failed confirm. The last one shows. */
 	problems: readonly string[];
 	saving: boolean;
+	/** How many drops are still being read. Confirm waits for them: their buckets are part of the import (IMP-11). */
+	reading: number;
 }
 
 export function initialImportDialog(session = 0): ImportDialogState {
@@ -117,7 +119,8 @@ export function initialImportDialog(session = 0): ImportDialogState {
 		mode: 'automatic',
 		delimiter: DEFAULT_DELIMITER,
 		problems: [],
-		saving: false
+		saving: false,
+		reading: 0
 	};
 }
 
@@ -135,10 +138,16 @@ export function problemText(state: ImportDialogState): string | null {
 	return `${last} ${others} other ${others === 1 ? 'file was' : 'files were'} refused.`;
 }
 
-/** Files are coming: the message goes first (IMP-12). */
+/** Files are coming: the message goes first (IMP-12), and confirm waits until `finishAdding` (IMP-11). */
 export function startAdding(state: ImportDialogState): ImportDialogState {
-	if (state.saving || state.problems.length === 0) return state;
-	return { ...state, problems: [] };
+	if (state.saving) return state;
+	return { ...state, problems: [], reading: state.reading + 1 };
+}
+
+/** The files of one `startAdding` have all been read, accepted or refused. A drop of an earlier opening answers to nobody. */
+export function finishAdding(state: ImportDialogState, session: number): ImportDialogState {
+	if (state.session !== session || state.reading === 0) return state;
+	return { ...state, reading: state.reading - 1 };
 }
 
 function current(state: ImportDialogState, session: number): boolean {
@@ -212,9 +221,12 @@ export function applyInferredFallback(state: ImportDialogState, session: number,
 
 /* Confirming. */
 
-/** Whether the confirm action is enabled (IMP-11). */
+/**
+ * Whether the confirm action is enabled (IMP-11). Never while a file is still being read: the
+ * import would go without its buckets and nothing would say so.
+ */
 export function confirmEnabled(state: ImportDialogState): boolean {
-	return canConfirm({ saving: state.saving, setName: state.setName, buckets: bucketsOf(state) });
+	return state.reading === 0 && canConfirm({ saving: state.saving, setName: state.setName, buckets: bucketsOf(state) });
 }
 
 /** The saving state, or null when confirm is not enabled (IMP-11). The message goes. */
