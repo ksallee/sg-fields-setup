@@ -4,6 +4,7 @@ import {
 	orderEntries,
 	planCreate,
 	planDuplicate,
+	planDuplicateOf,
 	planSave,
 	refusalMessage,
 	type Mint,
@@ -614,6 +615,53 @@ describe('planDuplicate', () => {
 	it('MOD-5: refuses entries that repeat a pair', () => {
 		const plan = planDuplicate(source, [draft(), draft()], [], mint());
 		expect(plan).toMatchObject({ ok: false, reason: 'duplicate_entries' });
+	});
+});
+
+describe('planDuplicateOf (EDT-9, audit M3)', () => {
+	const source = stored([entry('e1')], { origin: 'import', originDetails: { sourceFiles: 'report.csv', importedAt: T0 } });
+	const whole = { name: 'Working name', description: 'Working.', entries: [draft({ displayName: 'Edited' })] };
+
+	it('SET-18: with nothing given it copies the stored set', () => {
+		const plan = planDuplicateOf(source, {}, OTHERS, mint());
+		expect(plan).toMatchObject({ ok: true, set: { name: 'Camera report copy', description: 'Lens fields', origin: 'import' }, entries: [{ displayName: 'Lens' }] });
+	});
+
+	it('EDT-9: the stored set gives the origin, whatever the caller says, while it exists', () => {
+		const plan = planDuplicateOf(source, { ...whole, origin: 'manual', originDetails: null }, OTHERS, mint());
+		expect(plan).toMatchObject({
+			ok: true,
+			set: { name: 'Working name copy', description: 'Working.', origin: 'import', originDetails: { sourceFiles: 'report.csv' } },
+			entries: [{ displayName: 'Edited' }]
+		});
+	});
+
+	it('M3: with no stored set, a whole working copy is planned from what the caller gives', () => {
+		const plan = planDuplicateOf(null, { ...whole, origin: 'import', originDetails: { sourceFiles: 'report.csv', importedAt: T0 } }, OTHERS, mint());
+		expect(plan).toMatchObject({
+			ok: true,
+			set: { name: 'Working name copy', description: 'Working.', origin: 'import', originDetails: { sourceFiles: 'report.csv', importedAt: T0 } },
+			entries: [{ displayName: 'Edited' }]
+		});
+	});
+
+	it('M3: with no stored set and no origin given, the copy is a manual set', () => {
+		expect(planDuplicateOf(null, whole, OTHERS, mint())).toMatchObject({ ok: true, set: { origin: 'manual', originDetails: null } });
+		expect(planDuplicateOf(null, { ...whole, description: null }, OTHERS, mint())).toMatchObject({ ok: true, set: { description: null } });
+	});
+
+	it('M3: with no stored set, anything less than the whole working copy is refused as missing', () => {
+		const missing = { ok: false, reason: 'set_missing' };
+		expect(planDuplicateOf(null, {}, OTHERS, mint())).toEqual(missing);
+		expect(planDuplicateOf(null, { name: whole.name, description: whole.description }, OTHERS, mint())).toEqual(missing);
+		expect(planDuplicateOf(null, { name: whole.name, entries: whole.entries }, OTHERS, mint())).toEqual(missing);
+		expect(planDuplicateOf(null, { description: null, entries: whole.entries }, OTHERS, mint())).toEqual(missing);
+		expect(planDuplicateOf(null, { ...whole, name: ' ' }, OTHERS, mint())).toEqual(missing);
+	});
+
+	it('MOD-5: refuses entries that repeat a pair, with or without a stored set', () => {
+		expect(planDuplicateOf(null, { ...whole, entries: [draft(), draft()] }, OTHERS, mint())).toMatchObject({ ok: false, reason: 'duplicate_entries' });
+		expect(planDuplicateOf(source, { entries: [draft(), draft()] }, OTHERS, mint())).toMatchObject({ ok: false, reason: 'duplicate_entries' });
 	});
 });
 

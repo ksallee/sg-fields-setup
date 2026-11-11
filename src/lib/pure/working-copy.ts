@@ -10,7 +10,7 @@
 import { cleanEntry } from './clean';
 import { isMirror } from './data-types';
 import { hasNonAscii, predictFieldName } from './field-name';
-import type { Entry, EntryDefinition, EntrySnapshot, FieldSet, Timestamp } from './model';
+import type { Entry, EntryDefinition, EntrySnapshot, FieldSet, Origin, OriginDetails, Timestamp } from './model';
 import { validateSet, type SetValidity } from './validity';
 
 /**
@@ -40,6 +40,9 @@ export interface SavedState {
 	description: string | null;
 	/** The set's `changedAt` as stored then: what a save made elsewhere since is told by. */
 	changedAt: Timestamp;
+	/** Where the set came from, as stored then: what a duplicate copies when the set is gone from storage. */
+	origin: Origin;
+	originDetails: OriginDetails | null;
 	entries: readonly Entry[];
 }
 
@@ -116,7 +119,14 @@ export function openWorkingCopy(set: FieldSet, entries: readonly Entry[]): Worki
 		);
 	return {
 		setId: set.id,
-		saved: { name: set.name, description: set.description, changedAt: set.changedAt, entries: [...entries] },
+		saved: {
+			name: set.name,
+			description: set.description,
+			changedAt: set.changedAt,
+			origin: set.origin,
+			originDetails: set.originDetails,
+			entries: [...entries]
+		},
 		name: set.name,
 		description: set.description ?? '',
 		rows

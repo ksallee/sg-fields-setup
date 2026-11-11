@@ -588,6 +588,50 @@ describe('two tabs on one set (audit H1, M3)', () => {
 		expect((await b.getSet(set.id))?.entries).toHaveLength(2);
 	});
 
+	it('M3: a set deleted in another tab cannot be saved, and its open working copy is duplicated all the same', async () => {
+		const { a, b, idb, set, load, key } = await twoTabs();
+		const tabB = load();
+		const editedB = setDescription(editRow(tabB, key(tabB, 'sg_lens'), { description: 'Which lens.' }), 'Edited.');
+		await a.deleteSet(set.id);
+
+		expect(await b.saveSet(set.id, saveRequest(editedB))).toEqual({ ok: false, reason: 'set_missing' });
+		// The whole working copy is given: the stored set is not needed. Origin comes from what the tab loaded.
+		const copy = await b.duplicateSet(set.id, {
+			name: editedB.name,
+			description: editedB.description,
+			entries: draftsOf(editedB),
+			origin: editedB.saved.origin,
+			originDetails: editedB.saved.originDetails
+		});
+		expect(copy).toMatchObject({
+			ok: true,
+			set: { name: 'Camera report copy', description: 'Edited.', origin: 'import', originDetails: { sourceFiles: 'report.csv', importedAt: T0 } }
+		});
+		expect(copy.ok && copy.entries.map((e) => [e.programmaticName, e.description])).toEqual([
+			['sg_lens', 'Which lens.'],
+			['sg_slate', null]
+		]);
+		expect((await dump(idb)).sets).toMatchObject([{ name: 'Camera report copy' }]);
+
+		// A selection of it is rescued the same way.
+		const part = await b.duplicateSet(set.id, { name: editedB.name, description: editedB.description, entries: draftsOf(editedB, [key(editedB, 'sg_slate')]) });
+		expect(part).toMatchObject({ ok: true, set: { name: 'Camera report copy 2', origin: 'manual', originDetails: null } });
+		expect(part.ok && part.entries.map((e) => e.programmaticName)).toEqual(['sg_slate']);
+	});
+
+	it('M3: a deleted set is still missing when the working copy is not all given', async () => {
+		const { a, b, idb, set, load } = await twoTabs();
+		const tabB = load();
+		await a.deleteSet(set.id);
+		const entries = draftsOf(tabB);
+		expect(await b.duplicateSet(set.id)).toEqual({ ok: false, reason: 'set_missing' });
+		expect(await b.duplicateSet(set.id, { entries })).toEqual({ ok: false, reason: 'set_missing' });
+		expect(await b.duplicateSet(set.id, { name: 'Camera report', entries })).toEqual({ ok: false, reason: 'set_missing' });
+		expect(await b.duplicateSet(set.id, { name: 'Camera report', description: null })).toEqual({ ok: false, reason: 'set_missing' });
+		expect(await b.duplicateSet(set.id, { name: '  ', description: null, entries })).toEqual({ ok: false, reason: 'set_missing' });
+		expect((await dump(idb)).sets).toEqual([]);
+	});
+
 	it('H1: changes to different fields from two tabs are both kept', async () => {
 		const { a, b, set, load, key } = await twoTabs();
 		const tabA = load();

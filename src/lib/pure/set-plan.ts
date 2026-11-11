@@ -437,7 +437,7 @@ export interface DuplicateOverrides {
  * `drafts` may be stored entries: their ids, set and times are not copied.
  */
 export function planDuplicate(
-	source: FieldSet,
+	source: Pick<FieldSet, 'name' | 'description' | 'origin' | 'originDetails'>,
 	drafts: readonly EntryDraft[],
 	existing: readonly SetRef[],
 	mint: Mint,
@@ -463,4 +463,52 @@ export function planDuplicate(
 		throw new Error(`copyName gave an unusable name: ${plan.reason}`);
 	}
 	return plan;
+}
+
+/** What the editor's duplicate copies instead of the stored set (EDT-9). Each part is optional. */
+export interface DuplicateSource {
+	/** The working copy's name, unsaved edits included. Blank or absent: the stored name. */
+	name?: string;
+	/** The working copy's description. Absent: the stored one. */
+	description?: string | null;
+	/**
+	 * The entries to copy: the whole working copy, or the selected rows. Absent: the stored
+	 * entries. Stored entries may be passed as they are; their ids and times are not copied.
+	 */
+	entries?: readonly EntryDraft[];
+	/**
+	 * The origin of the set as the caller loaded it, with its details. Used only when the stored
+	 * set is gone: while it exists, its own origin is copied. Absent: `manual`, no details.
+	 */
+	origin?: Origin;
+	originDetails?: OriginDetails | null;
+}
+
+/**
+ * The duplicate of a set as the store runs it: of `stored`, with whatever `copied` gives in its
+ * place (EDT-9).
+ *
+ * `stored` is null when the set is no longer in storage: deleted in another tab while this one
+ * had it open. The copy is then planned from `copied` alone, when it gives all of a set: a name
+ * that is not blank, a description (null for none) and the entries. Origin and origin details
+ * are the caller's too. So open edits are never lost with the set. Anything less is `set_missing`.
+ */
+export function planDuplicateOf(
+	stored: StoredSet | null,
+	copied: DuplicateSource,
+	existing: readonly SetRef[],
+	mint: Mint
+): CreatePlan | DuplicateEntries | SetMissing {
+	const overrides = { name: copied.name, description: copied.description };
+	if (stored) return planDuplicate(stored.set, copied.entries ?? stored.entries, existing, mint, overrides);
+	if (copied.entries === undefined || copied.description === undefined || copied.name === undefined || !isValidSetName(copied.name)) {
+		return { ok: false, reason: 'set_missing' };
+	}
+	return planDuplicate(
+		{ name: copied.name, description: copied.description, origin: copied.origin ?? 'manual', originDetails: copied.originDetails ?? null },
+		copied.entries,
+		existing,
+		mint,
+		overrides
+	);
 }
