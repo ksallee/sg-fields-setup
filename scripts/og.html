@@ -1,0 +1,52 @@
+<!doctype html>
+<!-- The share card, static/og.png: open at 1200 by 630 and screenshot (scripts/make-og.mjs). -->
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<style>
+			* { box-sizing: border-box; margin: 0; }
+			body { width: 1200px; height: 630px; background: #f7fafd; color: #171a1f; font-family: Inter, -apple-system, 'Helvetica Neue', Arial, sans-serif; display: flex; flex-direction: column; align-items: center; padding: 84px 120px 0; }
+			.brand { display: flex; align-items: center; gap: 18px; font-size: 38px; letter-spacing: -0.5px; }
+			.brand b { font-weight: 700; } .brand span { color: #5f646b; }
+			h1 { font-size: 44px; letter-spacing: -1px; margin-top: 22px; text-align: center; }
+			.sub { font-size: 16px; color: #4a4f57; margin-top: 18px; }
+			.cols { display: flex; gap: 26px; margin-top: 22px; width: 100%; align-items: stretch; }
+			.card { flex: 1; background: #fff; border: 1px solid #dfe3e8; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+			.head { display: flex; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid #dfe3e8; font-size: 15px; font-weight: 600; }
+			.head small { font-weight: 400; color: #5f646b; font-size: 13px; }
+			.row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; font-size: 15px; border-bottom: 1px solid #eef0f3; }
+			.row:last-child { border-bottom: 0; }
+			.row .name { font-weight: 500; flex: 1; } .row code { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; color: #5f646b; }
+			.cell { font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: #171a1f; background: #f1f4f7; border: 1px solid #dfe3e8; border-radius: 4px; padding: 3px 8px; }
+			.tag { font-size: 12.5px; border-radius: 999px; padding: 2px 10px; font-weight: 500; }
+			.create { background: #e6f3fb; color: #00609a; } .update { background: #fff4dc; color: #8a5a00; } .same { background: #eef0f3; color: #4a4f57; } .blocked { background: #fdecec; color: #b3261e; }
+			.foot { margin-top: auto; padding: 11px 14px; border-top: 1px solid #dfe3e8; font-size: 13px; color: #4a4f57; }
+		</style>
+	</head>
+	<body>
+		<div class="brand">
+			<svg width="44" height="44" viewBox="0 0 32 32"><rect fill="#bdbdbd" x="4" y="5" width="24" height="5" rx="1.5" /><rect fill="#006eaf" x="4" y="13.5" width="24" height="5" rx="1.5" /><rect fill="#bdbdbd" x="4" y="22" width="24" height="5" rx="1.5" /></svg>
+			<div><b>SG</b> <span>Fields Setup</span></div>
+		</div>
+		<h1>Spreadsheet columns to Flow PT fields.</h1>
+		<p class="sub">Drop a CSV or XLSX. Read the plan. Install.</p>
+		<div class="cols">
+			<div class="card">
+				<div class="head">camera-report.xlsx <small>72 columns</small></div>
+				<div class="row"><span class="cell">Focal Length</span><span class="cell">Lens Serial Num</span></div>
+				<div class="row"><span class="cell">Shutter Angle</span><span class="cell">Camera Body</span></div>
+				<div class="row"><span class="cell">White Balance</span><span class="cell">Shoot Date</span></div>
+				<div class="row"><span class="cell">Scene Number</span><span class="cell">Notes</span></div>
+				<div class="foot">Only the headers and a few rows are read.</div>
+			</div>
+			<div class="card">
+				<div class="head">Install plan <small>Shot · 72 fields</small></div>
+				<div class="row"><span class="name">Focal Length</span><code>sg_focal_length</code><span class="tag create">create</span></div>
+				<div class="row"><span class="name">Camera Body</span><code>sg_camera_body</code><span class="tag update">update</span></div>
+				<div class="row"><span class="name">Shoot Date</span><code>sg_shoot_date</code><span class="tag same">already matches</span></div>
+				<div class="row"><span class="name">Notes</span><code>sg_notes</code><span class="tag blocked">type conflict</span></div>
+				<div class="foot">Nothing is written before you see the plan.</div>
+			</div>
+		</div>
+	</body>
+</html>

@@ -31,6 +31,16 @@ export function isConnected(state: Pick<SiteState, 'siteUrl' | 'problem'>): bool
 	return state.siteUrl !== '' && state.problem === null;
 }
 
+/**
+ * What to say where a site is needed and none can be read, or null when one can. Sets need no
+ * site; comparing and installing do (CMP-3, OVR-7).
+ */
+export function connectNudge(state: Pick<SiteState, 'siteUrl' | 'problem'>): { title: string; text: string; action: string } | null {
+	if (isConnected(state)) return null;
+	const text = 'Sets work without a site. Connect to compare a set with your site and install it.';
+	return state.siteUrl === '' ? { title: 'No site connected.', text, action: 'Connect a site' } : { title: 'Not signed in.', text, action: 'Sign in' };
+}
+
 /** Who reads the site: the signed-in person over the dev key, else the dev key, else nobody. */
 export function siteWho(state: Pick<SiteState, 'session' | 'devToken'>): { kind: 'person' | 'dev-key' | 'nobody'; text: string } {
 	if (state.session) return { kind: 'person', text: state.session.login };
