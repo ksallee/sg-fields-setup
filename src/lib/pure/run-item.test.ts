@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createFakeSite, type FakeSite } from './fixtures/fake-site';
 import { planEntry, type PlanEntry, type PlanItem, type PlanSite } from './plan';
-import { applyItem, type ItemContext } from './run-item';
+import { applyItem, plainCreate, writeAndVerify, type ItemContext } from './run-item';
 import type { FieldEffect } from './run';
 
 function entry(overrides: Partial<PlanEntry> = {}): PlanEntry {
@@ -105,6 +105,63 @@ describe('the valid types guard (corpus finding 121)', () => {
 		const result = await applyItem(narrowed, wanted, planned);
 		expect(result.note).toEqual({ code: 'unknown-valid-types', names: ['Asset'] });
 		expect(site.calls).toHaveLength(before);
+	});
+
+	/*
+	 * The second and third guards. `applyItem` plans the entry again itself, so while its first guard
+	 * holds no payload with a stray type reaches them. Each is called alone here, with a plan item a
+	 * broken planner would hand over: the entry is clean and the payload is not.
+	 */
+
+	it.each([
+		['in the wrong case', ['Asset', 'shot'], ['shot']],
+		['unknown to the site', ['ZzNoSuchType', 'Shot'], ['ZzNoSuchType']]
+	])('the update step alone sends nothing when its request carries a valid type %s: the field is not lost', async (_, carried, names) => {
+		const site = createFakeSite().seed('Version', 'sg_link', { displayName: 'Link', dataType: 'entity', validTypes: ['Shot'] });
+		const wanted = entry({ validTypes: ['Shot', 'Asset'] });
+		const { ctx, planSite, effects } = await context(site);
+		const planned = planEntry(wanted, await ctx.reader.field('Version', 'sg_link'), planSite) as PlanItem;
+		expect(planned.update).toEqual({ properties: [{ property_name: 'valid_types', value: ['Shot', 'Asset'] }] });
+		const doctored: PlanItem = { ...planned, update: { properties: [{ property_name: 'valid_types', value: carried }] } };
+		const before = site.calls.length;
+		expect(await writeAndVerify(ctx, wanted, doctored, 'update')).toEqual({
+			state: 'failed',
+			note: { code: 'unknown-valid-types', names },
+			visibility: null,
+			abort: null
+		});
+		expect(site.calls).toHaveLength(before);
+		expect(effects).toEqual([]);
+		expect(site.get('Version', 'sg_link')).toMatchObject({ retired: false, broken: false, validTypes: ['Shot'] });
+		// The same item, as planned, is written.
+		expect(await writeAndVerify(ctx, wanted, planned, 'update')).toBeNull();
+		expect(site.get('Version', 'sg_link')?.validTypes).toEqual(['Shot', 'Asset']);
+	});
+
+	it.each([
+		['in the wrong case', ['shot'], ['shot']],
+		['unknown to the site', ['Shot', 'ZzNoSuchType'], ['ZzNoSuchType']]
+	])('the create step alone sends nothing when its payload carries a valid type %s', async (_, carried, names) => {
+		const site = createFakeSite();
+		const wanted = entry({ validTypes: ['Shot'] });
+		const { ctx, planSite, effects } = await context(site);
+		const planned = planEntry(wanted, await ctx.reader.field('Version', 'sg_link'), planSite) as PlanItem;
+		expect(planned.class).toBe('create');
+		const doctored: PlanItem = {
+			...planned,
+			create: {
+				data_type: 'entity',
+				properties: [
+					{ property_name: 'name', value: 'Link' },
+					{ property_name: 'valid_types', value: carried }
+				]
+			}
+		};
+		const before = site.calls.length;
+		expect(await plainCreate(ctx, wanted, doctored)).toEqual({ state: 'failed', note: { code: 'unknown-valid-types', names }, visibility: null, abort: null });
+		expect(site.calls).toHaveLength(before);
+		expect(effects).toEqual([]);
+		expect(site.get('Version', 'sg_link')).toBeNull();
 	});
 
 	it('marks the effect of a write that carried valid types', async () => {

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { COMMON_ENTITY_TYPES } from '$lib/io/schema';
+import { IMPORT_MODES } from './import-entity-type';
 import { makeLiveField } from './fixtures/make-live-field';
 import {
 	bucketColumnCount,
@@ -199,7 +200,7 @@ describe('buildEntries (IMP-30 to IMP-32, IMP-48, IMP-52)', () => {
 
 	it('IMP-20: the field name loses its prefix in every mode, also where the prefix is not used for the type', () => {
 		const sheet = bucket(['Shot::Lens Height', 'Lens::Focal'], [], { worksheet: 'Assets', fallback: 'Shot' });
-		for (const mode of ['automatic', 'prefix', 'worksheet', 'fallback'] as const) {
+		for (const mode of IMPORT_MODES) {
 			const { entries } = buildEntries({ buckets: [sheet], mode, delimiter: '::', site, importedAt: NOW });
 			expect(entries.map((entry) => [entry.displayName, entry.programmaticName]), mode).toEqual([
 				['Lens Height', 'sg_lens_height'],
