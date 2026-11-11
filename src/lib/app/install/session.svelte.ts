@@ -31,7 +31,7 @@ import { confirmText, installSummary, planContext, reportFileName, summaryItems,
 import { analysisRows, groupRows, viewRows, type ViewGroup, type ViewRow } from '$lib/pure/install-view';
 import type { LiveEntityType } from '$lib/pure/live-entity-types';
 import { emptyPlanText, type PlanEntry, type PlanItem } from '$lib/pure/plan';
-import { ALL_TICKED, selectAllState, setAllTicked, tickedIds, toggleTick, type PlanSelection, type SelectAllState, type TickRow } from '$lib/pure/plan-selection';
+import { ALL_TICKED, ranSelectAllState, selectAllState, setAllTicked, tickedIds, toggleTick, type PlanSelection, type SelectAllState, type TickRow } from '$lib/pure/plan-selection';
 import { INITIAL_RUN_STATE, runCounters, type RunState } from '$lib/pure/run';
 import { createRun, replan, type Run } from '$lib/pure/run-driver';
 import { errorMessage } from '$lib/pure/run-port';
@@ -102,7 +102,10 @@ export class InstallSession {
 		new Set(this.run.status === 'idle' ? tickedIds(this.selection, this.tickRows) : this.run.rows.map((row) => row.entryId))
 	);
 	readonly disabled: ReadonlySet<string> = $derived(new Set(this.tickRows.filter((row) => row.disabled).map((row) => row.entryId)));
-	readonly selectAll: SelectAllState = $derived(selectAllState(this.selection, this.tickRows));
+	/** Before a run: the ticks. Once there is one: the rows it took, so a finished row stays counted (RUN-25). */
+	readonly selectAll: SelectAllState = $derived(
+		this.run.status === 'idle' ? selectAllState(this.selection, this.tickRows) : ranSelectAllState(this.tickRows, this.ticked)
+	);
 	/** Checkboxes and the picker are locked while running and after finishing (RUN-25). */
 	readonly locked: boolean = $derived(this.run.status !== 'idle' || this.refreshing);
 	readonly running: boolean = $derived(this.run.status === 'running');
