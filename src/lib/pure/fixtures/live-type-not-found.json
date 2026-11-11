@@ -1,0 +1,13 @@
+{
+  "errors": [
+    {
+      "id": "<id>",
+      "status": 404,
+      "code": 103,
+      "title": "Not Found",
+      "source": null,
+      "detail": "Entity type 'CustomEntity08' does not exist.",
+      "meta": null
+    }
+  ]
+}
