@@ -11,3 +11,4 @@ Import them through the local module named below, never from this folder, so the
 | file | copied from | at | imported through |
 |---|---|---|---|
 | `field-name.ts` | `packages/core/src/field-name.ts`, branch `dev` | `1c6ef5f`, 2026-11-10 | `src/lib/pure/field-name.ts` |
+| `project-eligibility.ts` | `packages/core/src/project-eligibility.ts`, branch `dev` | `86adc5f`, 2026-11-10 | `src/lib/pure/project-eligibility.ts` |
