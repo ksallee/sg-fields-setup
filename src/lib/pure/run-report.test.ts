@@ -69,7 +69,7 @@ describe('runReport (RUN-20)', () => {
 				'Reverse fields (1)',
 				'  Shot.sg_link: Also makes a reverse field on Asset. It takes a field name there for good.',
 				'',
-				'Install has no undo. To remove a field, delete it in FPT.',
+				'Install has no undo. To remove a field, delete it in Flow PT.',
 				''
 			].join('\n')
 		);

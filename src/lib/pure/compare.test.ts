@@ -240,7 +240,7 @@ interface ReasonCase {
 }
 
 const REASON_CASES: Record<ReasonCode, ReasonCase | { notFromAListing: string }> = {
-	'type-conflict': { row: row('a', { programmaticName: 'sg_frames', displayName: 'Frames' }), says: 'The field on the site is Number, not Text.' },
+	'type-conflict': { row: row('a', { programmaticName: 'sg_frames', displayName: 'Frames' }), says: 'The field on the site is Number. The set wants Text.' },
 	incomplete: { row: row('a', { displayName: ' ' }), says: '' },
 	'type-not-on-site': { row: row('a', { targetEntityType: 'CustomEntity19' }), says: 'CustomEntity19 is not on this site.' },
 	undeclared: { notFromAListing: 'A listing holds only the fields the schema declares. Only the plan\'s one-field read can find a name the site answers for and does not declare.' },
@@ -255,7 +255,7 @@ const REASON_CASES: Record<ReasonCode, ReasonCase | { notFromAListing: string }>
 	'entity-needs-valid-types': { row: row('a', { dataType: 'entity' }), says: 'An entity link needs at least one valid type.' },
 	'multi-entity-needs-one-valid-type': {
 		row: row('a', { dataType: 'multi_entity', validTypes: ['Asset', 'Shot'] }),
-		says: 'A multi-entity link takes exactly one valid type. The entry has 2.'
+		says: 'A multi-entity link takes exactly one valid type. The field has 2.'
 	},
 	'default-not-in-values': {
 		row: row('a', { programmaticName: 'sg_grade', displayName: 'Grade', dataType: 'list', validValues: ['a', 'b'], defaultValue: 'z' }),
@@ -322,7 +322,7 @@ describe('compareWithSite: every reason the planner can give needs attention, wi
 		expect(result.notes).toEqual([{ kind: 'plan', reason: result.reasons[0] }]);
 		expect(explanationText(result.notes[0])).toBe(reasonText(result.reasons[0]));
 		expect(explanationText(result.notes[0])).toBe(
-			'"Described" (Shot.sg_described), description: "What it is for." on the site, none in the set. The API refuses an empty value. Clear it by hand in FPT, or fill it in the entry.'
+			'"Described" (Shot.sg_described), description: "What it is for." on the site, none in the set. The API refuses an empty value. Clear it by hand in Flow PT, or fill it in the set.'
 		);
 	});
 

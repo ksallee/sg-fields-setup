@@ -148,7 +148,7 @@ function settingLead(reason: PlanReason): string {
  */
 export function trashParts(trashPageUrl: string | null): ReasonPart[] {
 	if (trashPageUrl === null) {
-		return [{ kind: 'text', text: 'the trash for fields. In FPT, open the admin menu, then Trash, then Fields.' }];
+		return [{ kind: 'text', text: 'the trash for fields. In Flow PT, open the admin menu, then Trash, then Fields.' }];
 	}
 	return [
 		{ kind: 'link', text: 'the trash page for fields', href: trashPageUrl },
@@ -183,24 +183,24 @@ function body(reason: PlanReason): ReasonPart[] {
 		case 'type-conflict': {
 			const liveType = dataTypeLabel(reason.other ?? '');
 			return text(
-				`${field} is a ${liveType} field on the site. The set wants ${type}. A field's data type cannot be changed. Install skips it. Change the entry's data type to ${liveType}, or give the entry another name.`
+				`${field} is a ${liveType} field on the site. The set wants ${type}. A field's data type cannot be changed. Install skips it. Change the field's data type to ${liveType}, or give the field another name.`
 			);
 		}
 		case 'incomplete':
 			return text(
-				`${field} misses a required value: entity type, programmatic name, display name or data type. Complete the entry in the editor.`
+				`${field} misses a required value: entity type, programmatic name, display name or data type. Complete the field in the editor.`
 			);
 		case 'type-not-on-site':
 			return text(
-				`${field} is skipped. This site has no ${reason.entityType} entity. Enable it in FPT's admin screens, then refresh.`
+				`${field} is skipped. This site has no ${reason.entityType} entity. Enable it in Flow PT's admin screens, then refresh.`
 			);
 		case 'undeclared':
 			return text(
-				`${field} is skipped. The site answers for this name, but its schema does not list the field. The name is taken. Give the entry another name.`
+				`${field} is skipped. The site answers for this name, but its schema does not list the field. The name is taken. Give the field another name.`
 			);
 		case 'no-data-type':
 			return text(
-				`${field} is skipped. The site returned this field with no data type. The name is taken and the field cannot be compared. Check the field in FPT, or give the entry another name.`
+				`${field} is skipped. The site returned this field with no data type. The name is taken and the field cannot be compared. Check the field in Flow PT, or give the field another name.`
 			);
 		case 'non-ascii-name':
 			return text(
@@ -215,21 +215,21 @@ function body(reason: PlanReason): ReasonPart[] {
 				`${field} cannot be created. ${reason.entityType}.${reason.other} already has the display name "${reason.displayName}". The site would add a suffix to the new field's name. Rename the field on the site, or change this display name.`
 			);
 		case 'status-list-needs-values':
-			return text(`${field} cannot be created. A status list needs at least one valid value. Add valid values to the entry.`);
+			return text(`${field} cannot be created. A status list needs at least one valid value. Add valid values to the field.`);
 		case 'entity-needs-valid-types':
-			return text(`${field} cannot be created. An entity link needs at least one valid type. Add one to the entry.`);
+			return text(`${field} cannot be created. An entity link needs at least one valid type. Add one to the field.`);
 		case 'multi-entity-needs-one-valid-type': {
 			const count = Array.isArray(reason.wanted) ? reason.wanted.length : 0;
-			const has = count === 0 ? 'The entry has none. Add one.' : `The entry has ${count}. Keep one.`;
+			const has = count === 0 ? 'The field has none. Add one.' : `The field has ${count}. Keep one.`;
 			return text(`${field} cannot be created. A multi-entity link takes exactly one valid type. ${has}`);
 		}
 		case 'default-not-in-values':
 			return text(
-				`${settingLead(reason)} The site refuses a default that is missing from the valid values. Add ${formatValue(reason.wanted)} to the entry's valid values, or change its default.`
+				`${settingLead(reason)} The site refuses a default that is missing from the valid values. Add ${formatValue(reason.wanted)} to the field's valid values, or change its default.`
 			);
 		case 'unique-cannot-change':
 			return text(
-				`${settingLead(reason)} The API cannot change it. Change it by hand in FPT: open a ${reason.entityType} page, configure the field's column and turn the unique option ${onOff(reason.wanted)}. Or turn it ${onOff(reason.live)} in the entry.`
+				`${settingLead(reason)} The API cannot change it. Change it by hand in Flow PT: open a ${reason.entityType} page, configure the field's column and turn the unique option ${onOff(reason.wanted)}. Or turn it ${onOff(reason.live)} in the set.`
 			);
 		case 'multi-entity-valid-types':
 			return [
@@ -240,11 +240,11 @@ function body(reason: PlanReason): ReasonPart[] {
 			];
 		case 'default-cannot-be-cleared':
 			return text(
-				`${settingLead(reason)} The API cannot clear a default. It can only change it to another value. Clear it by hand in FPT, or give the entry a default.`
+				`${settingLead(reason)} The API cannot clear a default. It can only change it to another value. Clear it by hand in Flow PT, or give the field a default.`
 			);
 		case 'cannot-be-emptied':
 			return text(
-				`${settingLead(reason)} The API refuses an empty value. Clear it by hand in FPT, or fill it in the entry.`
+				`${settingLead(reason)} The API refuses an empty value. Clear it by hand in Flow PT, or fill it in the set.`
 			);
 		case 'valid-type-not-on-site': {
 			const names = reason.types.map((type) => `"${type.name}"`);
@@ -255,10 +255,10 @@ function body(reason: PlanReason): ReasonPart[] {
 			const rule = `This site has no entity type named ${listed(names, 'or')}.${guesses} A valid type is the API name of an entity type, case included.`;
 			// No live value: the field is absent and this is a create. The retirement was measured on an update only.
 			if (reason.live === null) {
-				return text(`${field} cannot be created. Its valid types are ${formatValue(reason.wanted)}. ${rule} Correct the entry.`);
+				return text(`${field} cannot be created. Its valid types are ${formatValue(reason.wanted)}. ${rule} Correct the field.`);
 			}
 			return text(
-				`${settingLead(reason)} ${rule} On a field that exists, the site answers a name in the wrong case with a server error and retires the field. Install sends nothing. Correct the entry.`
+				`${settingLead(reason)} ${rule} On a field that exists, the site answers a name in the wrong case with a server error and retires the field. Install sends nothing. Correct the field.`
 			);
 		}
 		case 'valid-type-removed': {
@@ -266,12 +266,12 @@ function body(reason: PlanReason): ReasonPart[] {
 			const one = reason.types.length === 1;
 			const where = one ? removed : 'each of them';
 			return text(
-				`${settingLead(reason)} Removing ${removed} retires the reverse field of this link on ${where}. A retired field keeps its name, so the name is spent, and adding the type back makes a new field under a new name. Install skips the field. Keep ${removed} in the entry, or remove ${one ? 'it' : 'them'} by hand in FPT.`
+				`${settingLead(reason)} Removing ${removed} retires the reverse field of this link on ${where}. A retired field keeps its name, so the name stays taken, and adding the type back makes a new field under a new name. Install skips the field. Keep ${removed} in the field, or remove ${one ? 'it' : 'them'} by hand in Flow PT.`
 			);
 		}
 		case 'status-values-need-default':
 			return text(
-				`${settingLead(reason)} A status list's valid values must include its default, ${formatValue(reason.other)}. Add it to the entry's valid values, or change the default.`
+				`${settingLead(reason)} A status list's valid values must include its default, ${formatValue(reason.other)}. Add it to the field's valid values, or change the default.`
 			);
 	}
 }

@@ -42,26 +42,26 @@ describe('row notes (RUN-21)', () => {
 
 	it('RUN-10: gives the menu path when the site has no trash page', () => {
 		expect(words({ code: 'retired-other-type', liveDataType: 'number', trashPageUrl: null, retired: true, retireError: null })).toBe(
-			'The name Version.sg_lens is held by a retired Number field. The set wants Text for "Lens". A retired field comes back with the data type it had, so the API cannot reuse the name. Install put Version.sg_lens back in the trash. To free the name, delete it for good from the trash for fields. In FPT, open the admin menu, then Trash, then Fields. Then install again.'
+			'The name Version.sg_lens is held by a retired Number field. The set wants Text for "Lens". A retired field comes back with the data type it had, so the API cannot reuse the name. Install put Version.sg_lens back in the trash. To free the name, delete it for good from the trash for fields. In Flow PT, open the admin menu, then Trash, then Fields. Then install again.'
 		);
 	});
 
 	it('RUN-12: says when the field under the wrong name could not be deleted, or has no known name', () => {
 		expect(words({ code: 'wrong-name', assigned: 'sg_lens_1', retired: false, retireError: 'No.' })).toBe(
-			'The site named the new field Version.sg_lens_1. The set wants Version.sg_lens for "Lens". Install could not delete the new field: No. It is live on the site. Delete it in FPT.'
+			'The site named the new field Version.sg_lens_1. The set wants Version.sg_lens for "Lens". Install could not delete the new field: No. It is live on the site. Delete it in Flow PT.'
 		);
 		expect(words({ code: 'wrong-name', assigned: '', retired: false, retireError: null })).toContain('did not say under which name');
 	});
 
 	it('finding 121: names the valid types the site does not have', () => {
 		expect(words({ code: 'unknown-valid-types', names: ['shot'] })).toBe(
-			`"Lens" (Version.sg_lens) was not sent to the site. The valid type "shot" is not on this site. A type name must match the site's exactly, capitals included. Fix the entry's valid types, or enable the entity in FPT's admin screens, then refresh.`
+			`"Lens" (Version.sg_lens) was not sent to the site. The valid type "shot" is not on this site. A type name must match the site's exactly, capitals included. Fix the field's valid types, or enable the entity in Flow PT's admin screens, then refresh.`
 		);
 	});
 
 	it('words an unreadable field and a broken step', () => {
 		expect(words({ code: 'unreadable', after: 'create', message: null })).toBe(
-			'"Lens" (Version.sg_lens) was created, then could not be read. Check the field in FPT, then retry.'
+			'"Lens" (Version.sg_lens) was created, then could not be read. Check the field in Flow PT, then retry.'
 		);
 		expect(words({ code: 'error', message: 'Broken.' })).toBe('Install could not finish "Lens" (Version.sg_lens). Broken.');
 	});

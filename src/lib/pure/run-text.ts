@@ -77,7 +77,7 @@ function retrashParts(row: Named, name: string, back: Retrash, trashPageUrl: str
 	}
 	return sentence(
 		text(
-			`Install could not put ${field} back in the trash${back.retireError ? `: ${back.retireError}` : '.'} It is live on the site now. Delete it in FPT, then delete it for good from`
+			`Install could not put ${field} back in the trash${back.retireError ? `: ${back.retireError}` : '.'} It is live on the site now. Delete it in Flow PT, then delete it for good from`
 		),
 		trashParts(trashPageUrl),
 		text('Then install again.')
@@ -109,18 +109,18 @@ export function noteParts(row: Named, note: RowNote | null): ReasonPart[] {
 		case 'unknown-valid-types': {
 			const names = note.names.map((name) => `"${name}"`).join(', ');
 			return text(
-				`${field} was not sent to the site. ${note.names.length === 1 ? `The valid type ${names} is` : `The valid types ${names} are`} not on this site. A type name must match the site's exactly, capitals included. Fix the entry's valid types, or enable the entity in FPT's admin screens, then refresh.`
+				`${field} was not sent to the site. ${note.names.length === 1 ? `The valid type ${names} is` : `The valid types ${names} are`} not on this site. A type name must match the site's exactly, capitals included. Fix the field's valid types, or enable the entity in Flow PT's admin screens, then refresh.`
 			);
 		}
 		case 'gone':
 			return text(`${field} is no longer on the site. It was there when the plan was made. Refresh to plan it again.`);
 		case 'not-applied':
 			return text(
-				`${field} ${AFTER[note.after]}. The site answered success and the field does not read back as wanted. ${differenceLines(note.differences)} Check the field in FPT, then retry.`
+				`${field} ${AFTER[note.after]}. The site answered success and the field does not read back as wanted. ${differenceLines(note.differences)} Check the field in Flow PT, then retry.`
 			);
 		case 'unreadable':
 			return text(
-				`${field} ${AFTER[note.after]}, then could not be read${note.message ? `: ${note.message}` : '.'} Check the field in FPT, then retry.`
+				`${field} ${AFTER[note.after]}, then could not be read${note.message ? `: ${note.message}` : '.'} Check the field in Flow PT, then retry.`
 			);
 		case 'refused': {
 			const said = note.status === null ? `No answer came: ${note.message}` : `The site answered ${note.status}: ${note.message}`;
@@ -151,13 +151,13 @@ export function noteParts(row: Named, note: RowNote | null): ReasonPart[] {
 		case 'wrong-name': {
 			if (note.assigned === '') {
 				return text(
-					`The site created a field for ${field} and did not say under which name. Install left it. Find it in FPT's field list for ${row.entityType} and check its name.`
+					`The site created a field for ${field} and did not say under which name. Install left it. Find it in Flow PT's field list for ${row.entityType} and check its name.`
 				);
 			}
 			const lead = `The site named the new field ${row.entityType}.${note.assigned}. The set wants ${row.entityType}.${row.programmaticName} for "${row.displayName}".`;
-			if (note.retired) return text(`${lead} Install deleted the new field. The name ${note.assigned} is spent on this site.`);
+			if (note.retired) return text(`${lead} Install deleted the new field. The name ${note.assigned} stays taken on this site.`);
 			return text(
-				`${lead} Install could not delete the new field${note.retireError ? `: ${note.retireError}` : '.'} It is live on the site. Delete it in FPT.`
+				`${lead} Install could not delete the new field${note.retireError ? `: ${note.retireError}` : '.'} It is live on the site. Delete it in Flow PT.`
 			);
 		}
 		case 'error':

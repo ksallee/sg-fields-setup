@@ -141,7 +141,7 @@ export function planContext(input: { whole: boolean; entries: number; siteUrl: s
 
 /** Said before leaving the page while a run is in progress, under "Leave the install?". */
 export function leaveQuestion(): string {
-	return 'An install is running. If you leave now it stops after the step in flight and the rest is not applied.';
+	return 'An install is running. If you leave now it stops after the step that is running and the rest is not applied.';
 }
 
 /**

@@ -272,7 +272,7 @@ describe('an update at its turn (RUN-7, RUN-15, RUN-27)', () => {
 			note: { code: 'not-applied', after: 'update', differences: [{ setting: 'description', live: 'Old.', wanted: 'New.' }] }
 		});
 		expect(rowText(row(state))).toBe(
-			'"Lens" (Version.sg_lens) was updated. The site answered success and the field does not read back as wanted. Description: "Old." on the site, "New." in the set. Check the field in FPT, then retry.'
+			'"Lens" (Version.sg_lens) was updated. The site answered success and the field does not read back as wanted. Description: "Old." on the site, "New." in the set. Check the field in Flow PT, then retry.'
 		);
 	});
 
@@ -444,7 +444,7 @@ describe('a create at its turn (RUN-8 to RUN-12)', () => {
 		expect(site.get('Version', 'sg_lens_1')?.retired).toBe(true);
 		expect(site.get('Version', 'sg_lens')?.retired).toBe(false);
 		expect(rowText(row(state))).toBe(
-			'The site named the new field Version.sg_lens_1. The set wants Version.sg_lens for "Lens". Install deleted the new field. The name sg_lens_1 is spent on this site.'
+			'The site named the new field Version.sg_lens_1. The set wants Version.sg_lens for "Lens". Install deleted the new field. The name sg_lens_1 stays taken on this site.'
 		);
 		expect(runReport(state)).toMatchObject({ created: [], retired: [{ name: 'sg_lens_1' }] });
 	});
