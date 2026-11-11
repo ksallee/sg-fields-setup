@@ -5,6 +5,16 @@
  * workbook, its relationships, the shared strings and the sheets. The XML is read by a small
  * scanner over the few elements that matter; namespace prefixes are ignored.
  *
+ * A workbook is bounded (IMP-3, the note of 2026-11-10), since a small zip can hold a huge one:
+ * - A part that declares more than `XLSX_PART_CAP_BYTES` inflated, or parts needed that declare
+ *   more than `XLSX_WORKBOOK_CAP_BYTES` together, refuse the workbook before anything is inflated.
+ * - The declared size can lie, so what really comes out is counted too, against the same two caps.
+ * - A sheet is inflated one at a time and only as far as its header row and sample: a megabyte
+ *   first, then twice as much while the sample is not full. The shared strings are read the
+ *   same way, as far as the highest index a cell asks for.
+ * - More than `XLSX_MAX_SHEETS` sheets, or a header row of more than `MAX_COLUMNS`, refuse it.
+ *   Each distinct sheet part is parsed once, however many sheets name it.
+ *
  * Rules where the spec leaves room:
  * - The header row is the first row with a non-blank cell. Blank rows above it are skipped, so a
  *   blank first row followed by a header reads the same as a header in row 1.
@@ -16,15 +26,47 @@
  * - A damaged workbook (a listed part missing, a shared string index out of range) is unreadable.
  * - Date cells stay serial numbers (IMP-46, kept on purpose).
  */
-import { strFromU8, unzipSync } from 'fflate';
-import type { ParsedTable } from './table';
+import { strFromU8 } from 'fflate';
+import { MAX_COLUMNS, type ParsedTable } from './table';
+import { ZipPartReader, zipDirectory, type ZipEntry } from './zip-parts';
 
 export const DEFAULT_SAMPLE_SIZE = 50;
+
+const MB = 1024 * 1024;
+
+/** The most one part of a workbook may inflate to. */
+export const XLSX_PART_CAP_BYTES = 64 * MB;
+/** The most the parts read from one workbook may inflate to, together. */
+export const XLSX_WORKBOOK_CAP_BYTES = 200 * MB;
+/** The most sheets a workbook may list. */
+export const XLSX_MAX_SHEETS = 200;
+
+/** How much of a sheet or of the shared strings is inflated first. It doubles from there. */
+const FIRST_READ_BYTES = 1 * MB;
+
+export interface XlsxCaps {
+	partBytes: number;
+	workbookBytes: number;
+	sheets: number;
+	columns: number;
+}
+
+export const XLSX_CAPS: XlsxCaps = {
+	partBytes: XLSX_PART_CAP_BYTES,
+	workbookBytes: XLSX_WORKBOOK_CAP_BYTES,
+	sheets: XLSX_MAX_SHEETS,
+	columns: MAX_COLUMNS
+};
 
 export interface XlsxOptions {
 	/** Data rows read per sheet after the header row. Default 50 (IMP-45). */
 	sampleSize?: number;
+	/** The bounds, for a test that needs small ones. Default `XLSX_CAPS`. */
+	caps?: Partial<XlsxCaps>;
 }
+
+/** Why a workbook over a bound is refused. */
+export type XlsxRefusal = 'part-too-large' | 'workbook-too-large' | 'too-many-sheets' | 'too-many-columns';
 
 /** One worksheet with a header row, as a parsed table. */
 export interface WorkbookSheet {
@@ -32,59 +74,162 @@ export interface WorkbookSheet {
 	table: ParsedTable;
 }
 
-export type WorkbookResult = { ok: true; sheets: WorkbookSheet[] } | { ok: false; reason: 'no-header' | 'unreadable' };
+export type WorkbookResult = { ok: true; sheets: WorkbookSheet[] } | { ok: false; reason: 'no-header' | 'unreadable' | XlsxRefusal };
 
 class Unreadable extends Error {}
+
+/** The XML stops making sense. In a part read part way, that is where the read was cut. */
+class BadXml extends Unreadable {}
+
+/** The workbook is over a bound. The one error `readXlsx` does not turn into `unreadable`. */
+class Refused extends Error {
+	constructor(readonly reason: XlsxRefusal) {
+		super(reason);
+	}
+}
 
 export function readXlsx(bytes: Uint8Array, options: XlsxOptions = {}): WorkbookResult {
 	const sampleSize = Math.max(0, Math.floor(options.sampleSize ?? DEFAULT_SAMPLE_SIZE));
 	try {
-		const sheets = readSheets(bytes, sampleSize);
+		const sheets = readSheets(new Workbook(bytes, { ...XLSX_CAPS, ...options.caps }), sampleSize);
 		return sheets.length > 0 ? { ok: true, sheets } : { ok: false, reason: 'no-header' };
-	} catch {
-		return { ok: false, reason: 'unreadable' };
+	} catch (error) {
+		return { ok: false, reason: error instanceof Refused ? error.reason : 'unreadable' };
 	}
 }
 
-function readSheets(bytes: Uint8Array, sampleSize: number): WorkbookSheet[] {
-	const pkgRels = parseRels(part(unzip(bytes, ['_rels/.rels']), '_rels/.rels'), '');
+function readSheets(book: Workbook, sampleSize: number): WorkbookSheet[] {
+	const pkgRels = parseRels(book.whole('_rels/.rels'), '');
 	const workbookPath = pkgRels.find((r) => r.type.endsWith('/officeDocument'))?.target ?? 'xl/workbook.xml';
-	const workbookRelsPath = relsPathOf(workbookPath);
 
-	const top = unzip(bytes, [workbookPath, workbookRelsPath]);
-	const listed = parseWorkbook(part(top, workbookPath));
-	const rels = parseRels(part(top, workbookRelsPath), dirOf(workbookPath));
+	const listed = parseWorkbook(book.whole(workbookPath), book.caps.sheets);
+	const rels = parseRels(book.whole(relsPathOf(workbookPath)), dirOf(workbookPath));
+	const targetById = new Map(rels.map((r) => [r.id, r.target]));
 
 	const sheetPaths = listed.map(({ relId }) => {
-		const rel = rels.find((r) => r.id === relId);
-		if (!rel) throw new Unreadable(`no relationship ${relId}`);
-		return rel.target;
+		const target = targetById.get(relId);
+		if (target === undefined) throw new Unreadable(`no relationship ${relId}`);
+		return target;
 	});
 	const sstPath = rels.find((r) => r.type.endsWith('/sharedStrings'))?.target;
 
-	const parts = unzip(bytes, sstPath ? [...sheetPaths, sstPath] : sheetPaths);
-	const shared = sstPath && parts[sstPath] ? parseSharedStrings(text(parts[sstPath])) : [];
+	// Refused on what the zip declares, before a sheet is inflated.
+	const distinct = [...new Set(sheetPaths)];
+	book.declare(sstPath !== undefined && book.has(sstPath) ? [...distinct, sstPath] : distinct);
 
+	const shared = new SharedStrings(sstPath !== undefined && book.has(sstPath) ? book.open(sstPath) : null);
+	const tables = new Map<string, ParsedTable | null>();
 	const sheets: WorkbookSheet[] = [];
 	listed.forEach(({ name }, i) => {
-		const table = parseSheet(part(parts, sheetPaths[i]), shared, sampleSize);
+		const path = sheetPaths[i];
+		if (!tables.has(path)) tables.set(path, readSheet(book.open(path), shared, sampleSize, book.caps.columns));
+		const table = tables.get(path);
 		if (table) sheets.push({ name, table });
 	});
 	return sheets;
 }
 
+/** One sheet, inflated only as far as its header row and sample (IMP-45). */
+function readSheet(part: Part, shared: SharedStrings, sampleSize: number, maxColumns: number): ParsedTable | null {
+	for (let target = FIRST_READ_BYTES; ; target *= 2) {
+		part.fill(target);
+		const read = parseSheet(part.text(), shared, sampleSize, maxColumns, !part.done);
+		if (read.complete) return read.table;
+	}
+}
+
 // ---------------------------------------------------------------------------------------------
 // Zip parts
 
-function unzip(bytes: Uint8Array, names: string[]): Record<string, Uint8Array> {
-	const wanted = new Set(names);
-	return unzipSync(bytes, { filter: (file) => wanted.has(file.name) });
+/** The workbook's zip: its directory, the bounds, and the running total of what was inflated. */
+class Workbook {
+	private readonly entries: Map<string, ZipEntry>;
+	private readonly declared = new Set<string>();
+	private declaredBytes = 0;
+	private inflatedBytes = 0;
+
+	constructor(
+		private readonly bytes: Uint8Array,
+		readonly caps: XlsxCaps
+	) {
+		this.entries = zipDirectory(bytes);
+	}
+
+	has(name: string): boolean {
+		return this.entries.has(name);
+	}
+
+	/** Counts what these parts declare against the two caps. A part is counted once. */
+	declare(names: readonly string[]): void {
+		for (const name of names) {
+			const entry = this.entries.get(name);
+			if (!entry) throw new Unreadable(`missing ${name}`);
+			if (this.declared.has(name)) continue;
+			this.declared.add(name);
+			if (entry.size > this.caps.partBytes) throw new Refused('part-too-large');
+			this.declaredBytes += entry.size;
+			if (this.declaredBytes > this.caps.workbookBytes) throw new Refused('workbook-too-large');
+		}
+	}
+
+	/** A part to read as far as needed. What comes out counts against the two caps as it comes. */
+	open(name: string): Part {
+		this.declare([name]);
+		const reader = new ZipPartReader(this.bytes, this.entries.get(name)!, (added, total) => {
+			if (total > this.caps.partBytes) throw new Refused('part-too-large');
+			this.inflatedBytes += added;
+			if (this.inflatedBytes > this.caps.workbookBytes) throw new Refused('workbook-too-large');
+		});
+		return new Part(reader);
+	}
+
+	/** A small part read whole: the relationships and the workbook. */
+	whole(name: string): string {
+		const part = this.open(name);
+		part.fill(Infinity);
+		return part.text();
+	}
 }
 
-function part(parts: Record<string, Uint8Array>, name: string): string {
-	const data = parts[name];
-	if (!data) throw new Unreadable(`missing ${name}`);
-	return text(data);
+/** One part of the zip as text, read as far as it has been filled. */
+class Part {
+	constructor(private readonly reader: ZipPartReader) {}
+
+	get done(): boolean {
+		return this.reader.done;
+	}
+
+	fill(target: number): void {
+		this.reader.fill(target);
+	}
+
+	text(): string {
+		return text(this.reader.bytes());
+	}
+}
+
+/**
+ * The shared strings, read as far as the highest index asked for. A workbook's strings can be
+ * most of its size, and a header row and a sample need the first few.
+ */
+class SharedStrings {
+	private strings: string[] = [];
+	private target = FIRST_READ_BYTES;
+	private exhausted: boolean;
+
+	constructor(private readonly part: Part | null) {
+		this.exhausted = part === null;
+	}
+
+	get(index: number): string | undefined {
+		while (index >= this.strings.length && !this.exhausted && this.part) {
+			this.part.fill(this.target);
+			this.target *= 2;
+			this.strings = parseSharedStrings(this.part.text(), !this.part.done);
+			this.exhausted = this.part.done;
+		}
+		return this.strings[index];
+	}
 }
 
 /** A part as text, BOM dropped and line ends normalized as XML 1.0 requires (§2.11). */
@@ -133,31 +278,39 @@ function parseRels(xml: string, base: string): Rel[] {
 	return rels;
 }
 
-/** The workbook's sheets in workbook order (IMP-42). */
-function parseWorkbook(xml: string): { name: string; relId: string }[] {
+/** The workbook's sheets in workbook order (IMP-42). One more than `maxSheets` refuses it. */
+function parseWorkbook(xml: string, maxSheets: number): { name: string; relId: string }[] {
 	const sheets: { name: string; relId: string }[] = [];
 	for (const tok of tokens(xml)) {
 		if (tok.kind !== 'open' || tok.name !== 'sheet') continue;
 		const a = attributes(tok.attrs);
 		if (a.id === undefined) throw new Unreadable('sheet without a relationship');
+		if (sheets.length >= maxSheets) throw new Refused('too-many-sheets');
 		sheets.push({ name: a.name ?? '', relId: a.id });
 	}
 	return sheets;
 }
 
-/** Shared strings: rich text runs concatenated, phonetic runs ignored (IMP-43). */
-function parseSharedStrings(xml: string): string[] {
+/**
+ * Shared strings: rich text runs concatenated, phonetic runs ignored (IMP-43). With `partial`
+ * the text is the start of the part, cut anywhere: the strings that are whole come back.
+ */
+function parseSharedStrings(xml: string, partial: boolean): string[] {
 	const strings: string[] = [];
 	const collect = new TextCollector();
-	for (const tok of tokens(xml)) {
-		if (tok.kind === 'open' && tok.name === 'si') {
-			collect.reset();
-			if (tok.empty) strings.push('');
-		} else if (tok.kind === 'close' && tok.name === 'si') {
-			strings.push(collect.value());
-		} else {
-			collect.feed(tok);
+	try {
+		for (const tok of tokens(xml)) {
+			if (tok.kind === 'open' && tok.name === 'si') {
+				collect.reset();
+				if (tok.empty) strings.push('');
+			} else if (tok.kind === 'close' && tok.name === 'si') {
+				strings.push(collect.value());
+			} else {
+				collect.feed(tok);
+			}
 		}
+	} catch (error) {
+		if (!partial || !(error instanceof BadXml)) throw error;
 	}
 	return strings;
 }
@@ -194,8 +347,30 @@ class TextCollector {
 // ---------------------------------------------------------------------------------------------
 // Sheets
 
-/** The header row and up to `sampleSize` data rows, or null when the sheet has no header row. */
-function parseSheet(xml: string, shared: string[], sampleSize: number): ParsedTable | null {
+/**
+ * The header row and up to `sampleSize` data rows; the table is null when the sheet has no header
+ * row. With `partial` the text is the start of the sheet, cut anywhere: `complete` is false when
+ * the cut came before the sample was full, and the caller reads further.
+ */
+function parseSheet(
+	xml: string,
+	shared: SharedStrings,
+	sampleSize: number,
+	maxColumns: number,
+	partial: boolean
+): { complete: boolean; table: ParsedTable | null } {
+	try {
+		const scan = scanSheet(xml, shared, sampleSize, maxColumns);
+		return { complete: scan.ended || !partial, table: scan.table };
+	} catch (error) {
+		// Every token before a bad one was whole, so a bad one in a partial read is the cut.
+		if (partial && error instanceof BadXml) return { complete: false, table: null };
+		throw error;
+	}
+}
+
+/** `ended` is true when the sample filled or the sheet's data closed, false when the text ran out first. */
+function scanSheet(xml: string, shared: SharedStrings, sampleSize: number, maxColumns: number): { ended: boolean; table: ParsedTable | null } {
 	let headers: string[] | null = null;
 	const rows: string[][] = [];
 
@@ -220,6 +395,7 @@ function parseSheet(xml: string, shared: string[], sampleSize: number): ParsedTa
 			if (blank) return false;
 			headers = row.map((v) => (v ?? '').trim());
 			while (headers.length > 0 && headers[headers.length - 1] === '') headers.pop();
+			if (headers.length > maxColumns) throw new Refused('too-many-columns');
 		} else if (!blank) {
 			const width = headers.length;
 			const out = row.slice(0, width);
@@ -235,7 +411,7 @@ function parseSheet(xml: string, shared: string[], sampleSize: number): ParsedTa
 				case 'row':
 					row = [];
 					col = -1;
-					if (tok.empty && endRow()) return finish(headers, rows);
+					if (tok.empty && endRow()) return { ended: true, table: finish(headers, rows) };
 					break;
 				case 'c': {
 					const a = attributes(tok.attrs);
@@ -260,10 +436,10 @@ function parseSheet(xml: string, shared: string[], sampleSize: number): ParsedTa
 					break;
 				case 'row':
 					endCell();
-					if (endRow()) return finish(headers, rows);
+					if (endRow()) return { ended: true, table: finish(headers, rows) };
 					break;
 				case 'sheetData':
-					return finish(headers, rows);
+					return { ended: true, table: finish(headers, rows) };
 				default:
 					cell?.inline.feed(tok);
 			}
@@ -272,7 +448,8 @@ function parseSheet(xml: string, shared: string[], sampleSize: number): ParsedTa
 			else cell.inline.feed(tok);
 		}
 	}
-	return finish(headers, rows);
+	// The text ran out before </sheetData>: a partial read was cut, or the whole sheet ends so.
+	return { ended: false, table: finish(headers, rows) };
 }
 
 function finish(headers: string[] | null, rows: string[][]): ParsedTable | null {
@@ -280,15 +457,14 @@ function finish(headers: string[] | null, rows: string[][]): ParsedTable | null 
 }
 
 /** A cell's text by its type (IMP-43). Numbers and dates stay as stored (IMP-46). */
-function cellValue(type: string, stored: string, inline: TextCollector, shared: string[]): string {
+function cellValue(type: string, stored: string, inline: TextCollector, shared: SharedStrings): string {
 	switch (type) {
 		case 's': {
 			if (stored.trim() === '') return '';
 			const index = Number(stored);
-			if (!Number.isInteger(index) || index < 0 || index >= shared.length) {
-				throw new Unreadable(`shared string ${stored} out of range`);
-			}
-			return shared[index];
+			const found = Number.isInteger(index) && index >= 0 ? shared.get(index) : undefined;
+			if (found === undefined) throw new Unreadable(`shared string ${stored} out of range`);
+			return found;
 		}
 		case 'inlineStr':
 			return inline.value();
@@ -339,7 +515,7 @@ function* tokens(xml: string): Generator<Token> {
 			i = after(xml, '-->', lt + 4);
 		} else if (xml.startsWith('<![CDATA[', lt)) {
 			const end = xml.indexOf(']]>', lt + 9);
-			if (end < 0) throw new Unreadable('unclosed CDATA');
+			if (end < 0) throw new BadXml('unclosed CDATA');
 			yield { kind: 'text', text: xml.slice(lt + 9, end), cdata: true };
 			i = end + 3;
 		} else if (xml.startsWith('<?', lt)) {
@@ -349,18 +525,19 @@ function* tokens(xml: string): Generator<Token> {
 		} else {
 			TAG.lastIndex = lt;
 			const m = TAG.exec(xml);
-			if (!m) throw new Unreadable(`bad tag at ${lt}`);
+			if (!m) throw new BadXml(`bad tag at ${lt}`);
+			// Read before the yield: a consumer may scan another part meanwhile, with the same regex.
+			i = TAG.lastIndex;
 			const name = localName(m[2]);
 			if (m[1]) yield { kind: 'close', name };
 			else yield { kind: 'open', name, attrs: m[3], empty: m[4] === '/' };
-			i = TAG.lastIndex;
 		}
 	}
 }
 
 function after(xml: string, end: string, from: number): number {
 	const at = xml.indexOf(end, from);
-	if (at < 0) throw new Unreadable(`missing ${end}`);
+	if (at < 0) throw new BadXml(`missing ${end}`);
 	return at + end.length;
 }
 

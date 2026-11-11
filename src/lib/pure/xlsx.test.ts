@@ -2,7 +2,15 @@ import { readFileSync } from 'node:fs';
 import { strToU8, unzipSync, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import reviewNotes from '../../../fixtures/field-sets/review-notes.json';
-import { DEFAULT_SAMPLE_SIZE, readXlsx, type WorkbookResult } from './xlsx';
+import { MAX_COLUMNS } from './table';
+import {
+	DEFAULT_SAMPLE_SIZE,
+	readXlsx,
+	XLSX_MAX_SHEETS,
+	XLSX_PART_CAP_BYTES,
+	XLSX_WORKBOOK_CAP_BYTES,
+	type WorkbookResult
+} from './xlsx';
 
 const fixture = new Uint8Array(readFileSync(new URL('../../../fixtures/source/FlowStudioDemo.xlsx', import.meta.url)));
 
@@ -378,5 +386,248 @@ describe('readXlsx refuses what is not a workbook (IMP-47, IMP-4)', () => {
 			ok: false,
 			reason: 'unreadable'
 		});
+	});
+});
+
+// ---------------------------------------------------------------------------------------------
+// Bounds (IMP-3, the note of 2026-11-10; A2, A3 and A4 of the security audit)
+
+const MB = 1024 * 1024;
+
+/** How long a hostile file may take to be refused. Generous: CI is slow, a frozen tab is minutes. */
+const REFUSAL_MS = 5000;
+
+function timed<T>(run: () => T): { result: T; ms: number } {
+	const start = performance.now();
+	const result = run();
+	return { result, ms: performance.now() - start };
+}
+
+/** A package with any files, zipped hard: a megabyte of spaces is a kilobyte on disk. */
+function pack(sheetFiles: Record<string, Uint8Array>, sheetXml: string, relsXml: string, level: 1 | 9 = 9): Uint8Array {
+	return zipSync(
+		{
+			'_rels/.rels': strToU8(`<Relationships><Relationship Id="rId1" Type="${REL}/officeDocument" Target="xl/workbook.xml"/></Relationships>`),
+			'xl/workbook.xml': strToU8(`<workbook xmlns:r="${REL}"><sheets>${sheetXml}</sheets></workbook>`),
+			'xl/_rels/workbook.xml.rels': strToU8(`<Relationships>${relsXml}</Relationships>`),
+			...sheetFiles
+		},
+		{ level }
+	);
+}
+
+/** `count` sheets; `target(i)` names the part of sheet i. */
+function listing(count: number, target: (i: number) => string): { sheetXml: string; relsXml: string } {
+	let sheetXml = '';
+	let relsXml = '';
+	for (let i = 0; i < count; i++) {
+		sheetXml += `<sheet name="S${i}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`;
+		relsXml += `<Relationship Id="rId${i + 1}" Type="${REL}/worksheet" Target="${target(i)}"/>`;
+	}
+	return { sheetXml, relsXml };
+}
+
+const HEAD = `<worksheet><sheetData><row r="1">${is('A1', 'Shot::Lens')}</row>`;
+const SAMPLE = Array.from({ length: 50 }, (_, i) => `<row><c t="inlineStr"><is><t>v${i}</t></is></c></row>`).join('');
+
+/** A sheet that starts like a real one and goes on in spaces to `bytes`. The audit's bomb. */
+function paddedSheet(bytes: number, head = HEAD + SAMPLE): Uint8Array {
+	const out = new Uint8Array(bytes).fill(0x20);
+	out.set(strToU8(head), 0);
+	return out;
+}
+
+/** Rewrites the inflated size the zip declares for every entry of that size. */
+function forgeDeclaredSize(zip: Uint8Array, real: number, declared: number): Uint8Array {
+	const out = zip.slice();
+	const view = new DataView(out.buffer);
+	for (let at = 0; at + 46 <= out.length; at++) {
+		const signature = view.getUint32(at, true);
+		// Local header: size at +22. Directory entry: size at +24.
+		if (signature === 0x04034b50 && view.getUint32(at + 22, true) === real) view.setUint32(at + 22, declared, true);
+		if (signature === 0x02014b50 && view.getUint32(at + 24, true) === real) view.setUint32(at + 24, declared, true);
+	}
+	return out;
+}
+
+describe('readXlsx bounds: inflated size (A2)', () => {
+	const one = listing(1, () => 'worksheets/sheet1.xml');
+
+	it('states the caps', () => {
+		expect(XLSX_PART_CAP_BYTES).toBe(64 * MB);
+		expect(XLSX_WORKBOOK_CAP_BYTES).toBe(200 * MB);
+	});
+
+	it('refuses a 100 KB file whose sheet declares 100 MB, before inflating it', () => {
+		const zip = pack({ 'xl/worksheets/sheet1.xml': paddedSheet(100 * MB) }, one.sheetXml, one.relsXml);
+		expect(zip.length).toBeLessThan(200 * 1024);
+		const { result, ms } = timed(() => readXlsx(zip));
+		expect(result).toEqual({ ok: false, reason: 'part-too-large' });
+		expect(ms).toBeLessThan(REFUSAL_MS);
+	});
+
+	it('stops a sheet whose header lies about its size, once more comes out than declared', () => {
+		const real = 100 * MB;
+		const zip = forgeDeclaredSize(pack({ 'xl/worksheets/sheet1.xml': paddedSheet(real, '') }, one.sheetXml, one.relsXml), real, 4096);
+		const { result, ms } = timed(() => readXlsx(zip));
+		expect(result).toEqual({ ok: false, reason: 'unreadable' });
+		expect(ms).toBeLessThan(REFUSAL_MS);
+	});
+
+	it('stops at the cap a sheet that declares the cap and holds more', () => {
+		// The real output is counted against the declared size, and the declared size against the cap.
+		const real = 24 * MB;
+		const zip = forgeDeclaredSize(pack({ 'xl/worksheets/sheet1.xml': paddedSheet(real, '') }, one.sheetXml, one.relsXml), real, 8 * MB);
+		const { result, ms } = timed(() => readXlsx(zip, { caps: { partBytes: 8 * MB } }));
+		expect(result).toEqual({ ok: false, reason: 'unreadable' });
+		expect(ms).toBeLessThan(REFUSAL_MS);
+	});
+
+	it('reads to the end of a sheet under the cap that never fills its sample', () => {
+		const zip = pack({ 'xl/worksheets/sheet1.xml': paddedSheet(40 * MB, '') }, one.sheetXml, one.relsXml);
+		const { result, ms } = timed(() => readXlsx(zip));
+		expect(result).toEqual({ ok: false, reason: 'no-header' });
+		expect(ms).toBeLessThan(REFUSAL_MS);
+	});
+
+	it('refuses parts that declare more than the workbook cap together, before inflating them', () => {
+		const four = listing(4, (i) => `worksheets/sheet${i}.xml`);
+		const sheet = paddedSheet(60 * MB);
+		const files: Record<string, Uint8Array> = {};
+		for (let i = 0; i < 4; i++) files[`xl/worksheets/sheet${i}.xml`] = sheet;
+		const zip = pack(files, four.sheetXml, four.relsXml, 1);
+		const { result, ms } = timed(() => readXlsx(zip));
+		expect(result).toEqual({ ok: false, reason: 'workbook-too-large' });
+		expect(ms).toBeLessThan(REFUSAL_MS);
+	});
+
+	it('holds the sheets to what they declare, so the total cannot pass the cap by lying', () => {
+		const three = listing(3, (i) => `worksheets/sheet${i}.xml`);
+		const files: Record<string, Uint8Array> = {};
+		for (let i = 0; i < 3; i++) files[`xl/worksheets/sheet${i}.xml`] = paddedSheet(3 * MB, HEAD);
+		const zip = pack(files, three.sheetXml, three.relsXml);
+		expect(readXlsx(zip, { caps: { workbookBytes: 10 * MB } }).ok).toBe(true);
+		expect(readXlsx(zip, { caps: { workbookBytes: 8 * MB } })).toEqual({ ok: false, reason: 'workbook-too-large' });
+		// Each sheet declares 1 MB and holds 3: the declared total passes, the first sheet does not.
+		const forged = forgeDeclaredSize(zip, 3 * MB, 1 * MB);
+		expect(readXlsx(forged, { caps: { workbookBytes: 8 * MB } })).toEqual({ ok: false, reason: 'unreadable' });
+	});
+
+	it('reads a large sheet only as far as its header and sample (IMP-45)', () => {
+		const two = listing(2, (i) => `worksheets/sheet${i}.xml`);
+		const sheet = paddedSheet(60 * MB);
+		const zip = pack({ 'xl/worksheets/sheet0.xml': sheet, 'xl/worksheets/sheet1.xml': sheet }, two.sheetXml, two.relsXml, 1);
+		const { result, ms } = timed(() => readXlsx(zip));
+		const read = sheets(result);
+		expect(read.map((s) => s.name)).toEqual(['S0', 'S1']);
+		expect(read[0].table.headers).toEqual(['Shot::Lens']);
+		expect(read[0].table.rows).toHaveLength(50);
+		expect(ms).toBeLessThan(REFUSAL_MS);
+	});
+
+	it('reads on when the header row comes after the first megabyte', () => {
+		const blanks = '<row/>'.repeat(600_000);
+		const xml = `<worksheet><sheetData>${blanks}<row>${is('A1', 'Late')}</row><row>${is('A2', 'x')}</row></sheetData></worksheet>`;
+		expect(xml.length).toBeGreaterThan(3 * MB);
+		const zip = pack({ 'xl/worksheets/sheet1.xml': strToU8(xml) }, one.sheetXml, one.relsXml);
+		expect(only(readXlsx(zip))).toEqual({ headers: ['Late'], rows: [['x']] });
+	});
+
+	it('reads the shared strings as far as the highest index asked for', () => {
+		const strings = Array.from({ length: 150_000 }, (_, i) => `string number ${i}`);
+		const xml = `<sst>${strings.map((t) => `<si><t>${t}</t></si>`).join('')}</sst>`;
+		expect(xml.length).toBeGreaterThan(4 * MB);
+		const sheet = `<worksheet><sheetData><row><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>149999</v></c></row><row><c r="A2" t="s"><v>70000</v></c></row></sheetData></worksheet>`;
+		const zip = pack(
+			{ 'xl/worksheets/sheet1.xml': strToU8(sheet), 'xl/sharedStrings.xml': strToU8(xml) },
+			one.sheetXml,
+			`${one.relsXml}<Relationship Id="rIdS" Type="${REL}/sharedStrings" Target="sharedStrings.xml"/>`
+		);
+		expect(only(readXlsx(zip))).toEqual({ headers: ['string number 0', 'string number 149999'], rows: [['string number 70000', '']] });
+	});
+
+	it('still refuses a shared string index past the end', () => {
+		const xml = `<sst>${'<si><t>x</t></si>'.repeat(100_000)}</sst>`;
+		const sheet = `<worksheet><sheetData><row><c r="A1" t="s"><v>100000</v></c></row></sheetData></worksheet>`;
+		const zip = pack(
+			{ 'xl/worksheets/sheet1.xml': strToU8(sheet), 'xl/sharedStrings.xml': strToU8(xml) },
+			one.sheetXml,
+			`${one.relsXml}<Relationship Id="rIdS" Type="${REL}/sharedStrings" Target="sharedStrings.xml"/>`
+		);
+		expect(readXlsx(zip)).toEqual({ ok: false, reason: 'unreadable' });
+	});
+});
+
+describe('readXlsx bounds: sheets (A3)', () => {
+	const small = { 'xl/worksheets/sheet1.xml': strToU8(`${HEAD}${SAMPLE}</sheetData></worksheet>`) };
+
+	it('states the cap', () => {
+		expect(XLSX_MAX_SHEETS).toBe(200);
+	});
+
+	it('refuses 100,000 sheets that all name one part, at once', () => {
+		const many = listing(100_000, () => 'worksheets/sheet1.xml');
+		const zip = pack(small, many.sheetXml, many.relsXml);
+		const { result, ms } = timed(() => readXlsx(zip));
+		expect(result).toEqual({ ok: false, reason: 'too-many-sheets' });
+		expect(ms).toBeLessThan(REFUSAL_MS);
+	});
+
+	it('refuses one sheet more than the cap', () => {
+		const over = listing(XLSX_MAX_SHEETS + 1, () => 'worksheets/sheet1.xml');
+		expect(readXlsx(pack(small, over.sheetXml, over.relsXml))).toEqual({ ok: false, reason: 'too-many-sheets' });
+	});
+
+	it('reads the cap, each sheet with its name, the one part they share parsed once', () => {
+		const full = listing(XLSX_MAX_SHEETS, () => 'worksheets/sheet1.xml');
+		const { result, ms } = timed(() => readXlsx(pack(small, full.sheetXml, full.relsXml)));
+		const read = sheets(result);
+		expect(read).toHaveLength(XLSX_MAX_SHEETS);
+		expect(read[199].name).toBe('S199');
+		// Parsed once: every sheet holds the same table.
+		expect(read[199].table).toBe(read[0].table);
+		expect(ms).toBeLessThan(REFUSAL_MS);
+	});
+
+	it('finds each relationship without a scan per sheet', () => {
+		const many = listing(XLSX_MAX_SHEETS, (i) => `worksheets/s${i}.xml`);
+		const rels = listing(50_000, (i) => `worksheets/other${i}.xml`).relsXml.replaceAll('rId', 'rOther');
+		const { result, ms } = timed(() => readXlsx(pack({}, many.sheetXml, rels + many.relsXml)));
+		expect(result).toEqual({ ok: false, reason: 'unreadable' });
+		expect(ms).toBeLessThan(REFUSAL_MS);
+	});
+});
+
+describe('readXlsx bounds: columns (A4)', () => {
+	const one = listing(1, () => 'worksheets/sheet1.xml');
+	const sheetOf = (row: string): Record<string, Uint8Array> => ({
+		'xl/worksheets/sheet1.xml': strToU8(`<worksheet><sheetData>${row}</sheetData></worksheet>`)
+	});
+
+	it('states the cap', () => {
+		expect(MAX_COLUMNS).toBe(2000);
+	});
+
+	it('refuses a header in column XFD, after three million blank rows', () => {
+		const blanks = '<row/>'.repeat(3_000_000);
+		const zip = pack(sheetOf(`${blanks}<row>${is('XFD1', 'last')}</row>`), one.sheetXml, one.relsXml);
+		expect(zip.length).toBeLessThan(100 * 1024);
+		const { result, ms } = timed(() => readXlsx(zip));
+		expect(result).toEqual({ ok: false, reason: 'too-many-columns' });
+		expect(ms).toBeLessThan(REFUSAL_MS);
+	});
+
+	it('reads a header row of the cap and refuses one more', () => {
+		const cells = (count: number): string => Array.from({ length: count }, (_, i) => `<c t="inlineStr"><is><t>h${i}</t></is></c>`).join('');
+		expect(only(readXlsx(pack(sheetOf(`<row>${cells(MAX_COLUMNS)}</row>`), one.sheetXml, one.relsXml))).headers).toHaveLength(MAX_COLUMNS);
+		expect(readXlsx(pack(sheetOf(`<row>${cells(MAX_COLUMNS + 1)}</row>`), one.sheetXml, one.relsXml))).toEqual({
+			ok: false,
+			reason: 'too-many-columns'
+		});
+	});
+
+	it('counts the header row alone: a data cell far to the right is cut as before (IMP-44)', () => {
+		const zip = pack(sheetOf(`<row>${is('A1', 'h')}</row><row>${is('A2', 'x')}${is('XFD2', 'far')}</row>`), one.sheetXml, one.relsXml);
+		expect(only(readXlsx(zip))).toEqual({ headers: ['h'], rows: [['x']] });
 	});
 });

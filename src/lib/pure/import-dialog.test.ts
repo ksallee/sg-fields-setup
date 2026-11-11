@@ -78,6 +78,13 @@ describe('problem messages (IMP-2 to IMP-5)', () => {
 	it('IMP-5: a file with no header row is named', () => {
 		expect(fileProblemText('no-header', 'empty.csv')).toBe('"empty.csv" has no header row.');
 	});
+
+	it('IMP-3, the note of 2026-11-10: a file over a bound is named with the bound', () => {
+		expect(fileProblemText('part-too-large', 'bomb.xlsx')).toBe('"bomb.xlsx" holds a part over 64 MB once unpacked.');
+		expect(fileProblemText('workbook-too-large', 'bomb.xlsx')).toBe('"bomb.xlsx" is over 200 MB once unpacked.');
+		expect(fileProblemText('too-many-sheets', 'tabs.xlsx')).toBe('"tabs.xlsx" has more than 200 sheets.');
+		expect(fileProblemText('too-many-columns', 'wide.csv')).toBe('"wide.csv" has more than 2,000 columns.');
+	});
 });
 
 describe('a file to its buckets (IMP-4 to IMP-6, IMP-41, IMP-47)', () => {
@@ -113,6 +120,10 @@ describe('a file to its buckets (IMP-4 to IMP-6, IMP-41, IMP-47)', () => {
 		expect(result.buckets[0].label).toMatch(/^FlowStudioDemo\.xlsx \(.+\)$/);
 		expect(result.buckets[0].table.headers).toHaveLength(72);
 		expect(result.buckets[0].fallback).toBe('');
+	});
+
+	it('IMP-3, the note of 2026-11-10: a table over the column bound is refused by its reason', () => {
+		expect(bucketsFromFile('wide.csv', { kind: 'csv', text: 'a,'.repeat(2001) })).toEqual({ ok: false, problem: 'too-many-columns' });
 	});
 
 	it('IMP-47: bytes that are not a workbook are unreadable', () => {

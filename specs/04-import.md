@@ -11,6 +11,19 @@ a data type. No row data is stored or sent to the site.
   message; other files in the same drop still load.
 - IMP-3. A file over the size cap (default 15 MB) is refused before it is read, with a message
   naming the file and the cap.
+  - Note, 2026-11-10 (security audit A2 to A4, #46). The 15 MB are the file as stored. A workbook
+    is a zip, and a small one can unpack to gigabytes, so what a file holds is bounded too. Each
+    bound refuses the file with a message naming it and the bound, as IMP-4 does:
+    - a workbook part over 64 MB unpacked (`XLSX_PART_CAP_BYTES`);
+    - the parts read from one workbook over 200 MB unpacked together (`XLSX_WORKBOOK_CAP_BYTES`);
+    - more than 200 sheets in a workbook (`XLSX_MAX_SHEETS`);
+    - more than 2,000 columns in a worksheet's header row or on any line of a CSV (`MAX_COLUMNS`).
+
+    The sizes are checked on what the zip declares, before anything is unpacked, and counted
+    again on what really comes out: a part that unpacks past its declared size is unreadable
+    (IMP-4). A sheet is unpacked only as far as its header row and sample (IMP-45), and the shared
+    strings as far as the cells read ask for. Parsing still runs on the page's own thread; moving
+    it to a worker is a possible follow-up.
 - IMP-4. A file that cannot be parsed is refused with a message naming it.
 - IMP-5. A file with no readable header row is refused with a message naming it.
 - IMP-6. Each CSV becomes one **bucket**. Each worksheet of an XLSX that has a header row becomes

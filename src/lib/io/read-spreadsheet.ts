@@ -14,7 +14,7 @@ import { exceedsSizeCap, IMPORT_SIZE_CAP_BYTES, spreadsheetKind, type FileConten
 /** The part of a `File` this reads. */
 export type ReadableFile = Pick<File, 'name' | 'size' | 'arrayBuffer'>;
 
-export type SpreadsheetRead = { ok: true; content: FileContent } | { ok: false; problem: Exclude<FileProblem, 'no-header'> };
+export type SpreadsheetRead = { ok: true; content: FileContent } | { ok: false; problem: Extract<FileProblem, 'unsupported' | 'too-large' | 'unreadable'> };
 
 /** CSV bytes as text. Never throws. */
 export function decodeText(bytes: Uint8Array): string {
