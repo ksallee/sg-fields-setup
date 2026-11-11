@@ -150,14 +150,16 @@ function updateRow(workingCopy: WorkingCopy, key: string, change: (row: Row) => 
 
 /**
  * The definition with `patch` applied by the rules of one row: derived mode keeps the
- * programmatic name read-only and re-derives it on a display name edit (EDT-25, MOD-17); a blank
- * display name gives a blank name (MOD-19).
+ * programmatic name read-only and re-derives it on a display name edit, from the display name as
+ * it will be stored, trimmed (EDT-25, MOD-17, MOD-7); a blank display name gives a blank name
+ * (MOD-19).
  */
 function applyPatch(row: Row, patch: Partial<EntryDefinition>): Row {
 	if (row.nameMode === 'manual') return { ...row, ...patch };
 	const { programmaticName: _ignored, ...rest } = patch;
 	const next = { ...row, ...rest };
-	if ('displayName' in patch) next.programmaticName = predictFieldName(next.displayName) ?? '';
+	// From the trimmed display name: that is what is stored (MOD-7) and what the site is sent.
+	if ('displayName' in patch) next.programmaticName = predictFieldName(next.displayName.trim()) ?? '';
 	return next;
 }
 
@@ -224,12 +226,25 @@ export function removeRow(workingCopy: WorkingCopy, key: string): WorkingCopy {
 }
 
 /**
- * The seam for re-sync from site (EDT-42, issue #8): replaces a row's nine definition keys with
- * `definition`, wholesale. Nothing else moves: not the key, the name mode, nor the snapshot. No
- * derivation, no mirror lock: re-sync is how a mirror row catches up with the site.
+ * The seam for re-sync from site (EDT-42): replaces a row's nine definition keys with
+ * `definition`, wholesale, and its three snapshot fields with `snapshot` when one is given.
+ * Nothing else moves: not the key, nor the name mode. No derivation, no mirror lock: re-sync is
+ * how a mirror row catches up with the site. A snapshot is never compared (EDT-3): a refreshed
+ * one alone leaves the set clean, and it is stored when the row's definition is (`saveRequest`).
  */
-export function replaceDefinition(workingCopy: WorkingCopy, key: string, definition: EntryDefinition): WorkingCopy {
-	return updateRow(workingCopy, key, (row) => ({ ...row, ...definitionOf(definition) }));
+export function replaceDefinition(
+	workingCopy: WorkingCopy,
+	key: string,
+	definition: EntryDefinition,
+	snapshot?: EntrySnapshot
+): WorkingCopy {
+	return updateRow(workingCopy, key, (row) => ({
+		...row,
+		...definitionOf(definition),
+		...(snapshot
+			? { snapshot: snapshot.snapshot, snapshotSite: snapshot.snapshotSite, snapshotTime: snapshot.snapshotTime }
+			: {})
+	}));
 }
 
 function sameList(a: readonly string[], b: readonly string[]): boolean {

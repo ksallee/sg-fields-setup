@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry, FieldSet } from './model';
-import { addRow, editRow, isDirty, openWorkingCopy, removeRow, rowByKey, setDescription, setName } from './working-copy';
+import {
+	addRow,
+	editRow,
+	isDirty,
+	openWorkingCopy,
+	removeRow,
+	replaceDefinition,
+	rowByKey,
+	setDescription,
+	setName
+} from './working-copy';
 import { addedKeys, adoptStored, afterSave, draftsOf, installEntries, saveRequest } from './working-copy-save';
 
 const SET: FieldSet = {
@@ -73,6 +83,17 @@ describe('saveRequest', () => {
 		expect(saveRequest(wc).changed).toEqual([{ ...snapshotted, displayName: 'Lens B' }]);
 	});
 
+	it('EDT-42, EDT-45: a re-synced row that changed is sent with its refreshed snapshot, not the saved one', () => {
+		const fresh = { snapshot: { data_type: { value: 'list', editable: false } }, snapshotSite: 'https://site.example', snapshotTime: null };
+		const wc = replaceDefinition(open(), 'b', { ...snapshotted, displayName: 'Lens B', dataType: 'list', validValues: ['x'] }, fresh);
+		expect(saveRequest(wc).changed).toEqual([{ ...snapshotted, displayName: 'Lens B', dataType: 'list', validValues: ['x'], ...fresh }]);
+	});
+
+	it('EDT-42, EDT-45: a re-synced row whose definition did not move is not written', () => {
+		const wc = replaceDefinition(open(), 'b', snapshotted, { snapshot: { other: true }, snapshotSite: 'https://site.example', snapshotTime: null });
+		expect(saveRequest(wc).changed).toEqual([]);
+	});
+
 	it('EDT-44, EDT-18: added rows are sent as cleaned drafts, in row order', () => {
 		let wc = addRow(addRow(open(), 'new-1', 'Shot'), 'new-2', 'Asset');
 		wc = editRow(wc, 'new-2', { displayName: 'Focal ', dataType: 'list', validValues: [' 35 ', ''] });
@@ -94,7 +115,7 @@ describe('saveRequest', () => {
 			},
 			{
 				targetEntityType: 'Asset',
-				programmaticName: 'sg_focal_',
+				programmaticName: 'sg_focal',
 				displayName: 'Focal',
 				dataType: 'list',
 				validTypes: [],
