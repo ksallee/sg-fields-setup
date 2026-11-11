@@ -39,6 +39,25 @@ yourself. A production build answers that route 404 and always signs in.
 Every schema write spends a field name for good. Write to the sandbox only, with the corpus's
 throwaway naming.
 
+## The fake site
+
+The install screen is the only one that writes to a site. To drive its run with no network and
+nothing written anywhere, under `vite dev` only:
+
+1. On the list, "Import set file": `fixtures/install-drive/install-drive.fieldset.json`.
+2. Open its install screen and add `?fake` to the address.
+
+The screen then works on a site held in memory (`src/lib/io/install-site-fake.ts`, on
+`src/lib/pure/fixtures/fake-site.ts`), seeded for that set: every class of the plan, a revive, a
+retired field of another type, a create refused once, a visibility write that fails once. The
+header of `install-site-fake.ts` lists them. `?fake&delay=400` slows each call so a cancel can
+land mid-run. `?fake&faults=0` turns the two faults off. `window.__installFake` is the fake.
+
+A production build cannot reach it: the flag is read behind `import.meta.env.DEV`, and the
+build drops the branch and the module. `src/lib/io/install-site.test.ts` holds the source to
+that. To check a build: `pnpm build`, then
+`grep -rl "fake.shotgrid.autodesk.com" .svelte-kit/output .vercel/output` finds nothing.
+
 ## Deploy
 
 From `main` alone. `vercel.json` names SvelteKit as the framework, enables `main` under

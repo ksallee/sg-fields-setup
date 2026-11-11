@@ -33,8 +33,8 @@ importers:
         specifier: ^0.8.3
         version: 0.8.3
       sg-widgets-core:
-        specifier: ^0.3.1
-        version: 0.3.1
+        specifier: ^0.4.0
+        version: 0.4.0
       tailwind-merge:
         specifier: ^3.7.0
         version: 3.7.0
@@ -1082,8 +1082,8 @@ packages:
   set-cookie-parser@3.1.2:
     resolution: {integrity: sha512-5/r/lTwbJ3zQ+qwdUFZYeRNqda7P5HD8zQKqlSjdGt1/S0cjLAphHusj4Y58ahDtWn/g32xrIS58/ikOvwl0Lw==}
 
-  sg-widgets-core@0.3.1:
-    resolution: {integrity: sha512-4e99RumJk2xWSo4uKiZzFrIKyWQzP2qyRFzbIHP3zX7tngtpvmqNFCEDxShUxqQxPcpTt1XPTshrrzaU23rfuA==}
+  sg-widgets-core@0.4.0:
+    resolution: {integrity: sha512-SfS7FgLCuJSpwxdtv4DcD7p/pkh9CpDB7MV0UvjM1FdDMvy1G3VB0ISXmYBUXSrjivQNfZBYiEZswLm3Wjo4Ug==}
     engines: {node: '>=22'}
 
   shadcn-svelte@1.7.0:
@@ -2083,7 +2083,7 @@ snapshots:
 
   set-cookie-parser@3.1.2: {}
 
-  sg-widgets-core@0.3.1: {}
+  sg-widgets-core@0.4.0: {}
 
   shadcn-svelte@1.7.0(svelte@5.57.1):
     dependencies:

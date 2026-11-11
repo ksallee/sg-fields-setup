@@ -13,9 +13,7 @@
  * | revive               | `POST /schema/<Type>/fields/<field>` `{revive: true}`                    |
  * | the trash page       | `POST /entity/pages/_search`, a read                                     |
  *
- * The HTTP is sg-widgets core's `RestSchemaClient`. No npm release carries it yet, so it is the
- * copy in `$lib/vendor-core/schema-write.ts`, imported here and nowhere else. Issue #21 swaps the
- * import below for `sg-widgets-core`.
+ * The HTTP is sg-widgets core's `RestSchemaClient` (0.4.0), built here and nowhere else.
  *
  * A refusal comes out as core's `SchemaApiError`: `status`, `message` (the first error's
  * `detail`, else its `title`) and `source`. That is what `$lib/pure/run-port` reads.
@@ -24,11 +22,10 @@
  * one of the forms above. Such a rejection has no `status`, so the run reads it as a failure
  * that is not the site's answer and stops (RUN-17). A wrong request never leaves.
  */
-import type { RestClientOptions, SearchOptions, SearchResult } from 'sg-widgets-core';
+import { RestSchemaClient, type RestClientOptions, type SchemaClient, type SearchOptions, type SearchResult } from 'sg-widgets-core';
 import type { CreatePayload, PropertyWrite } from '$lib/pure/plan';
 import type { RunReader, SchemaWritePort } from '$lib/pure/run-port';
 import type { VisibleWrite } from '$lib/pure/visibility-value';
-import { RestSchemaClient, type SchemaClient } from '$lib/vendor-core/schema-write';
 import type { LiveSchema } from './schema';
 import type { VisibilityWriter } from './visibility';
 
@@ -167,12 +164,12 @@ export interface PageLister {
 }
 
 /** The `Page` row that lists retired fields (corpus finding 120). Its id differs per site. */
-export const TRASH_PAGE_FILTERS = {
-	logical_operator: 'and' as const,
+export const TRASH_PAGE_FILTERS: { logical_operator: 'and'; conditions: [string, 'is', string][] } = {
+	logical_operator: 'and',
 	conditions: [
 		['ui_category', 'is', 'trash'],
 		['entity_type', 'is', 'DisplayColumn']
-	] as [string, string, unknown][]
+	]
 };
 
 async function lookUpTrashPage(client: PageLister, siteUrl: string): Promise<{ url: string | null; failed: boolean }> {

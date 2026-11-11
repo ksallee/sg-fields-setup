@@ -23,7 +23,7 @@
  *   decides nothing.
  */
 import type { PlanScope } from './plan';
-import { isEligibleProject, type EligibilityFlags } from './project-eligibility';
+import { PROJECT_ELIGIBILITY_FIELDS, isEligibleProject, type EligibilityFlags } from './project-eligibility';
 
 /** A project as the plan and the steps carry it. */
 export interface ScopeProject {
@@ -120,6 +120,16 @@ export function resolveScope(read: ProjectsRead, chosenIds: readonly number[]): 
 		problem: null
 	};
 }
+
+/**
+ * The filter the project picker searches with, so that it offers the eligible projects and no
+ * other (VIS-2, Q4): no template, no demo project, nothing archived. The same three checkboxes
+ * as `isEligibleProject`. What is chosen still goes through `resolveScope`, which is the rule.
+ */
+export const ELIGIBLE_PROJECT_FILTERS: { logical_operator: 'and'; conditions: [string, 'is', boolean][] } = {
+	logical_operator: 'and',
+	conditions: PROJECT_ELIGIBILITY_FIELDS.map((field): [string, 'is', boolean] => [field, 'is', false])
+};
 
 /** The summary's scope line (RUN-5): all eligible projects with their number, or the number chosen. */
 export function scopeSummary(resolved: VisibilityScope): string {
