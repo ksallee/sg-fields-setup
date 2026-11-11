@@ -15,6 +15,7 @@
  */
 import { RestClient, RestSchemaClient, SchemaApiError, SgApiError, type RestClientOptions } from 'sg-widgets-core';
 import { isFieldMissing, type FieldReply } from '$lib/pure/live-field';
+import { siteErrorDetail } from '$lib/pure/site-error';
 import type { SchemaSource } from './schema';
 
 /** A name that is one path segment. Refused before asking, so a bad name never reaches the site. */
@@ -24,18 +25,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-/** The first error's `detail`: the line that says which name is wrong (corpus `findings/002`). */
-function detailOf(body: unknown): string | null {
-	const errors = isRecord(body) ? body['errors'] : null;
-	const first: unknown = Array.isArray(errors) ? errors[0] : null;
-	const detail = isRecord(first) ? first['detail'] : null;
-	return typeof detail === 'string' && detail !== '' ? detail : null;
-}
-
 /** The same refusal, saying what the site said. `RestClient`'s own message is the title, "Not Found". */
 function withDetail(error: unknown): unknown {
 	if (!(error instanceof SgApiError)) return error;
-	const detail = detailOf(error.body);
+	const detail = siteErrorDetail(error.body);
 	return detail ? new SchemaApiError(error.status, error.body, detail) : error;
 }
 

@@ -21,7 +21,7 @@
  * every plan and after every run (RUN-26).
  */
 import type { EntityRef } from 'sg-widgets-core';
-import { notify } from '$lib/app/toast';
+import { errorMessage, notify } from '$lib/app/toast';
 import { downloadText } from '$lib/io/download';
 import { readInstallSelection } from '$lib/io/install-selection';
 import { installSite, type InstallSite } from '$lib/io/install-site';
@@ -35,9 +35,9 @@ import { emptyPlanText, type PlanEntry, type PlanItem } from '$lib/pure/plan';
 import { ALL_TICKED, ranSelectAllState, selectAllState, setAllTicked, tickedIds, toggleTick, type PlanSelection, type SelectAllState, type TickRow } from '$lib/pure/plan-selection';
 import { INITIAL_RUN_STATE, runCounters, type RunState } from '$lib/pure/run';
 import { createRun, replan, type Run } from '$lib/pure/run-driver';
-import { errorMessage } from '$lib/pure/run-port';
 import { reportIsEmpty, reportText, runReport } from '$lib/pure/run-report';
 import { summaryText } from '$lib/pure/run-text';
+import { siteErrorMessage } from '$lib/pure/site-error';
 import { analysisStatus, rowVisibility, type RowVisibility, type VisibilityAnalysis } from '$lib/pure/visibility-analysis';
 import { createApplyVisibility, retryVisibility } from '$lib/pure/visibility-run';
 import { analysisProjects, resolveScope, scopeNotes, scopeSummary, type ProjectsRead, type VisibilityScope } from '$lib/pure/visibility-scope';
@@ -165,6 +165,7 @@ export class InstallSession {
 			this.whole = taken.kind === 'whole';
 			this.entries = taken.entries;
 		} catch (error) {
+			// A store error: its own plain sentence, or the fallback. Never the raw text (docs/design.md).
 			this.load = { status: 'set-failed', message: errorMessage(error) };
 			return;
 		}
@@ -178,7 +179,7 @@ export class InstallSession {
 			}
 			this.site = result.site;
 		} catch (error) {
-			this.load = { status: 'disconnected', problem: errorMessage(error) };
+			this.load = { status: 'disconnected', problem: siteErrorMessage(error) };
 			return;
 		}
 		await this.#plan();
@@ -211,7 +212,7 @@ export class InstallSession {
 		} catch (error) {
 			if (this.#disposed) return;
 			this.items = [];
-			this.load = { status: 'plan-failed', message: errorMessage(error) };
+			this.load = { status: 'plan-failed', message: siteErrorMessage(error) };
 		} finally {
 			this.refreshing = false;
 		}
@@ -321,7 +322,7 @@ export class InstallSession {
 			else if (state.status === 'cancelled' || counters.visibilityWarnings > 0) notify.warning(text, undefined, ABOVE_FOOTER);
 			else notify.success(text, undefined, ABOVE_FOOTER);
 		} catch (error) {
-			if (!this.#disposed) notify.error(errorMessage(error), undefined, ABOVE_FOOTER);
+			if (!this.#disposed) notify.error(siteErrorMessage(error), undefined, ABOVE_FOOTER);
 		} finally {
 			if (!this.#disposed && this.site) {
 				// New fields exist now, and visibility changed.

@@ -31,7 +31,8 @@ import {
 	type VisibilityRead,
 	type VisibilityReadResult
 } from '$lib/pure/visibility-analysis';
-import { errorMessage, type VisibilityPort } from '$lib/pure/visibility-run';
+import { siteErrorMessage } from '$lib/pure/site-error';
+import type { VisibilityPort } from '$lib/pure/visibility-run';
 import type { ProjectRow, ProjectsRead, ScopeProject } from '$lib/pure/visibility-scope';
 import { readVisibilityListing, type VisibleWrite } from '$lib/pure/visibility-value';
 import type { SchemaSource } from './schema';
@@ -84,7 +85,7 @@ export async function loadProjects(client: ProjectLister): Promise<ProjectsRead>
 	try {
 		return { status: 'loaded', projects: await readProjects(client) };
 	} catch (error) {
-		return { status: 'failed', message: errorMessage(error) };
+		return { status: 'failed', message: siteErrorMessage(error) };
 	}
 }
 
@@ -121,7 +122,7 @@ export async function readTypeVisibility(source: VisibilitySource, read: Visibil
 	try {
 		return { ok: true, fields: readVisibilityListing(await source.readRawFields(read.entityType, read.projectId)) };
 	} catch (error) {
-		return { ok: false, message: errorMessage(error) };
+		return { ok: false, message: siteErrorMessage(error) };
 	}
 }
 
@@ -177,7 +178,7 @@ export function createVisibilityAnalyser(source: VisibilitySource, options: { ca
 				(index, result) => {
 					const read = first.reads[index];
 					if (!read) return;
-					const answer: VisibilityReadResult = result.ok ? result.value : { ok: false, message: errorMessage(result.error) };
+					const answer: VisibilityReadResult = result.ok ? result.value : { ok: false, message: siteErrorMessage(result.error) };
 					held.analysis = foldRead(held.analysis, read, answer);
 					for (const listener of held.listeners) tell(listener, held.analysis);
 				}

@@ -36,7 +36,8 @@
 import { needsRead, planEntry, type PlanEntry, type PlanItem, type PlanSite } from './plan';
 import type { LiveField, LiveFieldRead } from './live-field';
 import { applyItem } from './run-item';
-import { errorMessage, type RunReader, type SchemaWritePort } from './run-port';
+import type { RunReader, SchemaWritePort } from './run-port';
+import { siteErrorMessage } from './site-error';
 import { INITIAL_RUN_STATE, madeByRun, needsVisibilityRetry, reduceRun, resumeIds, retryIds, type FieldEffect, type RunEvent, type RunState } from './run';
 import type { ApplyVisibility, FieldOrigin, VisibilityHooks, VisibilityOutcome } from './visibility-types';
 
@@ -118,7 +119,7 @@ async function showOn(
 		outcome = await apply({ isCancelled, onProgress: (done, total) => emit({ type: 'visibility-progress', entryId, done, total }) });
 	} catch (failure) {
 		// The step promises never to throw. If it does, the row carries the error and stays done.
-		error = errorMessage(failure);
+		error = siteErrorMessage(failure);
 	}
 	emit({ type: 'visibility-finished', entryId, outcome, error });
 	return outcome?.cancelled === true;
@@ -141,7 +142,7 @@ export async function drive(
 	try {
 		({ site, items } = await replan(deps, entries));
 	} catch (error) {
-		emit({ type: 'finished', status: 'finished', error: errorMessage(error) });
+		emit({ type: 'finished', status: 'finished', error: siteErrorMessage(error) });
 		return;
 	}
 	emit({ type: 'planned', items });

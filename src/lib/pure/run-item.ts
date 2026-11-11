@@ -60,7 +60,6 @@ import { diffEntry, wantedEntry, withoutRepeats } from './plan-diff';
 import { planEntry, unknownValidTypes, type PlanEntry, type PlanItem, type PlanSite, type PropertyWrite } from './plan';
 import {
 	asRefusal,
-	errorMessage,
 	isRetiredNameRefusal,
 	readRevive,
 	retiredNameIn,
@@ -68,6 +67,7 @@ import {
 	type RunReader,
 	type SchemaWritePort
 } from './run-port';
+import { siteErrorMessage } from './site-error';
 import type { FieldEffect, Retrash, RowNote, RunAction, WriteKind } from './run';
 import type { FieldOrigin } from './visibility-types';
 
@@ -96,7 +96,7 @@ const failed = (note: RowNote, abort: string | null = null): ItemResult => ({ st
 /** A call that threw: the site's refusal, or no answer at all. */
 function threw(action: RunAction, error: unknown): ItemResult {
 	const refusal = asRefusal(error);
-	const message = errorMessage(error);
+	const message = siteErrorMessage(error);
 	return failed({ code: 'refused', action, status: refusal?.status ?? null, message }, refusal ? null : message);
 }
 
@@ -144,7 +144,7 @@ async function verify(ctx: ItemContext, entry: PlanEntry, item: PlanItem, after:
 	const { read, failure } = await readNow(ctx, item);
 	if (read === null) {
 		const refusal = asRefusal(failure);
-		const message = errorMessage(failure);
+		const message = siteErrorMessage(failure);
 		return failed({ code: 'unreadable', after, message }, refusal ? null : message);
 	}
 	if (read.kind === 'absent') return failed({ code: 'unreadable', after, message: null });
@@ -181,7 +181,7 @@ async function retrash(ctx: ItemContext, entityType: string, name: string): Prom
 	try {
 		await ctx.port.retireField(entityType, name);
 	} catch (error) {
-		const message = errorMessage(error);
+		const message = siteErrorMessage(error);
 		return { retired: false, retireError: message, abort: asRefusal(error) ? null : message };
 	}
 	try {
@@ -192,7 +192,7 @@ async function retrash(ctx: ItemContext, entityType: string, name: string): Prom
 	} catch (error) {
 		// The delete was answered. Only the check failed: the field is taken as retired.
 		ctx.onEffect({ kind: 'retired', name });
-		return { retired: true, retireError: null, abort: asRefusal(error) ? null : errorMessage(error) };
+		return { retired: true, retireError: null, abort: asRefusal(error) ? null : siteErrorMessage(error) };
 	}
 	ctx.onEffect({ kind: 'retired', name });
 	return { retired: true, retireError: null, abort: null };
@@ -220,7 +220,7 @@ async function afterRevive(ctx: ItemContext, entry: PlanEntry, item: PlanItem): 
 	ctx.onEffect({ kind: 'revived', name: item.programmaticName });
 	const { read, failure } = await readNow(ctx, item);
 	if (read === null) {
-		const message = errorMessage(failure);
+		const message = siteErrorMessage(failure);
 		return failed({ code: 'unreadable', after: 'revive', message }, asRefusal(failure) ? null : message);
 	}
 	if (read.kind === 'absent') return failed({ code: 'unreadable', after: 'revive', message: null });
@@ -329,7 +329,7 @@ export async function applyItem(ctx: ItemContext, entry: PlanEntry, item: PlanIt
 			}
 		}
 	} catch (error) {
-		const message = errorMessage(error);
+		const message = siteErrorMessage(error);
 		return failed({ code: 'error', message }, message);
 	}
 }
