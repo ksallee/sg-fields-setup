@@ -56,9 +56,15 @@ describe('rowCounters', () => {
 		expect(NEVER_REMOVED).toBe('The tool never removes visibility from a field that existed before the run.');
 	});
 
-	it('VIS-4: a create row counts what it adds and what it hides', () => {
+	it('VIS-4, finding 115: a create row says where the field will be visible after the run, not what it adds', () => {
+		const counters = rowCounters(state({ class: 'create', toAdd: projects(14) }));
+		expect(counters.map((counter) => [counter.kind, counter.label])).toEqual([['newVisible', 'visible on 14']]);
+		expect(counters[0]!.tooltip).toBe(`A new field is visible on every project. It will be visible on ${projectNames(projects(14))}.`);
+	});
+
+	it('VIS-4: a create row in a chosen scope also says where it will be hidden', () => {
 		const counters = rowCounters(state({ class: 'create', toAdd: projects(2), toHide: projects(25, 3) }));
-		expect(counters.map((counter) => counter.label)).toEqual(['2 to add', '25 to hide']);
+		expect(counters.map((counter) => counter.label)).toEqual(['visible on 2', 'hidden on 25']);
 		expect(counters[1]!.tooltip).toBe(`A new field. To be hidden on ${projectNames(projects(25, 3))}.`);
 	});
 
@@ -89,28 +95,41 @@ describe('nothingLeftToDo', () => {
 describe('visibilityCount', () => {
 	const scope = { kind: 'all-eligible' as const, projects: projects(4) };
 
-	it('VIS-10: the sum of to add over the selected rows once the analysis is loaded', () => {
+	it('VIS-10, finding 115: the projects to add on existing rows; a create adds nothing', () => {
 		const count = visibilityCount([state({ toAdd: projects(2), visible: projects(2, 3) }), state({ class: 'create', toAdd: projects(4) })], scope);
-		expect(count).toEqual({ count: 6, upperBound: false, hides: 0, text: '6 visibility changes' });
+		expect(count).toEqual({ count: 2, adds: 2, upperBound: false, hides: 0, text: '2 visibility changes' });
 	});
 
-	it('VIS-10: before that, an upper bound, marked as such', () => {
+	it('VIS-10: 4 creates and 1 matching row over 14 projects, empty picker, are the matching row\'s adds only', () => {
+		const all = { kind: 'all-eligible' as const, projects: projects(14) };
+		const creates = [1, 2, 3, 4].map((n) => state({ entryId: `c${n}`, class: 'create', toAdd: projects(14) }));
+		const matching = state({ class: 'already-matches', toAdd: projects(13), visible: projects(1, 14) });
+		expect(visibilityCount([...creates, matching], all).text).toBe('13 visibility changes');
+	});
+
+	it('VIS-10: before the analysis is loaded, an upper bound over the existing rows, marked as such', () => {
 		const rows = [state({ toAdd: projects(1), analysing: projects(3, 2) }), state({ class: 'create', toAdd: projects(4) }), state({ visible: projects(4) })];
-		expect(visibilityCount(rows, scope)).toEqual({ count: 12, upperBound: true, hides: 0, text: 'Up to 12 visibility changes' });
+		expect(visibilityCount(rows, scope)).toEqual({ count: 8, adds: 8, upperBound: true, hides: 0, text: 'Up to 8 visibility changes' });
 	});
 
 	it('leaves out rows the run skips', () => {
 		expect(visibilityCount([state({ applies: false, class: 'blocked' }), state({ analysing: projects(4) })], scope).count).toBe(4);
 	});
 
-	it('counts where new fields will be hidden beside it (VIS-4)', () => {
+	it('VIS-4: with chosen projects a create\'s hides are writes, and are counted', () => {
 		const chosen = { kind: 'chosen' as const, projects: projects(1) };
 		const count = visibilityCount([state({ class: 'create', toAdd: projects(1), toHide: projects(3, 2) })], chosen);
-		expect(count).toEqual({ count: 1, upperBound: false, hides: 3, text: '1 visibility change, 3 to hide' });
+		expect(count).toEqual({ count: 3, adds: 0, upperBound: false, hides: 3, text: '3 visibility changes, all to hide' });
+		const mixed = visibilityCount([state({ class: 'create', toAdd: projects(1), toHide: projects(3, 2) }), state({ toAdd: projects(1) })], chosen);
+		expect(mixed.text).toBe('4 visibility changes: 1 to show, 3 to hide');
+		const loading = visibilityCount([state({ class: 'create', toAdd: projects(1), toHide: projects(3, 2) }), state({ analysing: projects(1) })], chosen);
+		expect(loading.text).toBe('Up to 4 visibility changes: up to 1 to show, 3 to hide');
 	});
 
 	it('says none plainly', () => {
 		expect(visibilityCount([], scope).text).toBe('No visibility changes');
 		expect(visibilityCount([state({ visible: projects(4) })], scope).text).toBe('No visibility changes');
+		expect(visibilityCount([state({ class: 'create', toAdd: projects(4) })], scope).text).toBe('No visibility changes');
+		expect(visibilityCount([state({ toAdd: projects(1) })], scope).text).toBe('1 visibility change');
 	});
 });

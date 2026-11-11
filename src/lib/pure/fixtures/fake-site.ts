@@ -6,7 +6,7 @@
  * What it models (corpus findings 019, 040, 115, 116, 117, 118, 119 and the endpoint cards):
  *
  * - Fields per entity type, live or retired. A retired field is a 404 to read, update and retire.
- * - Create: the name comes from the display name (`serverFieldName`), is only in `links.self`,
+ * - Create: the name comes from the display name (`predictFieldName` with the data type), is only in `links.self`,
  *   and gets `_1`, `_2` when a live field has it. A retired field with the name is the 400 code
  *   105 with `source.field_name`. The per-type requirements of a create are enforced.
  * - Update: `{property_name, value}` writes with the refusals of findings 116 and 121. A request
@@ -29,7 +29,8 @@
  */
 import { readEntityTypes } from '../live-entity-types';
 import { readFieldReply, readFields, type FieldReply } from '../live-field';
-import { serverFieldName, type CreatePayload, type PropertyWrite } from '../plan';
+import { predictFieldName } from '../field-name';
+import type { CreatePayload, PropertyWrite } from '../plan';
 import type { ReviveAnswer, RunReader, SchemaWritePort } from '../run-port';
 
 export const FAKE_OPS = [
@@ -585,7 +586,7 @@ export class FakeSite implements SchemaWritePort {
 		}
 
 		const table = this.table(entityType);
-		const base = serverFieldName(displayName, dataType) ?? '';
+		const base = predictFieldName(displayName, dataType) ?? '';
 		let name = base;
 		// A live field with the name: the new one is suffixed, at 201, with no warning (corpus finding 019).
 		for (let suffix = 1; table.get(name)?.retired === false; suffix += 1) name = `${base}_${suffix}`;

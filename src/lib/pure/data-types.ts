@@ -48,7 +48,8 @@ export function isMirror(entry: Pick<EntryDefinition, 'dataType'>): boolean {
 	return dataType !== '' && !isCreatable(dataType);
 }
 
-const LABELS: Readonly<Record<string, string>> = {
+/** This app's wording for each data type, handed to the data type picker as its `labels`. */
+export const DATA_TYPE_LABELS: Readonly<Record<string, string>> = {
 	// Creatable.
 	text: 'Text',
 	number: 'Number',
@@ -81,7 +82,7 @@ const LABELS: Readonly<Record<string, string>> = {
 
 /** The name a person reads for a data type. A type with no label shows exactly as read (MOD-16). */
 export function dataTypeLabel(dataType: string): string {
-	return Object.hasOwn(LABELS, dataType) ? LABELS[dataType] : dataType;
+	return Object.hasOwn(DATA_TYPE_LABELS, dataType) ? DATA_TYPE_LABELS[dataType] : dataType;
 }
 
 /** A type-specific setting, named by its key on an entry. */

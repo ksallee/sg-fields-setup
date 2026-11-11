@@ -9,11 +9,9 @@ import {
 	PLAN_CLASSES,
 	PlanInputError,
 	emptyPlanText,
-	hasNonAscii,
 	needsRead,
 	planEntry,
 	planSet,
-	serverFieldName,
 	type CreatePayload,
 	type PlanEntry,
 	type PlanItem,
@@ -228,30 +226,6 @@ function sitePut(field: LiveField, request: UpdateRequest, log: SiteLog = { made
 }
 
 /* Tests. */
-
-describe('serverFieldName', () => {
-	it('MOD-17: follows the ASCII rule measured by finding 117', () => {
-		expect(serverFieldName('zzprobe 117 a--b..c!!d  e_f', 'currency')).toBe('sg_zzprobe_117_a__b__c__d__e_f');
-		expect(serverFieldName('117 zzprobe digit', 'currency')).toBe('sg_117_zzprobe_digit');
-		expect(serverFieldName('zzprobe 117 MiXed CASE', 'currency')).toBe('sg_zzprobe_117_mixed_case');
-		expect(serverFieldName('sg_zzprobe_019_already_prefixed', 'text')).toBe('sg_sg_zzprobe_019_already_prefixed');
-	});
-
-	it('G11: any non-ASCII character anywhere gives sg_<data_type> (finding 117)', () => {
-		expect(serverFieldName('zzprobe 117 Durée Écran ñ', 'currency')).toBe('sg_currency');
-		expect(serverFieldName('zzprobe 117 日本語 поле', 'currency')).toBe('sg_currency');
-		expect(serverFieldName('Durée', 'text')).toBe('sg_text');
-	});
-
-	it('MOD-19: a blank display name has no name', () => {
-		expect(serverFieldName('  ', 'text')).toBeNull();
-	});
-
-	it('hasNonAscii: true for an accent, a non-Latin letter or an emoji; false for ASCII punctuation', () => {
-		for (const text of ['é', 'Lens ñ', '日本語', 'поле', 'a😀', 'a\u00a0b']) expect(hasNonAscii(text)).toBe(true);
-		for (const text of ['', 'Lens -- Height (Start)', 'a\tb', '~!@#$%^&*()_+']) expect(hasNonAscii(text)).toBe(false);
-	});
-});
 
 describe('needsRead', () => {
 	it('PLN-3: a complete, creatable entry on a type the site has', () => {
@@ -988,7 +962,7 @@ describe('PLN-20: idempotency', () => {
 				const log: SiteLog = { made: [], retired: [] };
 				const created = siteCreate(wanted.programmaticName, first.create!, log);
 				// The name the site derives is the one the entry asked for (PLN-15).
-				expect(serverFieldName(created.displayName, dataType)).toBe(wanted.programmaticName);
+				expect(predictFieldName(created.displayName, dataType)).toBe(wanted.programmaticName);
 				expect(replan(wanted, created).class, `${dataType} ${wanted.id}`).toBe('already-matches');
 				// Finding 121: the note names exactly the reverse fields the site makes.
 				expect(first.reverseFieldTypes, `${dataType} ${wanted.id}`).toEqual(log.made);

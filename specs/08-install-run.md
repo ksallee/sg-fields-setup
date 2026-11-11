@@ -151,8 +151,14 @@ install creates and updates fields only, and says that visibility is managed in 
   still being analysed, and projects outside the picker where it is visible. A create row has every
   picker project as "to add". Shown as small counters, with a tooltip listing project names (up to
   20, then "and N more") and, for outside projects, the reminder of VIS-6.
+  *Note, 2026-11-10:* a new field is visible on every project (`findings/115_field_visibility_per_project.md`),
+  so a create row's counters say what is true after the run, "visible on N" and, with chosen
+  projects, "hidden on M", in place of "N to add".
 - VIS-10. The summary's visibility count is the sum of "to add" over selected rows once analysis is
   loaded; before that, an upper bound (selected rows times projects in scope) marked as such.
+  *Note, 2026-11-10:* the count is the writes the run is expected to make, after finding 115: the
+  projects to add on existing rows, none on create rows, plus a create's hides when the scope is
+  chosen projects. The upper bound counts existing rows only. The confirmation states the same numbers.
 - VIS-11. Changing the picker recomputes VIS-9 and VIS-10 without re-reading the site.
 - VIS-12. If the analysis fails, rows stay in "analysing" and the run is still allowed.
 

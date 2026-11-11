@@ -68,8 +68,11 @@ Things that looked like bugs or accidents. The requirements above already avoid 
   record (PLN-6) was taken from its code and tests, not checked against a live response or the
   corpus sample.~~ Confirmed against live responses, 2026-11-10: the read-back table of
   `findings/116_field_settings_create_update.md`. PLN-6 stands as written.
-- Whether the baseline's assumptions in G3 to G8 were ever true on a real site. Its one live test
-  covered creating a text field and re-planning it as "already matches".
+- ~~Whether the baseline's assumptions in G3 to G8 were ever true on a real site. Its one live test
+  covered creating a text field and re-planning it as "already matches".~~ Answered by probes 115
+  to 121, 2026-11-10, except G7: G3 by 116 and 117, G4 by 116, G5 by 116 and 121, G6 by 115, G8 by
+  116. See the "Answered by probes" table in `09-api-and-widgets.md`. G7, the permission check,
+  is still unmeasured; RUN-27's fallback stands.
 - The revive call's exact request form differs between the baseline and the corpus. The corpus form
   is the one to build on.
 

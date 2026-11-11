@@ -99,6 +99,20 @@ describe('nameWarning (EDT-25, B2, Q3)', () => {
 		expect(nameWarning({ ...row, displayName: ' Lens ', programmaticName: 'sg_lens' }, false)).toBeNull();
 	});
 
+	it('G11, PLN-15: a non-ASCII display name says why, in either mode, with the name the site would give', () => {
+		const text =
+			'The display name holds a character outside ASCII. The site would name a new field sg_text. Install refuses to create it. Use an ASCII display name.';
+		expect(nameWarning({ ...row, displayName: 'Durée', programmaticName: 'sg_text' }, false)).toBe(text);
+		expect(nameWarning({ ...row, displayName: 'Durée', programmaticName: 'sg_text', nameMode: 'derived' }, false)).toBe(text);
+		expect(nameWarning({ ...row, displayName: 'Durée', programmaticName: '', dataType: '', nameMode: 'derived' }, false)).toBe(
+			'The display name holds a character outside ASCII. The site would name a new field after its data type. Install refuses to create it. Use an ASCII display name.'
+		);
+	});
+
+	it('G11: no non-ASCII warning when the field is already on the site', () => {
+		expect(nameWarning({ ...row, displayName: 'Durée', programmaticName: 'sg_duree' }, true)).toBeNull();
+	});
+
 	it('EDT-32: never on a mirror row', () => {
 		expect(nameWarning({ ...row, dataType: 'calculated' }, false)).toBeNull();
 	});

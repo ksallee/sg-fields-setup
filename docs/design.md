@@ -187,5 +187,6 @@ in place of mode-watcher. `Tooltip.Provider` is in the root layout.
 
 `src/lib/components/` (sg-widgets registry copies, added with the same CLI from
 `https://sg-widgets.vercel.app/r/svelte/<name>.json`, never edited here): entity-type-picker,
-entity-type-multi-picker, entity-glyphs, state-line, and what they install with them. The
+entity-type-multi-picker, entity-glyphs, state-line, data-type-picker, valid-values-editor, and
+what they install with them. The editor's data type and valid values are those two widgets. The
 registry's `checkbox` replaces shadcn's: it draws the mixed state.

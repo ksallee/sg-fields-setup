@@ -48,7 +48,7 @@
  */
 import { cleanEntry } from './clean';
 import { isMirror } from './data-types';
-import { predictFieldName } from './field-name';
+import { hasNonAscii, predictFieldName } from './field-name';
 import { hasEntityType, type LiveEntityType } from './live-entity-types';
 import type { LiveField, LiveFieldRead } from './live-field';
 import type { EntryDefinition } from './model';
@@ -197,27 +197,6 @@ export interface Plan {
 	/** Why `items` is empty, or null when it is not. */
 	empty: 'no-entries' | 'only-mirrors' | null;
 	scope: PlanScope;
-}
-
-/* The name the server will give. */
-
-/** Whether a text holds any character outside ASCII. */
-export function hasNonAscii(text: string): boolean {
-	return /[^\x00-\x7f]/.test(text);
-}
-
-/**
- * The programmatic name the server gives a new field (MOD-17, corpus
- * `findings/117_field_types_and_names`). Null for a blank display name.
- *
- * Any non-ASCII character makes the server discard the display name: the field is called
- * `sg_<data_type>`. That is decided here, before the ASCII rule is asked, so the answer does not
- * depend on what `predictFieldName` makes of such a name.
- */
-export function serverFieldName(displayName: string, dataType: string): string | null {
-	if (displayName.trim() === '') return null;
-	if (hasNonAscii(displayName)) return `sg_${dataType}`;
-	return predictFieldName(displayName);
 }
 
 /* Planning. */
@@ -410,7 +389,8 @@ export function planEntry(entry: PlanEntry, read: LiveFieldRead | null, site: Pl
 		if (read.reason === 'no-data-type') return refused([reason('no-data-type')]);
 
 		const reasons: PlanReason[] = [];
-		const serverName = serverFieldName(wanted.displayName, wanted.dataType);
+		// The name the server would give: with the data type, for a non-ASCII display name (G11).
+		const serverName = predictFieldName(wanted.displayName, wanted.dataType);
 		if (hasNonAscii(wanted.displayName)) reasons.push(reason('non-ascii-name', { other: serverName }));
 		else if (serverName !== wanted.programmaticName) reasons.push(reason('unreachable-name', { other: serverName }));
 
