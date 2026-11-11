@@ -56,9 +56,16 @@
 	const dataType = $derived(row.dataType.trim());
 	const missing = $derived(missingRequired(row));
 	const follows = $derived(row.nameMode === 'derived');
-	// Only with the site's fields to check against: without them a stock field such as `code`
-	// would be called out as a name the site would not derive.
-	const warning = $derived(context && !comparison?.typeNotOnSite ? nameWarning(row, comparison?.nameExists != null) : null);
+	// A typed name only with the site's fields to check against: without them a stock field such
+	// as `code` would be called out as a name the site would not derive. A derived name is a new
+	// field's, so a non-ASCII display name is called out without the site too (G11).
+	const warning = $derived(
+		context && !comparison?.typeNotOnSite
+			? nameWarning(row, comparison?.nameExists != null)
+			: follows
+				? nameWarning(row, false)
+				: null
+	);
 	// The group says a type is not on the site; the row does not say it again.
 	const notes = $derived((comparison?.notes ?? []).filter((note) => note.kind !== 'type_not_on_site'));
 

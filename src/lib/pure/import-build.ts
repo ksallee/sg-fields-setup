@@ -195,6 +195,8 @@ export interface BuildResult {
 function guessedDraft(targetEntityType: string, fieldName: string, values: readonly string[]): EntryDraft {
 	return {
 		targetEntityType,
+		// No data type here: a non-ASCII header stays blank rather than `sg_<guessed type>`, which
+		// would make two such columns one and drop the second as a duplicate (IMP-48, G11).
 		programmaticName: predictFieldName(fieldName) ?? '',
 		displayName: fieldName,
 		dataType: guessDataType(values),

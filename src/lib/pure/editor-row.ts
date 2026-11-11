@@ -5,7 +5,7 @@
  */
 import type { RowMarker } from './compare';
 import { isMirror } from './data-types';
-import { predictFieldName } from './field-name';
+import { hasNonAscii, predictFieldName } from './field-name';
 import type { DefaultValue, EntryDefinition } from './model';
 import type { NameMode } from './working-copy';
 
@@ -103,14 +103,25 @@ export function listDefaultValue(text: string): DefaultValue {
  * the plan refuses it (PLN-15). Null when the name is the derived one, when the field already
  * exists on the site (`nameExists`: nothing is created), on a mirror row, or while either name
  * is blank.
+ *
+ * A display name with a non-ASCII character is warned in either mode: the site names such a
+ * field `sg_<data_type>` and the plan refuses it (G11, PLN-15, findings/117).
  */
 export function nameWarning(
 	row: Pick<EntryDefinition, 'programmaticName' | 'displayName' | 'dataType'> & { nameMode: NameMode },
 	nameExists: boolean
 ): string | null {
-	if (row.nameMode !== 'manual' || nameExists || isMirror(row)) return null;
+	if (nameExists || isMirror(row)) return null;
+	const display = row.displayName.trim();
+	const dataType = row.dataType.trim() || undefined;
+	if (hasNonAscii(display)) {
+		const predicted = predictFieldName(display, dataType);
+		const named = predicted ? `name a new field ${predicted}` : 'name a new field after its data type';
+		return `The display name holds a character outside ASCII. The site would ${named}. Install refuses to create it. Use an ASCII display name.`;
+	}
+	if (row.nameMode !== 'manual') return null;
 	const name = row.programmaticName.trim();
-	const predicted = predictFieldName(row.displayName.trim());
+	const predicted = predictFieldName(display, dataType);
 	if (name === '' || !predicted || predicted === name) return null;
 	return `The site would name a new field ${predicted}. Install refuses to create it under another name.`;
 }

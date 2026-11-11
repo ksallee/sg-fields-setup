@@ -294,6 +294,21 @@ describe('buildEntries (IMP-30 to IMP-32, IMP-48, IMP-52)', () => {
 		expect(entries[0]).toMatchObject({ targetEntityType: 'shot', programmaticName: 'sg_fps', displayName: 'FPS', dataType: 'number', snapshot: null });
 	});
 
+	it('G11, IMP-48: non-ASCII headers get no predicted name, so two of them are both kept', () => {
+		const { entries, dropped } = buildEntries({
+			buckets: [bucket(['Durée', 'Début'], [['a', 'b']], { fallback: 'Shot' })],
+			mode: 'automatic',
+			delimiter: '::',
+			site: null,
+			importedAt: NOW
+		});
+		expect(dropped).toBe(0);
+		expect(entries.map((one) => [one.displayName, one.programmaticName])).toEqual([
+			['Durée', ''],
+			['Début', '']
+		]);
+	});
+
 	it('no buckets builds nothing', () => {
 		expect(buildEntries({ buckets: [], mode: 'automatic', delimiter: '::', site: null, importedAt: NOW })).toEqual({
 			entries: [],
