@@ -1,5 +1,5 @@
-import { SchemaApiError, SgApiError } from 'sg-widgets-core';
-import { describe, expect, it } from 'vitest';
+import { RestSchemaClient, SchemaApiError, SgApiError } from 'sg-widgets-core';
+import { describe, expect, it, vi } from 'vitest';
 import notFound from '../pure/fixtures/live-field-not-found.json';
 import statusList from '../pure/fixtures/live-field-status-list.json';
 import listing from '../pure/fixtures/live-schema.json';
@@ -68,6 +68,24 @@ describe('coreSchemaSource', () => {
 			status: 'missing',
 			message: "Field 'Version.sg_not_a_field' does not exist."
 		});
+	});
+
+	it('PLN-3: a "missing" from core whose message is not the field\'s own 404 rejects: the second guard', async () => {
+		// Core filters first, so no canned site reaches this. Core itself is made to answer it.
+		const spy = vi.spyOn(RestSchemaClient.prototype, 'readField');
+		try {
+			for (const message of ["Entity type 'Version' does not exist.", 'Not Found', '']) {
+				spy.mockResolvedValueOnce({ status: 'missing', message });
+				const { source } = site({});
+				const failure = await source.readField('Version', 'sg_lens').catch((error: unknown) => error);
+				expect(failure, message).toBeInstanceOf(SchemaApiError);
+				expect((failure as SchemaApiError).status).toBe(404);
+			}
+			spy.mockResolvedValueOnce({ status: 'missing', message: "Field 'Version.sg_lens' does not exist." });
+			expect(await site({}).source.readField('Version', 'sg_lens')).toEqual({ status: 'missing', message: "Field 'Version.sg_lens' does not exist." });
+		} finally {
+			spy.mockRestore();
+		}
 	});
 
 	it('answers undeclared for a 200 with no data, also where core knows the field (PLN-4)', async () => {

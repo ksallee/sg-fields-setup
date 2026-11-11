@@ -103,10 +103,8 @@ export type RowNote =
 			action: RunAction;
 			/** The error status, or null when no answer came. */
 			status: number | null;
-			/** The server's message (RUN-27). */
+			/** The server's message (RUN-27). An update is one request, applied whole or not at all (finding 121). */
 			message: string;
-			/** True when earlier requests of the same update were written. */
-			partial: boolean;
 	  }
 	| ({ code: 'retired-other-type'; liveDataType: string; trashPageUrl: string | null } & Retrash)
 	| ({ code: 'retired-blocked'; reasons: PlanReason[]; trashPageUrl: string | null } & Retrash)
@@ -355,6 +353,17 @@ export function runCounters(state: RunState): RunCounters {
 		pending: count('pending'),
 		visibilityWarnings: state.rows.filter(needsVisibilityRetry).length
 	};
+}
+
+/**
+ * Whether the run itself made the field of this name and it is still its own: the latest of the
+ * row's `created`, `revived` and `retired` effects for it is a `created` or a `revived`. Effects
+ * are kept across retries, so a field made by an attempt that then failed stays new when a retry
+ * finds it live (VIS-4). One the run put back in the trash is not its own any more (VIS-6).
+ */
+export function madeByRun(effects: readonly FieldEffect[], name: string): boolean {
+	const last = effects.findLast((effect) => effect.name === name && effect.kind !== 'updated');
+	return last !== undefined && last.kind !== 'retired';
 }
 
 /** The entry ids a retry runs again: the failed rows, in order (RUN-19). */

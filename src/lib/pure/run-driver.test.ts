@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createFakeSite, type FakeSite } from './fixtures/fake-site';
 import type { PlanEntry } from './plan';
 import { createRun, replan, type Run, type RunDeps } from './run-driver';
-import { runReport } from './run-report';
+import { reportText, runReport } from './run-report';
 import { rowParts, rowText, summaryText, visibilityProgress } from './run-text';
 import { runCounters, type RunRow, type RunState } from './run';
 import { createApplyVisibility, retryVisibility } from './visibility-run';
@@ -160,12 +160,40 @@ describe('an update at its turn (RUN-7, RUN-15, RUN-27)', () => {
 		expect(site.writes()).toEqual([]);
 	});
 
-	it('RUN-7: skips with nothing to change when the field now matches', async () => {
+	it('RUN-7, VIS-5, VIS-6: skips with nothing to change when the field now matches, and treats it as existing: hidden nowhere', async () => {
+		const site = createFakeSite({ projects: [70, 71] }).seed('Version', 'sg_lens', { ...live, hiddenIn: [70] });
+		onRead(site, 2, () => site.seed('Version', 'sg_lens', { displayName: 'Lens', description: 'New.', hiddenIn: [70] }));
+		const chosen = { scope: { kind: 'chosen' as const, projects: [{ id: 70, name: 'Alpha' }] }, eligible: [{ id: 70, name: 'Alpha' }, { id: 71, name: 'Beta' }] };
+		const state = await engine(site, { applyVisibility: createApplyVisibility(site, chosen) }).start([wanted]);
+		expect(row(state)).toMatchObject({ class: 'update', state: 'skipped', note: { code: 'nothing-to-change' }, visibility: { origin: 'existing', written: 1 } });
+		// Shown on the chosen project, and not hidden on the other eligible one.
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([]);
+		expect(site.writes().map((call) => [call.op, call.projectId])).toEqual([['updateField', 70]]);
+	});
+
+	it.each([
+		['a 502', (site: FakeSite) => site.failNext('readField', { status: 502, message: 'Bad Gateway' }), 'Bad Gateway', null],
+		['a dropped connection', (site: FakeSite) => site.dropNext('readField'), 'Failed to fetch', 'Failed to fetch']
+	])('RUN-15, RUN-17: an update whose read-back got %s is a failed row, never a done one', async (_, fault, message, runError) => {
 		const site = createFakeSite().seed('Version', 'sg_lens', live);
-		onRead(site, 2, () => site.seed('Version', 'sg_lens', { displayName: 'Lens', description: 'New.' }));
+		const visibility = scriptedVisibility();
+		// Two entries: reads 1 and 2 are the plan's, 3 the item's, 4 its read-back.
+		onRead(site, 4, () => fault(site));
+		const state = await engine(site, { applyVisibility: visibility.apply }).start([wanted, entry({ id: 'b', programmaticName: 'sg_b', displayName: 'B' })]);
+		expect(row(state)).toMatchObject({ state: 'failed', note: { code: 'unreadable', after: 'update', message }, effects: [{ kind: 'updated' }], visibility: null });
+		expect(state.error).toBe(runError);
+		// A refusal fails the row alone (RUN-16). No answer at all stops the run (RUN-17).
+		expect(row(state, 'b').state).toBe(runError === null ? 'done' : 'pending');
+		expect(visibility.calls.map((call) => call.field)).toEqual(runError === null ? ['Version.sg_b'] : []);
+	});
+
+	it('RUN-15: an update whose field is gone at the read-back is a failed row', async () => {
+		const site = createFakeSite().seed('Version', 'sg_lens', live);
+		// Someone retires the field between the write and the read-back.
+		onRead(site, 3, () => site.seedRetired('Version', 'sg_lens', { displayName: 'Lens', description: 'New.' }));
 		const state = await engine(site).start([wanted]);
-		expect(row(state)).toMatchObject({ class: 'update', state: 'skipped', note: { code: 'nothing-to-change' } });
-		expect(site.writes()).toEqual([]);
+		expect(row(state)).toMatchObject({ state: 'failed', note: { code: 'unreadable', after: 'update', message: null } });
+		expect(site.writeLog()).toEqual(['updateField Version.sg_lens']);
 	});
 
 	it('RUN-7: writes the differences of the fresh read, not of the plan', async () => {
@@ -179,7 +207,7 @@ describe('an update at its turn (RUN-7, RUN-15, RUN-27)', () => {
 		]);
 	});
 
-	it('RUN-7, RUN-15: sends every request of the update, in the order planned, and ends matching', async () => {
+	it('RUN-7, RUN-15, finding 121: sends the one request of the update, as planned, and ends matching', async () => {
 		const site = createFakeSite().seed('Version', 'sg_state', {
 			displayName: 'State',
 			dataType: 'status_list',
@@ -188,14 +216,12 @@ describe('an update at its turn (RUN-7, RUN-15, RUN-27)', () => {
 		});
 		const wantedState = entry({ programmaticName: 'sg_state', displayName: 'State', dataType: 'status_list', validValues: ['vwd', 'apr'], defaultValue: 'vwd' });
 		// What the planner asks for: the values and the default together, which the site checks as a whole (finding 121).
-		const requests = (await replan(deps(site), [wantedState])).items[0].update?.requests ?? [];
-		expect(requests.length).toBeGreaterThan(0);
+		const request = (await replan(deps(site), [wantedState])).items[0].update;
+		expect(request?.properties.map((property) => property.property_name)).toEqual(['valid_values', 'default_value']);
 
 		const state = await engine(site).start([wantedState]);
 		expect(row(state).state).toBe('done');
-		expect(site.writes().map((call) => [call.op, call.outcome, call.body])).toEqual(
-			requests.map((request) => ['updateField', 'ok', request.properties])
-		);
+		expect(site.writes().map((call) => [call.op, call.outcome, call.body])).toEqual([['updateField', 'ok', request?.properties]]);
 		expect(site.get('Version', 'sg_state')).toMatchObject({ validValues: ['vwd', 'apr'], defaultValue: 'vwd' });
 	});
 
@@ -282,6 +308,17 @@ describe('a create at its turn (RUN-8 to RUN-12)', () => {
 		expect(row(state)).toMatchObject({ state: 'failed', note: { code: 'unreadable', after: 'revive', message: 'Shotgun Server Error' } });
 		expect(site.writeLog()).toEqual(['reviveField Version.sg_lens']);
 		expect(runReport(state).revived.map((field) => field.name)).toEqual(['sg_lens']);
+	});
+
+	it('RUN-10: fails when the revived field reads as not there, and does not retire it or count it done', async () => {
+		const site = createFakeSite().seedRetired('Version', 'sg_lens', { displayName: 'Lens' });
+		const visibility = scriptedVisibility();
+		// Someone puts it back in the trash between the revive and its read.
+		onRead(site, 3, () => site.seedRetired('Version', 'sg_lens', { displayName: 'Lens' }));
+		const state = await engine(site, { applyVisibility: visibility.apply }).start([entry()]);
+		expect(row(state)).toMatchObject({ state: 'failed', note: { code: 'unreadable', after: 'revive', message: null }, effects: [{ kind: 'revived' }], visibility: null });
+		expect(site.writeLog()).toEqual(['reviveField Version.sg_lens']);
+		expect(visibility.calls).toEqual([]);
 	});
 
 	it('RUN-10: a revived field of another data type goes back to the trash, and the row links to the trash page', async () => {
@@ -371,6 +408,25 @@ describe('a create at its turn (RUN-8 to RUN-12)', () => {
 			'The site named the new field Version.sg_lens_1. The set wants Version.sg_lens for "Lens". Install deleted the new field. The name sg_lens_1 is spent on this site.'
 		);
 		expect(runReport(state)).toMatchObject({ created: [], retired: [{ name: 'sg_lens_1' }] });
+	});
+
+	it('RUN-11, RUN-12: a create answered with no name fails the row: nothing is retired, nothing read back, no visibility', async () => {
+		const site = createFakeSite();
+		const visibility = scriptedVisibility();
+		const port: RunDeps['port'] = {
+			createField: async (entityType, payload) => {
+				await site.createField(entityType, payload);
+				return { name: '' };
+			},
+			updateField: (entityType, field, properties) => site.updateField(entityType, field, properties),
+			retireField: (entityType, field) => site.retireField(entityType, field),
+			reviveField: (entityType, field) => site.reviveField(entityType, field)
+		};
+		const state = await engine(site, { port, applyVisibility: visibility.apply }).start([entry()]);
+		expect(row(state)).toMatchObject({ state: 'failed', note: { code: 'wrong-name', assigned: '', retired: false, retireError: null }, effects: [], visibility: null });
+		expect(site.writeLog()).toEqual(['reviveField Version.sg_lens', 'createField Version']);
+		expect(site.calls.at(-1)?.op).toBe('createField');
+		expect(visibility.calls).toEqual([]);
 	});
 
 	it('RUN-14: a create refused for a retired name fails with the trash instruction and does not loop', async () => {
@@ -488,6 +544,26 @@ describe('the run as a whole (RUN-6, RUN-16, RUN-17)', () => {
 		expect(run.getState()).toMatchObject({ status: 'idle', rows: [] });
 	});
 
+	it('RUN-25: a reset while a run is in progress does nothing: the rows stay, and the failed one can still be retried', async () => {
+		const site = createFakeSite().failNext('createField', { status: 500, message: 'Shotgun Server Error' });
+		const run = engine(site);
+		let during: RunState | null = null;
+		let after: RunState | null = null;
+		site.beforeNext('createField', () => {
+			during = run.getState();
+			run.reset();
+			after = run.getState();
+		});
+		const state = await run.start(three);
+		expect(during).toMatchObject({ status: 'running', rows: [{ state: 'in_progress' }, { state: 'pending' }, { state: 'pending' }] });
+		expect(after).toBe(during);
+		expect(state.rows.map((item) => item.state)).toEqual(['failed', 'done', 'done']);
+		// The run kept its entries: the retry has the failed one to run again.
+		const retried = await run.retry();
+		expect(retried.rows.map((item) => item.state)).toEqual(['done', 'done', 'done']);
+		expect(site.liveNames('Version')).toEqual(['sg_b', 'sg_c', 'sg_a']);
+	});
+
 	it('RUN-16: one failure does not stop the run: the next item proceeds', async () => {
 		const site = createFakeSite();
 		let creates = 0;
@@ -509,6 +585,18 @@ describe('the run as a whole (RUN-6, RUN-16, RUN-17)', () => {
 		expect(state).toMatchObject({ status: 'finished', error: 'Shotgun Server Error', rows: [] });
 		expect(site.writes()).toEqual([]);
 		expect(summaryText(state)).toBe('Install stopped. Shotgun Server Error 0 applied, 0 skipped.');
+	});
+
+	it('RUN-17, PLN-3, PLN-16: a field listing that fails during the re-plan ends the run with one error and nothing written', async () => {
+		const site = createFakeSite().failNext('readRawFields', { status: 503, message: 'Service Unavailable' });
+		await expect(replan(deps(site), three)).rejects.toThrow('Service Unavailable');
+		expect(site.calls.at(-1)).toMatchObject({ op: 'readRawFields', outcome: 'refused' });
+
+		site.failNext('readRawFields', { status: 503, message: 'Service Unavailable' });
+		const state = await engine(site).start(three);
+		// Without the listing the label check cannot run: no create is planned on a guess.
+		expect(state).toMatchObject({ status: 'finished', error: 'Service Unavailable', rows: [] });
+		expect(site.writes()).toEqual([]);
 	});
 
 	it('RUN-17: a dropped connection fails the item in flight, stops the run and leaves the rest pending', async () => {
@@ -566,6 +654,78 @@ describe('the run as a whole (RUN-6, RUN-16, RUN-17)', () => {
 		const second = await engine(site).start(entries);
 		expect(second.rows.every((item) => item.state === 'skipped' && item.note?.code === 'nothing-to-change')).toBe(true);
 		expect(site.writes()).toHaveLength(writes);
+	});
+});
+
+/* Reverse fields. */
+
+describe('reverse fields in a run (H2 of specs/10, corpus findings 116 and 121)', () => {
+	const link = (overrides: Partial<PlanEntry> = {}) =>
+		entry({ programmaticName: 'sg_plate', displayName: 'Plate', dataType: 'entity', validTypes: ['Shot', 'Asset'], ...overrides });
+	const spent = (site: FakeSite) => ['Shot', 'Asset', 'Task'].flatMap((type) => site.retiredNames(type).map((name) => `${type}.${name}`));
+	const live = (site: FakeSite) => ['Shot', 'Asset', 'Task'].flatMap((type) => site.liveNames(type).map((name) => `${type}.${name}`));
+
+	it('H2, PLN-8: an update that would remove a valid type sends nothing, and no reverse field is retired', async () => {
+		const site = createFakeSite().seed('Version', 'sg_plate', { displayName: 'Plate', dataType: 'entity', validTypes: ['Shot', 'Asset'], description: 'Old.' });
+		const state = await engine(site).start([link({ validTypes: ['Shot'], description: 'New.' })]);
+		expect(row(state)).toMatchObject({ class: 'blocked', state: 'skipped', note: { code: 'plan', reasons: [{ code: 'valid-type-removed' }] }, effects: [] });
+		expect(site.writes()).toEqual([]);
+		expect(live(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1']);
+		expect(spent(site)).toEqual([]);
+		expect(site.get('Version', 'sg_plate')).toMatchObject({ validTypes: ['Shot', 'Asset'], description: 'Old.' });
+	});
+
+	it('H2, RUN-7: a type added on the site between the plan and the item turns the update into a removal: the item fails and sends nothing', async () => {
+		const site = createFakeSite().seed('Version', 'sg_plate', { displayName: 'Plate', dataType: 'entity', validTypes: ['Shot'], description: 'Old.' });
+		// Someone adds Asset to the link after the plan: writing the entry's types would now retire Asset's field.
+		onRead(site, 2, () => site.seed('Version', 'sg_plate', { displayName: 'Plate', dataType: 'entity', validTypes: ['Shot', 'Asset'], description: 'Old.' }));
+		const state = await engine(site).start([link({ validTypes: ['Shot'], description: 'New.' })]);
+		expect(row(state)).toMatchObject({ class: 'update', state: 'failed', note: { code: 'plan', reasons: [{ code: 'valid-type-removed' }] }, effects: [] });
+		expect(site.writes()).toEqual([]);
+		expect(spent(site)).toEqual([]);
+	});
+
+	it('RUN-20, H2: a link create makes a field on each valid type, and the report says where', async () => {
+		const site = createFakeSite();
+		const state = await engine(site).start([link()]);
+		expect(row(state)).toMatchObject({ state: 'done', effects: [{ kind: 'created', name: 'sg_plate', reverseFieldTypes: ['Shot', 'Asset'] }] });
+		const report = runReport(state);
+		expect(report.created).toEqual([{ entityType: 'Version', name: 'sg_plate', displayName: 'Plate', rowState: 'done', reverseFieldTypes: ['Shot', 'Asset'] }]);
+		// The report names exactly the types the site made a field on.
+		expect(site.reverseFields('Version', 'sg_plate').map((field) => field.entityType)).toEqual(report.created[0].reverseFieldTypes);
+		expect(live(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1']);
+		expect(reportText(report)).toContain(
+			'Reverse fields (1)\n  Version.sg_plate: Also makes a reverse field on Shot and Asset. Each takes a field name there for good.'
+		);
+	});
+
+	it('RUN-20, H2: an update that adds a valid type makes one field, on the type added, and the report says so', async () => {
+		const site = createFakeSite().seed('Version', 'sg_plate', { displayName: 'Plate', dataType: 'entity', validTypes: ['Shot'] });
+		const state = await engine(site).start([link({ validTypes: ['Shot', 'Asset', 'Task'] })]);
+		expect(row(state)).toMatchObject({ class: 'update', state: 'done', effects: [{ kind: 'updated', reverseFieldTypes: ['Asset', 'Task'] }] });
+		expect(live(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1', 'Task.sg_versions_1']);
+		expect(spent(site)).toEqual([]);
+		expect(runReport(state).updated[0].reverseFieldTypes).toEqual(['Asset', 'Task']);
+	});
+
+	it('PLN-8, finding 121: a reorder alone is written and makes or retires no field', async () => {
+		const site = createFakeSite().seed('Version', 'sg_plate', { displayName: 'Plate', dataType: 'entity', validTypes: ['Asset', 'Shot'] });
+		const state = await engine(site).start([link()]);
+		expect(row(state)).toMatchObject({ class: 'update', state: 'done', effects: [{ kind: 'updated', name: 'sg_plate' }] });
+		expect(row(state).effects[0].reverseFieldTypes).toBeUndefined();
+		expect(live(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1']);
+		expect(site.get('Version', 'sg_plate')?.validTypes).toEqual(['Shot', 'Asset']);
+		expect(spent(site)).toEqual([]);
+	});
+
+	it('RUN-12, H2: a link created under another name and put back in the trash spends a name on each valid type too', async () => {
+		const site = createFakeSite();
+		site.beforeNext('createField', () => site.seed('Version', 'sg_plate', { displayName: 'Plate' }));
+		const state = await engine(site).start([link()]);
+		expect(row(state)).toMatchObject({ state: 'failed', note: { code: 'wrong-name', assigned: 'sg_plate_1', retired: true } });
+		expect(spent(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1']);
+		// The report's data holds the types. Its text does not say so yet.
+		expect(runReport(state).retired).toMatchObject([{ name: 'sg_plate_1', reverseFieldTypes: ['Shot', 'Asset'] }]);
 	});
 });
 
@@ -825,6 +985,89 @@ describe('the visibility seam (VIS-4, VIS-5, VIS-7, Q5, RUN-22)', () => {
 		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([]);
 		expect(site.calls.slice(before).every((call) => call.projectId === 71)).toBe(true);
 		expect(row(retried)).toMatchObject({ state: 'skipped', visibility: { status: 'applied', done: 1, total: 1, failures: [] } });
+	});
+
+	/* A field the run made stays new for the whole run, whatever a later re-plan finds (VIS-4, M1 of the audit). */
+
+	const CHOSEN = {
+		scope: { kind: 'chosen' as const, projects: [{ id: 70, name: 'Alpha' }] },
+		eligible: [
+			{ id: 70, name: 'Alpha' },
+			{ id: 71, name: 'Beta' }
+		]
+	};
+
+	it.each([
+		['a 502', (site: FakeSite) => site.failNext('readField', { status: 502, message: 'Bad Gateway' }), null],
+		['a dropped connection', (site: FakeSite) => site.dropNext('readField'), 'Failed to fetch']
+	])('VIS-4, RUN-19: a field created before a read-back that got %s is still hidden outside the chosen projects on retry', async (_, fault, runError) => {
+		const site = createFakeSite({ projects: [70, 71] });
+		onRead(site, 3, () => fault(site));
+		const run = engine(site, { applyVisibility: createApplyVisibility(site, CHOSEN) });
+		const first = await run.start([entry()]);
+		expect(row(first)).toMatchObject({ state: 'failed', note: { code: 'unreadable', after: 'create' }, effects: [{ kind: 'created', name: 'sg_lens' }], visibility: null });
+		expect(first.error).toBe(runError);
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([]);
+
+		const state = await run.retry();
+		// The re-plan finds the field live. The run made it all the same.
+		expect(row(state)).toMatchObject({ class: 'already-matches', state: 'skipped', visibility: { origin: 'new', status: 'applied', failures: [] } });
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([71]);
+	});
+
+	it('VIS-4, RUN-10, RUN-19: a field revived before a read that failed is still hidden outside the chosen projects on retry', async () => {
+		const site = createFakeSite({ projects: [70, 71] }).seedRetired('Version', 'sg_lens', { displayName: 'Lens' });
+		onRead(site, 3, () => site.failNext('readField', { status: 502, message: 'Bad Gateway' }));
+		const run = engine(site, { applyVisibility: createApplyVisibility(site, CHOSEN) });
+		const first = await run.start([entry()]);
+		expect(row(first)).toMatchObject({ state: 'failed', note: { code: 'unreadable', after: 'revive' }, effects: [{ kind: 'revived' }] });
+
+		const state = await run.retry();
+		expect(row(state)).toMatchObject({ state: 'skipped', visibility: { origin: 'new' } });
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([71]);
+	});
+
+	it('VIS-4, RUN-19: a created field that failed its read-back and is updated on retry is new all the same', async () => {
+		const site = createFakeSite({ projects: [70, 71] });
+		// Someone edits the field between the create and its read-back: the row fails, the retry plans an update.
+		onRead(site, 3, () => site.seed('Version', 'sg_lens', { displayName: 'Lens', description: 'Theirs.' }));
+		const run = engine(site, { applyVisibility: createApplyVisibility(site, CHOSEN) });
+		await run.start([entry({ description: 'Ours.' })]);
+		const state = await run.retry();
+		expect(row(state)).toMatchObject({ class: 'update', state: 'done', visibility: { origin: 'new' } });
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([71]);
+	});
+
+	it('VIS-5, VIS-6, RUN-10: a field the run revived and put back in the trash is not its own: found live on retry, it is hidden nowhere', async () => {
+		const site = createFakeSite({ projects: [70, 71] }).seedRetired('Version', 'sg_lens', { displayName: 'Lens', dataType: 'number' });
+		const run = engine(site, { applyVisibility: createApplyVisibility(site, CHOSEN) });
+		const first = await run.start([entry()]);
+		expect(row(first).effects.map((effect) => effect.kind)).toEqual(['revived', 'retired']);
+		// Someone deletes the retired field for good and makes the field by hand.
+		site.deleteForGood('Version', 'sg_lens').seed('Version', 'sg_lens', { displayName: 'Lens' });
+		const state = await run.retry();
+		expect(row(state)).toMatchObject({ class: 'already-matches', state: 'skipped', visibility: { origin: 'existing' } });
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([]);
+	});
+
+	it('VIS-4, RUN-18, RUN-20: a cancel between a create and its visibility keeps the field new: Resume leaves the row, its own retry hides it', async () => {
+		const site = createFakeSite({ projects: [70, 71] });
+		const run = engine(site, { applyVisibility: createApplyVisibility(site, CHOSEN) });
+		site.beforeNext('createField', () => run.cancel());
+		const first = await run.start([entry(), entry({ id: 'b', programmaticName: 'sg_b', displayName: 'B' })]);
+		expect(row(first)).toMatchObject({ state: 'done', visibility: { origin: 'new', status: 'cancelled' } });
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([]);
+
+		const resumed = await run.resume();
+		expect(resumed.rows.map((item) => item.state)).toEqual(['done', 'done']);
+		// Resume runs the pending rows only. The first row still says its visibility was not applied.
+		expect(row(resumed)).toMatchObject({ visibility: { origin: 'new', status: 'cancelled' } });
+		expect(runCounters(resumed).visibilityWarnings).toBe(1);
+		expect(site.get('Version', 'sg_b')?.hiddenIn).toEqual([71]);
+
+		const state = await run.retryVisibility('lens');
+		expect(row(state)).toMatchObject({ visibility: { origin: 'new', status: 'applied' } });
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([71]);
 	});
 
 	it('a visibility step that throws leaves the row done with the error, and the run goes on', async () => {

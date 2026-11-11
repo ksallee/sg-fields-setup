@@ -37,7 +37,7 @@ import { needsRead, planEntry, type PlanEntry, type PlanItem, type PlanSite } fr
 import type { LiveField, LiveFieldRead } from './live-field';
 import { applyItem } from './run-item';
 import { errorMessage, type RunReader, type SchemaWritePort } from './run-port';
-import { INITIAL_RUN_STATE, needsVisibilityRetry, reduceRun, resumeIds, retryIds, type RunEvent, type RunState } from './run';
+import { INITIAL_RUN_STATE, madeByRun, needsVisibilityRetry, reduceRun, resumeIds, retryIds, type FieldEffect, type RunEvent, type RunState } from './run';
 import type { ApplyVisibility, FieldOrigin, VisibilityHooks, VisibilityOutcome } from './visibility-types';
 
 export interface RunDeps {
@@ -128,7 +128,14 @@ async function showOn(
  * One pass of a run over these entries: re-plan, then each item in order. Emits every change
  * and ends with exactly one `finished` event. Never rejects.
  */
-export async function drive(deps: RunDeps, entries: readonly PlanEntry[], emit: Emit, isCancelled: () => boolean): Promise<void> {
+export async function drive(
+	deps: RunDeps,
+	entries: readonly PlanEntry[],
+	emit: Emit,
+	isCancelled: () => boolean,
+	/** The effects a row holds from earlier attempts of this run (RUN-19). Left out: none. */
+	effectsOf: (entryId: string) => readonly FieldEffect[] = () => []
+): Promise<void> {
 	let site: PlanSite;
 	let items: PlanItem[];
 	try {
@@ -156,7 +163,8 @@ export async function drive(deps: RunDeps, entries: readonly PlanEntry[], emit: 
 			item
 		);
 		const apply = deps.applyVisibility;
-		const origin = result.visibility;
+		// What the item found is per attempt. A field an earlier attempt created or revived is new all the same (VIS-4).
+		const origin = result.visibility !== null && madeByRun(effectsOf(entryId), item.programmaticName) ? 'new' : result.visibility;
 		if (origin !== null && apply && result.abort === null) {
 			const field = { entityType: item.entityType, name: item.programmaticName };
 			if (await showOn((hooks) => apply(field, origin, hooks), emit, isCancelled, entryId, origin)) cut = true;
@@ -207,6 +215,8 @@ export function createRun(deps: RunDeps): Run {
 		for (const listener of listeners) listener(state);
 	};
 
+	const effectsOf = (entryId: string) => state.rows.find((row) => row.entryId === entryId)?.effects ?? [];
+
 	/** One operation at a time. The check and the flag are set before anything is awaited. */
 	async function exclusive(work: () => Promise<void>): Promise<RunState> {
 		if (busy) throw new Error('A run is in progress.');
@@ -230,7 +240,8 @@ export function createRun(deps: RunDeps): Run {
 				deps,
 				entries.filter((entry) => wanted.has(entry.id)),
 				emit,
-				() => cancelled
+				() => cancelled,
+				effectsOf
 			);
 		});
 	}
@@ -246,7 +257,7 @@ export function createRun(deps: RunDeps): Run {
 			return exclusive(async () => {
 				entries = [...selected];
 				emit({ type: 'started' });
-				await drive(deps, entries, emit, () => cancelled);
+				await drive(deps, entries, emit, () => cancelled, effectsOf);
 			});
 		},
 		cancel() {

@@ -4,6 +4,7 @@ import {
 	orderEntries,
 	planCreate,
 	planDuplicate,
+	planDuplicateOf,
 	planSave,
 	refusalMessage,
 	type Mint,
@@ -473,6 +474,106 @@ describe('planSave', () => {
 	});
 });
 
+describe('planSave: a save made elsewhere since the set was loaded (two tabs, audit H1)', () => {
+	const T_OTHER = '2026-11-10T10:00:00.000Z';
+	const lens = entry('e1');
+	const slate = entry('e2', { programmaticName: 'sg_slate', displayName: 'Slate' });
+	/** What this tab loaded: the set and both entries at T0. */
+	const loaded = (more: Partial<NonNullable<SaveRequest['loaded']>> = {}): NonNullable<SaveRequest['loaded']> => ({
+		setChangedAt: T0,
+		name: 'Camera report',
+		description: 'Lens fields',
+		entryChangedAt: { e1: T0, e2: T0 },
+		...more
+	});
+	/** What the other tab stored since: the lens renamed. */
+	const renamedElsewhere = stored([{ ...lens, displayName: 'Lens B', changedAt: T_OTHER }, slate], { changedAt: T_OTHER });
+
+	it('the scenario: the other tab renamed a field; this one, on the old state, changes its description: refused, the rename stays', () => {
+		const stale = request({ changed: [{ ...lens, description: 'Which lens.' }], loaded: loaded() });
+		const plan = planSave(renamedElsewhere, stale, OTHERS, mint());
+		expect(plan).toEqual({ ok: false, reason: 'stale', details: false, fields: ['Lens'] });
+	});
+
+	it('names every field changed elsewhere that this save would write or remove, as this tab shows them', () => {
+		const both = stored(
+			[
+				{ ...lens, displayName: 'Lens B', changedAt: T_OTHER },
+				{ ...slate, description: 'Theirs.', changedAt: T_OTHER }
+			],
+			{ changedAt: T_OTHER }
+		);
+		const plan = planSave(both, request({ changed: [{ ...lens, displayName: 'My lens' }], removedIds: ['e2'], loaded: loaded() }), OTHERS, mint());
+		// The changed one by the name this tab gave it. The removed one by its stored name: this tab no longer shows it.
+		expect(plan).toEqual({ ok: false, reason: 'stale', details: false, fields: ['My lens', 'Slate'] });
+	});
+
+	it('a field changed elsewhere that this save leaves alone is no conflict: both changes are kept', () => {
+		const plan = planSave(renamedElsewhere, request({ changed: [{ ...slate, description: 'Board.' }], loaded: loaded() }), OTHERS, mint());
+		expect(plan).toMatchObject({ ok: true });
+		if (!plan.ok) return;
+		expect(plan.entries.map((e) => [e.displayName, e.description])).toEqual([
+			['Lens B', null],
+			['Slate', 'Board.']
+		]);
+		expect(plan.puts.map((e) => e.id)).toEqual(['e2']);
+	});
+
+	it('a change that asks for what is already stored is no conflict, so a request can be applied again', () => {
+		const wanted = request({ changed: [{ ...lens, displayName: 'Lens B' }], details: { name: 'Kit', description: null }, loaded: loaded() });
+		const first = planSave(stored([lens, slate]), wanted, OTHERS, mint());
+		expect(first).toMatchObject({ ok: true });
+		if (!first.ok) return;
+		const again = planSave({ set: first.set, entries: first.entries }, wanted, OTHERS, mint());
+		expect(again).toMatchObject({ ok: true, setChanged: false, puts: [], deletes: [] });
+	});
+
+	it('the name or description changed elsewhere, and this save changes them too: refused', () => {
+		const renamedSet = stored([lens, slate], { name: 'Camera kit', changedAt: T_OTHER });
+		const plan = planSave(renamedSet, request({ details: { name: 'Camera report', description: 'Mine.' }, loaded: loaded() }), OTHERS, mint());
+		expect(plan).toEqual({ ok: false, reason: 'stale', details: true, fields: [] });
+	});
+
+	it('the name or description changed elsewhere, and this save does not touch them: no conflict', () => {
+		const renamedSet = stored([lens, slate], { name: 'Camera kit', changedAt: T_OTHER });
+		const plan = planSave(renamedSet, request({ changed: [{ ...lens, description: 'Which lens.' }], loaded: loaded() }), OTHERS, mint());
+		expect(plan).toMatchObject({ ok: true, set: { name: 'Camera kit' } });
+	});
+
+	it('a field changed elsewhere does not make a rename of the set stale', () => {
+		const plan = planSave(renamedElsewhere, request({ details: { name: 'Kit', description: null }, loaded: loaded() }), OTHERS, mint());
+		expect(plan).toMatchObject({ ok: true, set: { name: 'Kit' } });
+	});
+
+	it('both at once are named together', () => {
+		const everything = stored([{ ...lens, displayName: 'Lens B', changedAt: T_OTHER }, slate], { description: 'Theirs.', changedAt: T_OTHER });
+		const plan = planSave(
+			everything,
+			request({ details: { name: 'Camera report', description: 'Mine.' }, changed: [{ ...lens, description: 'Which lens.' }], loaded: loaded() }),
+			OTHERS,
+			mint()
+		);
+		expect(plan).toEqual({ ok: false, reason: 'stale', details: true, fields: ['Lens'] });
+	});
+
+	it('a removal of a field already removed elsewhere is no conflict', () => {
+		const plan = planSave(stored([slate], { changedAt: T_OTHER }), request({ removedIds: ['e1'], loaded: loaded() }), OTHERS, mint());
+		expect(plan).toMatchObject({ ok: true, deletes: [] });
+	});
+
+	it('nothing changed elsewhere: the set reads as loaded and the save goes through', () => {
+		const plan = planSave(stored([lens, slate]), request({ changed: [{ ...lens, description: 'Which lens.' }], loaded: loaded() }), OTHERS, mint());
+		expect(plan).toMatchObject({ ok: true, puts: [{ id: 'e1', description: 'Which lens.' }] });
+	});
+
+	it('a stale save plans no write and alters nothing it is given', () => {
+		const stale = request({ changed: [{ ...lens, description: 'Which lens.' }], loaded: loaded() });
+		const before = structuredClone({ renamedElsewhere, stale });
+		planSave(renamedElsewhere, stale, OTHERS, mint());
+		expect({ renamedElsewhere, stale }).toEqual(before);
+	});
+});
+
 describe('planDuplicate', () => {
 	const source = fieldSet({
 		name: 'Lens',
@@ -517,6 +618,53 @@ describe('planDuplicate', () => {
 	});
 });
 
+describe('planDuplicateOf (EDT-9, audit M3)', () => {
+	const source = stored([entry('e1')], { origin: 'import', originDetails: { sourceFiles: 'report.csv', importedAt: T0 } });
+	const whole = { name: 'Working name', description: 'Working.', entries: [draft({ displayName: 'Edited' })] };
+
+	it('SET-18: with nothing given it copies the stored set', () => {
+		const plan = planDuplicateOf(source, {}, OTHERS, mint());
+		expect(plan).toMatchObject({ ok: true, set: { name: 'Camera report copy', description: 'Lens fields', origin: 'import' }, entries: [{ displayName: 'Lens' }] });
+	});
+
+	it('EDT-9: the stored set gives the origin, whatever the caller says, while it exists', () => {
+		const plan = planDuplicateOf(source, { ...whole, origin: 'manual', originDetails: null }, OTHERS, mint());
+		expect(plan).toMatchObject({
+			ok: true,
+			set: { name: 'Working name copy', description: 'Working.', origin: 'import', originDetails: { sourceFiles: 'report.csv' } },
+			entries: [{ displayName: 'Edited' }]
+		});
+	});
+
+	it('M3: with no stored set, a whole working copy is planned from what the caller gives', () => {
+		const plan = planDuplicateOf(null, { ...whole, origin: 'import', originDetails: { sourceFiles: 'report.csv', importedAt: T0 } }, OTHERS, mint());
+		expect(plan).toMatchObject({
+			ok: true,
+			set: { name: 'Working name copy', description: 'Working.', origin: 'import', originDetails: { sourceFiles: 'report.csv', importedAt: T0 } },
+			entries: [{ displayName: 'Edited' }]
+		});
+	});
+
+	it('M3: with no stored set and no origin given, the copy is a manual set', () => {
+		expect(planDuplicateOf(null, whole, OTHERS, mint())).toMatchObject({ ok: true, set: { origin: 'manual', originDetails: null } });
+		expect(planDuplicateOf(null, { ...whole, description: null }, OTHERS, mint())).toMatchObject({ ok: true, set: { description: null } });
+	});
+
+	it('M3: with no stored set, anything less than the whole working copy is refused as missing', () => {
+		const missing = { ok: false, reason: 'set_missing' };
+		expect(planDuplicateOf(null, {}, OTHERS, mint())).toEqual(missing);
+		expect(planDuplicateOf(null, { name: whole.name, description: whole.description }, OTHERS, mint())).toEqual(missing);
+		expect(planDuplicateOf(null, { name: whole.name, entries: whole.entries }, OTHERS, mint())).toEqual(missing);
+		expect(planDuplicateOf(null, { description: null, entries: whole.entries }, OTHERS, mint())).toEqual(missing);
+		expect(planDuplicateOf(null, { ...whole, name: ' ' }, OTHERS, mint())).toEqual(missing);
+	});
+
+	it('MOD-5: refuses entries that repeat a pair, with or without a stored set', () => {
+		expect(planDuplicateOf(null, { ...whole, entries: [draft(), draft()] }, OTHERS, mint())).toMatchObject({ ok: false, reason: 'duplicate_entries' });
+		expect(planDuplicateOf(source, { entries: [draft(), draft()] }, OTHERS, mint())).toMatchObject({ ok: false, reason: 'duplicate_entries' });
+	});
+});
+
 describe('refusalMessage', () => {
 	it('MOD-1: asks for a name', () => {
 		expect(refusalMessage({ ok: false, reason: 'blank_name' })).toBe('Give the set a name.');
@@ -539,6 +687,24 @@ describe('refusalMessage', () => {
 				]
 			})
 		).toBe('A set holds each field once. Repeated: Shot.sg_lens, Asset.sg_kind.');
+	});
+
+	it('H1: says what another tab changed, that nothing was saved, and what to do', () => {
+		const next = 'Nothing was saved. Reload to see it, or duplicate this set to keep your changes.';
+		expect(refusalMessage({ ok: false, reason: 'stale', details: false, fields: ['Lens'] })).toBe(`The field "Lens" was changed in another tab. ${next}`);
+		expect(refusalMessage({ ok: false, reason: 'stale', details: false, fields: ['Lens', 'Slate'] })).toBe(
+			`The fields "Lens" and "Slate" were changed in another tab. ${next}`
+		);
+		expect(refusalMessage({ ok: false, reason: 'stale', details: true, fields: [] })).toBe(
+			`The name or description of this set was changed in another tab. ${next}`
+		);
+		expect(refusalMessage({ ok: false, reason: 'stale', details: true, fields: ['Lens'] })).toBe(
+			`The name or description of this set and the field "Lens" were changed in another tab. ${next}`
+		);
+		expect(refusalMessage({ ok: false, reason: 'stale', details: false, fields: ['A', 'B', 'C', 'D', 'E', 'F', 'G'] })).toBe(
+			`The fields "A", "B", "C", "D", "E" and 2 more were changed in another tab. ${next}`
+		);
+		expect(refusalMessage({ ok: false, reason: 'stale', details: false, fields: [''] })).toBe(`A field was changed in another tab. ${next}`);
 	});
 
 	it('names what went missing', () => {

@@ -3,11 +3,13 @@ import { CREATABLE_DATA_TYPES } from './data-types';
 import { predictFieldName } from './field-name';
 import listing from './fixtures/live-version-fields.json';
 import schema from './fixtures/live-schema.json';
+import { indexLiveFields, matchLiveField } from './import-match';
 import { readEntityTypes, type LiveEntityType } from './live-entity-types';
 import { readField, readFieldReply, readFields, type LiveField, type LiveFieldRead } from './live-field';
 import {
 	PLAN_CLASSES,
 	PlanInputError,
+	UPDATE_ORDER,
 	emptyPlanText,
 	needsRead,
 	planEntry,
@@ -106,9 +108,7 @@ function plan(e: PlanEntry, read: LiveFieldRead | null, at: PlanSite = site): Pl
 
 /** The properties of an update's one request, in the order sent (finding 121). */
 function writes(item: PlanItem): PropertyWrite[] {
-	const requests = item.update?.requests ?? [];
-	expect(requests.length).toBeLessThanOrEqual(1);
-	return requests.flatMap((request) => request.properties);
+	return item.update?.properties ?? [];
 }
 
 /* The site, as findings 116 and 121 measured it. */
@@ -383,6 +383,19 @@ describe('planEntry: refusals', () => {
 		expect(item.reasons[0].other).toBe('sg_ai_seed_1');
 	});
 
+	it('PLN-16 beside IMP-27, on record: "Shot-Code" matches a live "Shot Code" at import and is no label clash at plan', () => {
+		// Two rules for two questions, each left as it is. Import asks "is this column that field?" and
+		// folds punctuation (`normaliseName`). The plan asks "does a live field have this very label?" and
+		// only trims and lowercases. So a column the import would have matched, typed by hand as a new
+		// field, plans as a create.
+		const live = liveField({ dataType: 'text', name: 'Shot Code' }, 'code');
+		const at = { ...site, fieldsByType: new Map([['Version', [live]]]) };
+		expect(matchLiveField(indexLiveFields([live]), 'Shot-Code')).toBe(live);
+		expect(plan(entry({ displayName: 'Shot-Code', programmaticName: 'sg_shot_code' }), ABSENT, at).class).toBe('create');
+		// The same label, case and padding aside, is the clash.
+		expect(refusal(plan(entry({ displayName: ' shot code ', programmaticName: 'sg_shot_code' }), ABSENT, at))).toEqual(['label-taken']);
+	});
+
 	it('PLN-16: a create with a free label is not refused', () => {
 		expect(plan(entry({ displayName: 'zz free label', programmaticName: 'sg_zz_free_label' }), ABSENT).class).toBe('create');
 	});
@@ -446,13 +459,9 @@ describe('planEntry: present fields', () => {
 		expect(item.class).toBe('update');
 		expect(item.differences.map((difference) => difference.setting)).toEqual(['displayName', 'description']);
 		expect(item.update).toEqual({
-			requests: [
-				{
-					properties: [
-						{ property_name: 'name', value: 'Lens B' },
-						{ property_name: 'description', value: 'New.' }
-					]
-				}
+			properties: [
+				{ property_name: 'name', value: 'Lens B' },
+				{ property_name: 'description', value: 'New.' }
 			]
 		});
 		expect(item.reasons).toEqual([]);
@@ -463,8 +472,8 @@ describe('planEntry: present fields', () => {
 			entry({ displayName: 'Lens B', description: 'New.', dataType: 'list', validValues: ['b', 'c'], defaultValue: 'c' }),
 			present({ dataType: 'list', name: 'Lens', description: 'Old.', validValues: ['a', 'b'], defaultValue: 'a' })
 		);
-		expect(list.update?.requests).toHaveLength(1);
 		expect(writes(list).map((write) => write.property_name)).toEqual(['name', 'description', 'valid_values', 'default_value']);
+		expect(writes(list).map((write) => write.property_name)).toEqual(UPDATE_ORDER.filter((name) => name !== 'valid_types'));
 		const link = plan(
 			entry({ displayName: 'Lens B', description: 'New.', dataType: 'entity', validTypes: ['Shot', 'Asset'] }),
 			present({ dataType: 'entity', name: 'Lens', validTypes: ['Shot'] })
@@ -510,13 +519,9 @@ describe('planEntry: present fields', () => {
 			const item = plan(status(['vwd', 'apr'], 'vwd'), liveStatus(['na', 'rev'], 'na'));
 			expect(item.class).toBe('update');
 			expect(item.update).toEqual({
-				requests: [
-					{
-						properties: [
-							{ property_name: 'valid_values', value: ['vwd', 'apr'] },
-							{ property_name: 'default_value', value: 'vwd' }
-						]
-					}
+				properties: [
+					{ property_name: 'valid_values', value: ['vwd', 'apr'] },
+					{ property_name: 'default_value', value: 'vwd' }
 				]
 			});
 		});
@@ -996,10 +1001,9 @@ describe('PLN-20: idempotency', () => {
 					}
 					if (item.class !== 'update') continue;
 					// One request, applied whole (finding 121). Throws where the site would refuse.
-					expect(item.update!.requests, label).toHaveLength(1);
-					expect(item.update!.requests[0].properties.length, label).toBeGreaterThan(0);
+					expect(item.update!.properties.length, label).toBeGreaterThan(0);
 					const log: SiteLog = { made: [], retired: [] };
-					const field = sitePut(live, item.update!.requests[0], log);
+					const field = sitePut(live, item.update!, log);
 					expect(replan(wanted, field).class, label).toBe('already-matches');
 					// No planned update retires a reverse field, and the note names the ones it makes.
 					expect(log.retired, label).toEqual([]);

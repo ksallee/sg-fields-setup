@@ -4,7 +4,7 @@
  * Rows are cleaned on the way out (MOD-7, MOD-9).
  */
 import { cleanEntry } from './clean';
-import type { Entry, EntryDraft, FieldSet } from './model';
+import type { Entry, EntryDraft, FieldSet, Timestamp } from './model';
 import {
 	cleanedDescription,
 	cleanedName,
@@ -35,6 +35,23 @@ export interface SaveRequest {
 	changed: Entry[];
 	/** The added rows as cleaned drafts, in row order. `addedKeys` gives their row keys. */
 	added: EntryDraft[];
+	/**
+	 * What the working copy was loaded from, so the store can tell a save made elsewhere since
+	 * (another tab) and refuse to write over it (`planSave`, the `stale` refusal). `saveRequest`
+	 * always gives it. Left out, the request is applied as it stands, with no such check.
+	 */
+	loaded?: LoadedState;
+}
+
+/** The stored state a save request was built on. */
+export interface LoadedState {
+	/** The set's `changedAt` as loaded. Unchanged in storage: nothing was saved elsewhere. */
+	setChangedAt: Timestamp;
+	/** The set's name and description as loaded: what tells a change of the details from one of a field. */
+	name: string;
+	description: string | null;
+	/** `changedAt` as loaded, by id, of each entry the request changes or removes. */
+	entryChangedAt: Record<string, Timestamp>;
 }
 
 function draftOf(row: Row): EntryDraft {
@@ -69,13 +86,25 @@ export function saveRequest(workingCopy: WorkingCopy): SaveRequest {
 			});
 		}
 	}
+	const removedIds = workingCopy.saved.entries.filter((entry) => !kept.has(entry.id)).map((entry) => entry.id);
+	const entryChangedAt: Record<string, Timestamp> = {};
+	for (const id of [...changed.map((entry) => entry.id), ...removedIds]) {
+		const entry = saved.get(id);
+		if (entry) entryChangedAt[id] = entry.changedAt;
+	}
 	return {
 		details: detailsChanged(workingCopy)
 			? { name: cleanedName(workingCopy), description: cleanedDescription(workingCopy) }
 			: null,
-		removedIds: workingCopy.saved.entries.filter((entry) => !kept.has(entry.id)).map((entry) => entry.id),
+		removedIds,
 		changed,
-		added
+		added,
+		loaded: {
+			setChangedAt: workingCopy.saved.changedAt,
+			name: workingCopy.saved.name,
+			description: workingCopy.saved.description,
+			entryChangedAt
+		}
 	};
 }
 

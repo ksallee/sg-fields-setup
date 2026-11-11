@@ -428,7 +428,10 @@
 			const result = await (await sharedSetStore()).duplicateSet(wc.setId, {
 				name: wc.name,
 				description: cleanedDescription(wc),
-				entries: draftsOf(wc, keys)
+				entries: draftsOf(wc, keys),
+				// Used only when the set was deleted in another tab: the copy is then made from this working copy alone.
+				origin: wc.saved.origin,
+				originDetails: wc.saved.originDetails
 			});
 			if (!result.ok) {
 				notify.error(refusalMessage(result), `Could not duplicate "${title}"`);

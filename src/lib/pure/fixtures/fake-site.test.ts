@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { asRefusal, isRetiredNameRefusal, readRevive, retiredNameIn } from '../run-port';
-import { createFakeSite, FakeSiteError } from './fake-site';
+import { createFakeSite, DEFAULT_STATUSES, FakeSiteError } from './fake-site';
 
 /** The refusal a call rejects with. */
 async function refusalOf(call: Promise<unknown>): Promise<FakeSiteError> {
@@ -418,5 +418,146 @@ describe('the fake site: one request, checked whole (corpus finding 121)', () =>
 		const site = createFakeSite({ statuses: ['na', 'rev'] }).seed('Version', 'sg_state', { dataType: 'status_list', validValues: ['na'] });
 		const refusal = await refusalOf(site.updateField('Version', 'sg_state', [{ property_name: 'valid_values', value: ['na', 'zzq'] }]));
 		expect(refusal.title).toBe("API schema_field_update() invalid/missing 'status_list' string");
+	});
+});
+
+describe('the fake site: reverse fields (corpus findings 116 and 121)', () => {
+	const link = (name: string, dataType: 'entity' | 'multi_entity', validTypes: string[]) => ({
+		data_type: dataType,
+		properties: [
+			{ property_name: 'name' as const, value: name },
+			{ property_name: 'valid_types' as const, value: validTypes }
+		]
+	});
+	const types = (value: string[]) => [{ property_name: 'valid_types' as const, value }];
+	const reverse = (site: ReturnType<typeof createFakeSite>, name = 'sg_plate') =>
+		site.reverseFields('Version', name).map((field) => `${field.entityType}.${field.name}${field.retired ? ' (retired)' : ''}`);
+
+	it('creating an entity link makes a field on each of its valid types, named sg_versions_<n>', async () => {
+		const site = createFakeSite();
+		await site.createField('Version', link('Plate', 'entity', ['Shot', 'Asset']));
+		expect(reverse(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1']);
+		expect(site.get('Shot', 'sg_versions_1')).toMatchObject({ retired: false, validTypes: ['Version'], reverseOf: { entityType: 'Version', name: 'sg_plate' } });
+		// A second link takes the next number on each type.
+		await site.createField('Version', link('Matte', 'entity', ['Shot']));
+		expect(reverse(site, 'sg_matte')).toEqual(['Shot.sg_versions_2']);
+		// They are fields of the type: its listing holds them.
+		expect(Object.keys(await site.readRawFields('Shot'))).toEqual(['sg_versions_1', 'sg_versions_2']);
+	});
+
+	it('creating a multi-entity link makes the reverse side on its valid type, named <type>_<field>_<types>', async () => {
+		const site = createFakeSite();
+		await site.createField('Version', link('Plates', 'multi_entity', ['Shot']));
+		expect(reverse(site, 'sg_plates')).toEqual(['Shot.version_sg_plates_versions']);
+		expect(site.get('Shot', 'version_sg_plates_versions')).toMatchObject({ dataType: 'multi_entity', validTypes: ['Version'], retired: false });
+	});
+
+	it('adding a type makes a field there, removing one retires it, and adding it back takes the next name', async () => {
+		const site = createFakeSite({ entityTypes: ['Version', 'Shot', 'Asset', 'Sequence'] });
+		await site.createField('Version', link('Plate', 'entity', ['Shot', 'Asset']));
+		await site.updateField('Version', 'sg_plate', types(['Sequence', 'Shot', 'Asset']));
+		expect(reverse(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1', 'Sequence.sg_versions_1']);
+
+		await site.updateField('Version', 'sg_plate', types(['Sequence', 'Asset']));
+		expect(reverse(site)).toEqual(['Shot.sg_versions_1 (retired)', 'Asset.sg_versions_1', 'Sequence.sg_versions_1']);
+		// The name stays taken: a create that derives it is refused as any retired name is.
+		expect(site.retiredNames('Shot')).toEqual(['sg_versions_1']);
+
+		await site.updateField('Version', 'sg_plate', types(['Sequence', 'Asset', 'Shot']));
+		expect(reverse(site)).toEqual(['Shot.sg_versions_1 (retired)', 'Asset.sg_versions_1', 'Sequence.sg_versions_1', 'Shot.sg_versions_2']);
+		expect(site.retiredNames('Shot')).toEqual(['sg_versions_1']);
+	});
+
+	it('a write that only reorders makes and retires nothing', async () => {
+		const site = createFakeSite();
+		await site.createField('Version', link('Plate', 'entity', ['Shot', 'Asset']));
+		await site.updateField('Version', 'sg_plate', types(['Asset', 'Shot']));
+		expect(site.get('Version', 'sg_plate')?.validTypes).toEqual(['Asset', 'Shot']);
+		expect(reverse(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1']);
+		expect(site.retiredNames('Shot')).toEqual([]);
+	});
+
+	it('a refused update makes and retires nothing', async () => {
+		const site = createFakeSite();
+		await site.createField('Version', link('Plate', 'entity', ['Shot']));
+		await refusalOf(site.updateField('Version', 'sg_plate', [...types(['Asset']), { property_name: 'description', value: '' }]));
+		expect(reverse(site)).toEqual(['Shot.sg_versions_1']);
+		expect(site.liveNames('Asset')).toEqual([]);
+	});
+
+	it.each(['entity', 'multi_entity'] as const)('retiring a %s link retires its reverse fields, and reviving it brings them back', async (dataType) => {
+		const site = createFakeSite();
+		await site.createField('Version', link('Plate', dataType, ['Shot']));
+		const [name] = site.liveNames('Shot');
+		await site.retireField('Version', 'sg_plate');
+		expect(site.liveNames('Shot')).toEqual([]);
+		expect(site.retiredNames('Shot')).toEqual([name]);
+		expect(await site.reviveField('Version', 'sg_plate')).toEqual({ revived: true });
+		expect(site.liveNames('Shot')).toEqual([name]);
+	});
+
+	it('a revive does not bring back the field of a type removed before the link was retired', async () => {
+		const site = createFakeSite();
+		await site.createField('Version', link('Plate', 'entity', ['Shot', 'Asset']));
+		await site.updateField('Version', 'sg_plate', types(['Asset']));
+		await site.retireField('Version', 'sg_plate');
+		await site.reviveField('Version', 'sg_plate');
+		expect(reverse(site)).toEqual(['Shot.sg_versions_1 (retired)', 'Asset.sg_versions_1']);
+	});
+
+	it('the wrong-case 500 retires the reverse fields with the link', async () => {
+		const site = createFakeSite();
+		await site.createField('Version', link('Plate', 'entity', ['Shot']));
+		expect((await refusalOf(site.updateField('Version', 'sg_plate', types(['shot'])))).status).toBe(500);
+		expect(reverse(site)).toEqual(['Shot.sg_versions_1 (retired)']);
+	});
+
+	it('a seeded link holds its reverse fields, as a link on the site does', () => {
+		const site = createFakeSite()
+			.seed('Version', 'sg_plate', { dataType: 'entity', validTypes: ['Shot', 'Asset'] })
+			.seedRetired('Version', 'sg_old', { dataType: 'entity', validTypes: ['Shot'] });
+		expect(reverse(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1']);
+		expect(reverse(site, 'sg_old')).toEqual(['Shot.sg_versions_2 (retired)']);
+		// Seeding the same link again, as a test does to change it behind the API, keeps the fields it has.
+		site.seed('Version', 'sg_plate', { dataType: 'entity', validTypes: ['Shot', 'Asset'], description: 'Changed.' });
+		expect(reverse(site)).toEqual(['Shot.sg_versions_1', 'Asset.sg_versions_1']);
+	});
+
+	it('a field that links nothing has no reverse field', async () => {
+		const site = createFakeSite();
+		await site.createField('Version', text('Lens'));
+		expect(site.reverseFields('Version', 'sg_lens')).toEqual([]);
+		expect(site.liveNames('Shot')).toEqual([]);
+	});
+});
+
+describe('the fake site: status codes (corpus findings 116 and 121)', () => {
+	const status = (values: string[], defaultValue?: string) => ({
+		data_type: 'status_list',
+		properties: [
+			{ property_name: 'name' as const, value: 'State' },
+			{ property_name: 'valid_values' as const, value: values },
+			...(defaultValue === undefined ? [] : [{ property_name: 'default_value' as const, value: defaultValue }])
+		]
+	});
+
+	it('refuses a code the site does not have, with no codes given: the site has a default set', async () => {
+		const site = createFakeSite().seed('Version', 'sg_state', { dataType: 'status_list', validValues: ['na'] });
+		const refusal = await refusalOf(site.updateField('Version', 'sg_state', [{ property_name: 'valid_values', value: ['na', 'zzq'] }]));
+		expect(refusal).toMatchObject({ status: 400, code: 103, title: "API schema_field_update() invalid/missing 'status_list' string" });
+		expect((await refusalOf(site.updateField('Version', 'sg_state', [{ property_name: 'default_value', value: 'zzq' }]))).status).toBe(400);
+		expect((await refusalOf(site.createField('Version', status(['na', 'zzq'])))).status).toBe(400);
+		expect(site.get('Version', 'sg_state')).toMatchObject({ validValues: ['na'], defaultValue: null });
+		expect(site.liveNames('Version')).toEqual(['sg_state']);
+	});
+
+	it('takes the codes of the default set, and the codes it is told instead', async () => {
+		const site = createFakeSite();
+		expect(DEFAULT_STATUSES).toEqual(expect.arrayContaining(['wtg', 'rdy', 'ip', 'fin', 'na', 'rev', 'vwd', 'apr']));
+		await site.createField('Version', status(['na', 'rev', 'vwd', 'apr'], 'rev'));
+		expect(site.get('Version', 'sg_state')).toMatchObject({ validValues: ['na', 'rev', 'vwd', 'apr'], defaultValue: 'rev' });
+		const own = createFakeSite({ statuses: ['zzq'] });
+		await own.createField('Version', status(['zzq']));
+		expect((await refusalOf(own.createField('Version', { ...status(['na']), properties: [{ property_name: 'name', value: 'Other' }, { property_name: 'valid_values', value: ['na'] }] }))).status).toBe(400);
 	});
 });

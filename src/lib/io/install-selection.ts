@@ -5,7 +5,8 @@
  * `sessionStorage`: it survives a reload of the install screen and ends with the tab.
  *
  * One selection at a time. A selection for another set, unreadable storage or blocked storage
- * all read as null, and the install screen then takes the whole set.
+ * all read as null. The install screen then plans nothing and says the selection was lost
+ * (`$lib/pure/install-entries`): it never takes the whole set in its place.
  */
 
 const KEY = 'sg-fields-setup:install-selection';
@@ -24,7 +25,7 @@ export function writeInstallSelection(setId: string, entryIds: readonly string[]
 		if (entryIds.length === 0) storage?.removeItem(KEY);
 		else storage?.setItem(KEY, JSON.stringify({ setId, entryIds }));
 	} catch {
-		/* Blocked storage: the install screen takes the whole set. */
+		/* Blocked storage: the install screen says the selection was lost. */
 	}
 }
 

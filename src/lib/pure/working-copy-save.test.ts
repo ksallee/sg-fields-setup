@@ -57,7 +57,30 @@ function open() {
 
 describe('saveRequest', () => {
 	it('EDT-44: a clean working copy asks for nothing', () => {
-		expect(saveRequest(open())).toEqual({ details: null, removedIds: [], changed: [], added: [] });
+		expect(saveRequest(open())).toEqual({
+			details: null,
+			removedIds: [],
+			changed: [],
+			added: [],
+			loaded: { setChangedAt: SET.changedAt, name: 'Lens', description: 'Camera data', entryChangedAt: {} }
+		});
+	});
+
+	it('H1: carries what the set and each changed or removed field read when loaded, never what was typed since', () => {
+		const loadedAt = '2026-11-02T10:00:00.000Z';
+		let wc = openWorkingCopy({ ...SET, changedAt: loadedAt }, [storedEntry('a', { changedAt: loadedAt }), snapshotted, storedEntry('c')]);
+		const key = (id: string) => wc.rows.find((row) => row.entryId === id)!.key;
+		wc = setName(wc, 'Lens kit');
+		wc = editRow(wc, key('a'), { description: 'Edited.' });
+		wc = removeRow(wc, key('c'));
+		wc = addRow(wc, 'new-1', 'Shot');
+		expect(saveRequest(wc).loaded).toEqual({
+			setChangedAt: loadedAt,
+			name: 'Lens',
+			description: 'Camera data',
+			// The changed one and the removed one. Not the untouched one, not the added one.
+			entryChangedAt: { a: loadedAt, c: '2026-11-01T09:00:00.000Z' }
+		});
 	});
 
 	it('EDT-44, MOD-1, MOD-7: a changed name or description sends both, cleaned', () => {

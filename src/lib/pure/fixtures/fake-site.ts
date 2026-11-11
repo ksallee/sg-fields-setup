@@ -15,6 +15,13 @@
  *   types, and kept on a status list.
  * - Valid types: an unknown entity type is a 400. A type in the wrong case (`shot`) is a 500 that
  *   leaves the field retired and broken (finding 121).
+ * - Reverse fields (findings 116 and 121): an entity or a multi-entity link holds a field on each
+ *   of its valid types. Creating the link makes them. Adding a type to an entity link makes one,
+ *   removing a type retires it, and its name stays taken: adding the type back makes a new field
+ *   under the next name. Retiring or reviving the link retires or revives them with it. A write
+ *   that only reorders makes nothing. `reverseFields` shows them to a test.
+ * - Status codes: a status list's values and default must be codes the site has (findings 116 and
+ *   121). The site has `DEFAULT_STATUSES` unless a test gives it others.
  * - Retire: 204, and the name stays taken.
  * - Revive: 204 on a retired field, which returns with its settings and visible in every project;
  *   404 `Retired field <Type>.<name> does not exist.` on a name never used; 400
@@ -79,6 +86,8 @@ export interface FakeField {
 	/** True after the wrong-case valid type's 500: retired, and not known to come back (corpus finding 121). */
 	broken: boolean;
 	hiddenIn: number[];
+	/** For a reverse field: the link it is the other side of. Null for every other field. */
+	reverseOf: { entityType: string; name: string } | null;
 }
 
 /** One call, as the log keeps it. */
@@ -155,8 +164,8 @@ export interface FakeSiteOptions {
 	/** The ids of the site's projects. A `visible` write for any other id is refused (corpus finding 115). */
 	projects?: readonly number[];
 	/**
-	 * The site's status codes. When given, a status list's values and default must be among them
-	 * (corpus finding 121). Left out: any code is taken.
+	 * The site's status codes. A status list's values and default must be among them: any other
+	 * code is a 400 (corpus findings 116 and 121). Default: `DEFAULT_STATUSES`.
 	 */
 	statuses?: readonly string[];
 }
@@ -173,6 +182,10 @@ interface Held {
 	retired: boolean;
 	broken: boolean;
 	hiddenIn: Set<number>;
+	/** A reverse field: the link it belongs to. */
+	reverseOf: { entityType: string; name: string } | null;
+	/** A reverse field that went to the trash with its link, and comes back with it. */
+	retiredWithLink: boolean;
 }
 
 type Injected =
@@ -181,6 +194,13 @@ type Injected =
 	| { kind: 'ignore' };
 
 const DEFAULT_TYPES = ['Version', 'Shot', 'Asset', 'Task'];
+
+/**
+ * The status codes of a site when a test names none: a small set of the codes a stock site ships
+ * with. The probed site held 41 (corpus finding 121); the list itself is not in the corpus, so
+ * these are stand-ins, not a measurement. A test that needs another code passes `statuses`.
+ */
+export const DEFAULT_STATUSES: readonly string[] = ['wtg', 'rdy', 'ip', 'hld', 'fin', 'omt', 'na', 'rev', 'vwd', 'apr', 'act', 'opn', 'res', 'clsd'];
 const DEFAULT_CARRIERS = ['list', 'status_list', 'checkbox'];
 const VALUE_CARRIERS = ['list', 'status_list'];
 const TYPE_CARRIERS = ['entity', 'multi_entity'];
@@ -202,7 +222,11 @@ function strings(value: unknown): string[] | null {
 	return Array.isArray(value) && value.every((item) => typeof item === 'string') ? [...(value as string[])] : null;
 }
 
-/** The type as `links.self` spells it: `Version` as it is, the others in snake case (corpus finding 118). */
+/**
+ * The type as `links.self` spells it: `Version` as it is, the others in snake case. Measured on
+ * Version, a custom entity (`custom_entityNN`) and Tag (corpus finding 118). Not measured: every
+ * other type, among them one with two capitals such as `PublishedFile`; snake case is assumed.
+ */
 function selfSegment(entityType: string): string {
 	if (entityType === 'Version') return entityType;
 	return entityType.replace(/(?!^)([A-Z])/g, '_$1').toLowerCase();
@@ -222,11 +246,13 @@ export class FakeSite implements SchemaWritePort {
 
 	private readonly types: Map<string, string>;
 	private readonly projects: Set<number>;
-	private readonly statuses: Set<string> | null;
+	private readonly statuses: Set<string>;
 	private readonly fieldsOf = new Map<string, Map<string, Held>>();
 	private readonly undeclared = new Set<string>();
 	private readonly injected = new Map<FakeOp, Injected[]>();
 	private readonly hooks = new Map<FakeOp, (() => void)[]>();
+	/** When each reverse field was made, by `<Type>.<name>`: 1 for the first. */
+	private readonly made = new Map<string, number>();
 	private writesInFlight: FakeCall[] = [];
 
 	constructor(options: FakeSiteOptions = {}) {
@@ -234,21 +260,19 @@ export class FakeSite implements SchemaWritePort {
 		const types = options.entityTypes ?? DEFAULT_TYPES;
 		this.types = new Map(Array.isArray(types) ? types.map((name) => [name, name]) : Object.entries(types));
 		this.projects = new Set(options.projects ?? []);
-		this.statuses = options.statuses ? new Set(options.statuses) : null;
+		this.statuses = new Set(options.statuses ?? DEFAULT_STATUSES);
 	}
 
 	/* Seeding and looking: what a test does to the site behind the API's back. */
 
-	/** Puts a live field on the site. */
+	/** Puts a live field on the site. A link comes with its reverse fields, as on the site. */
 	seed(entityType: string, name: string, settings: FakeFieldSettings = {}): this {
-		this.table(entityType).set(name, this.held(settings, false));
-		return this;
+		return this.place(entityType, name, this.held(settings, false));
 	}
 
-	/** Puts a retired field on the site: in the trash, its name taken. */
+	/** Puts a retired field on the site: in the trash, its name taken. A link's reverse fields are in the trash with it. */
 	seedRetired(entityType: string, name: string, settings: FakeFieldSettings = {}): this {
-		this.table(entityType).set(name, this.held(settings, true));
-		return this;
+		return this.place(entityType, name, this.held(settings, true));
 	}
 
 	/** A name the row answers and the schema leaves out: its read is 200 with no record. */
@@ -257,7 +281,11 @@ export class FakeSite implements SchemaWritePort {
 		return this;
 	}
 
-	/** Deletes a field for good, as the site's trash page does. The name is free again. */
+	/**
+	 * Deletes a field for good, as the site's trash page does. The name is free again. Not measured:
+	 * what a revive of the name answers afterwards (the fake answers as for a name never used), and
+	 * what becomes of a link's reverse fields (the fake leaves them where they are).
+	 */
 	deleteForGood(entityType: string, name: string): this {
 		this.fieldsOf.get(entityType)?.delete(name);
 		return this;
@@ -280,8 +308,17 @@ export class FakeSite implements SchemaWritePort {
 			stock: held.stock,
 			retired: held.retired,
 			broken: held.broken,
-			hiddenIn: [...held.hiddenIn]
+			hiddenIn: [...held.hiddenIn],
+			reverseOf: held.reverseOf ? { ...held.reverseOf } : null
 		};
+	}
+
+	/**
+	 * The reverse fields of a link, live and retired, in the order they were made (corpus findings
+	 * 116 and 121). Each is a field name taken on its type for good.
+	 */
+	reverseFields(entityType: string, name: string): FakeField[] {
+		return this.reverseOf(entityType, name).flatMap(([type, field]) => this.get(type, field) ?? []);
 	}
 
 	/** The names of a type's live fields, in creation order. */
@@ -396,7 +433,7 @@ export class FakeSite implements SchemaWritePort {
 			{ entityType, field, projectId, body: properties },
 			() => {
 				const held = this.needLive(entityType, field);
-				this.update(held, properties, projectId);
+				this.update(entityType, field, held, properties, projectId);
 				return this.record(entityType, held, projectId);
 			},
 			() => {
@@ -413,6 +450,8 @@ export class FakeSite implements SchemaWritePort {
 			{ entityType, field },
 			() => {
 				this.needLive(entityType, field).retired = true;
+				// The reverse fields go with it: measured on a multi-entity link (finding 116) and an entity link (121).
+				this.retireReverse(entityType, field);
 			},
 			() => undefined
 		);
@@ -444,6 +483,15 @@ export class FakeSite implements SchemaWritePort {
 					held.retired = false;
 					// It comes back as it was retired, except that it is visible in every project (corpus finding 115).
 					held.hiddenIn.clear();
+					// Its reverse fields come back with it (finding 121, measured on an entity link; a multi-entity
+					// link's revive was not measured and is taken to do the same). Their visibility was not measured.
+					for (const [type, name] of this.reverseOf(entityType, field)) {
+						const reverse = this.table(type).get(name);
+						if (reverse?.retiredWithLink) {
+							reverse.retired = false;
+							reverse.retiredWithLink = false;
+						}
+					}
 					return { revived: true };
 				},
 				(): ReviveAnswer => ({ revived: true })
@@ -494,8 +542,99 @@ export class FakeSite implements SchemaWritePort {
 			stock: settings.stock ?? false,
 			retired,
 			broken: false,
-			hiddenIn: new Set(settings.hiddenIn ?? [])
+			hiddenIn: new Set(settings.hiddenIn ?? []),
+			reverseOf: null,
+			retiredWithLink: false
 		};
+	}
+
+	/** Puts a seeded field in its table. A link gets the reverse fields it lacks, in the state of the link. */
+	private place(entityType: string, name: string, held: Held): this {
+		this.table(entityType).set(name, held);
+		if (!TYPE_CARRIERS.includes(held.dataType)) return this;
+		const have = new Set(this.reverseOf(entityType, name).map(([type]) => type));
+		for (const type of held.validTypes ?? []) {
+			if (!have.has(type)) this.makeReverse(entityType, name, held.dataType, type);
+		}
+		if (held.retired) this.retireReverse(entityType, name);
+		return this;
+	}
+
+	/** Where the reverse fields of a link are: `[entity type, field name]`, in the order they were made. */
+	private reverseOf(entityType: string, name: string): [string, string][] {
+		const found: [string, string][] = [];
+		for (const [type, table] of this.fieldsOf) {
+			for (const [field, held] of table) {
+				if (held.reverseOf?.entityType === entityType && held.reverseOf.name === name) found.push([type, field]);
+			}
+		}
+		const madeAt = ([type, field]: [string, string]) => this.made.get(`${type}.${field}`) ?? 0;
+		return found.sort((a, b) => madeAt(a) - madeAt(b));
+	}
+
+	/**
+	 * Makes the field a link holds on one of its valid types (corpus findings 116 and 121).
+	 *
+	 * Measured, from the event log, for links on Version: an entity link's field is `sg_versions_<n>`
+	 * under the next free number, a retired name counting as taken (`Shot.sg_versions_3`,
+	 * `Sequence.sg_versions_1`); a multi-entity link's is `version_<field>_versions`
+	 * (`version_sg_deliveries_versions`, a multi_entity whose valid type is Version, finding 056).
+	 *
+	 * Not measured, and assumed here: the names for a link on another type (the type lowercased, plus
+	 * `s`); the data type, valid types and display name of an entity link's reverse field (modelled
+	 * as the multi-entity one, labelled with its own name); that an entity link's reverse field is
+	 * in the type's field listing; what happens when the multi-entity name is already taken (a
+	 * number is added).
+	 */
+	private makeReverse(linkType: string, linkName: string, linkDataType: string, onType: string): void {
+		if (!this.types.has(onType)) return;
+		const table = this.table(onType);
+		const plural = `${linkType.toLowerCase()}s`;
+		const base = linkDataType === 'multi_entity' ? `${linkType.toLowerCase()}_${linkName}_${plural}` : `sg_${plural}`;
+		let name = linkDataType === 'multi_entity' ? base : `${base}_1`;
+		for (let n = 2; table.has(name); n += 1) name = `${base}_${n}`;
+		table.set(name, {
+			dataType: 'multi_entity',
+			displayName: name,
+			description: '',
+			defaultValue: null,
+			validValues: null,
+			validTypes: [linkType],
+			unique: false,
+			stock: false,
+			retired: false,
+			broken: false,
+			hiddenIn: new Set(),
+			reverseOf: { entityType: linkType, name: linkName },
+			retiredWithLink: false
+		});
+		this.made.set(`${onType}.${name}`, this.made.size + 1);
+	}
+
+	/** The link went to the trash: its live reverse fields go with it (findings 116 and 121). */
+	private retireReverse(entityType: string, name: string): void {
+		for (const [type, field] of this.reverseOf(entityType, name)) {
+			const reverse = this.table(type).get(field);
+			if (reverse && !reverse.retired) {
+				reverse.retired = true;
+				reverse.retiredWithLink = true;
+			}
+		}
+	}
+
+	/**
+	 * An entity link's valid types changed from `before` to `after` (finding 121): a field is made on
+	 * each type added and the field of each type removed is retired, its name taken for good. A type
+	 * that stays, in whatever place, keeps its field: a reorder makes nothing.
+	 */
+	private syncReverse(entityType: string, name: string, before: readonly string[], after: readonly string[]): void {
+		for (const [type, field] of this.reverseOf(entityType, name)) {
+			const reverse = this.table(type).get(field);
+			if (reverse && !reverse.retired && !after.includes(type)) reverse.retired = true;
+		}
+		for (const type of after) {
+			if (!before.includes(type)) this.makeReverse(entityType, name, 'entity', type);
+		}
 	}
 
 	/** A field's record as the site sends it, every value wrapped (corpus `endpoints/get_schema_type_fields`). */
@@ -552,6 +691,7 @@ export class FakeSite implements SchemaWritePort {
 			sent.set(property.property_name, property.value);
 		}
 		const displayName = sent.get('name');
+		// Not measured: a create with no name, or a blank one. The "missing required" 400 of a status list with no values is assumed.
 		if (typeof displayName !== 'string' || displayName.trim() === '') {
 			throw new FakeSiteError(400, { code: 103, title: `API ${api}() missing required 'properties' ["name"]` });
 		}
@@ -559,9 +699,13 @@ export class FakeSite implements SchemaWritePort {
 		const validValues = sent.has('valid_values') ? strings(sent.get('valid_values')) : null;
 		const validTypes = sent.has('valid_types') ? strings(sent.get('valid_types')) : null;
 		const defaultValue = sent.get('default_value') ?? null;
+		// Measured with the property left out (findings 019 and 116). Not measured: an empty list, here and for valid
+		// types below. It is taken as left out.
 		if (dataType === 'status_list' && (validValues === null || validValues.length === 0)) {
 			throw new FakeSiteError(400, { code: 103, title: `API ${api}() missing required 'properties' ["valid_values"]` });
 		}
+		// Measured with no default at all (finding 019). Not measured: a default sent as a string at creation. An
+		// update stores the string (finding 116); the create is taken to refuse it as it refuses none.
 		if (dataType === 'checkbox' && typeof defaultValue !== 'boolean') {
 			throw new FakeSiteError(500, { code: 105, title: 'Only true or false allowed in checkbox' });
 		}
@@ -586,9 +730,13 @@ export class FakeSite implements SchemaWritePort {
 		}
 
 		const table = this.table(entityType);
+		// A non-ASCII display name gives `sg_<data_type>`: measured on a currency field only (finding 117), assumed
+		// for every other type.
 		const base = predictFieldName(displayName, dataType) ?? '';
 		let name = base;
-		// A live field with the name: the new one is suffixed, at 201, with no warning (corpus finding 019).
+		// A live field with the name: the new one is suffixed, at 201, with no warning (corpus finding 019). Measured
+		// with the same display name three times over. Not measured, and assumed to follow: another display name that
+		// derives a live name; and a live base whose `_1` is retired, taken here as the retired-name refusal for `_1`.
 		for (let suffix = 1; table.get(name)?.retired === false; suffix += 1) name = `${base}_${suffix}`;
 		if (table.get(name)?.retired) {
 			const said = `there is a retired field with the same field_name: ${name}`;
@@ -604,18 +752,28 @@ export class FakeSite implements SchemaWritePort {
 			dataType,
 			displayName,
 			description: typeof description === 'string' ? description : '',
+			// Not measured: a default sent at creation on a type that carries none. It is dropped here. (On an update it
+			// is a 400, finding 117.)
 			defaultValue: DEFAULT_CARRIERS.includes(dataType) ? defaultValue : null,
 			// Repeats: dropped on a list and on valid types, kept on a status list (measured on update, finding 121).
 			validValues: VALUE_CARRIERS.includes(dataType) ? (dataType === 'list' ? unique(validValues ?? []) : (validValues ?? [])) : null,
+			// Not measured: the order valid types take at creation (finding 121 lists it). The order sent is assumed,
+			// as an update keeps it. The run's PLN-20 test rests on this.
 			validTypes: TYPE_CARRIERS.includes(dataType) && validTypes ? unique(validTypes) : null,
+			// Measured on a text field (finding 116). Not measured: `unique` at creation on another type. Taken on all.
 			unique: sent.get('unique') === true,
 			stock: false,
 			retired: false,
 			broken: false,
 			// A new field is visible in every project (corpus finding 115).
-			hiddenIn: new Set()
+			hiddenIn: new Set(),
+			reverseOf: null,
+			retiredWithLink: false
 		});
-		// The reverse field a multi_entity creates on the other type (corpus finding 116) is not modelled.
+		// A link makes a field on each of its valid types (corpus findings 116 and 121).
+		if (TYPE_CARRIERS.includes(dataType)) {
+			for (const type of unique(validTypes ?? [])) this.makeReverse(entityType, name, dataType, type);
+		}
 		return { name, self: `/api/v1/schema/${selfSegment(entityType)}/fields/${name}` };
 	}
 
@@ -635,8 +793,7 @@ export class FakeSite implements SchemaWritePort {
 	}
 
 	private checkStatuses(api: string, codes: readonly string[]): void {
-		if (this.statuses === null) return;
-		const stray = codes.find((code) => !this.statuses?.has(code));
+		const stray = codes.find((code) => !this.statuses.has(code));
 		if (stray === undefined) return;
 		throw new FakeSiteError(400, {
 			code: 103,
@@ -650,6 +807,8 @@ export class FakeSite implements SchemaWritePort {
 	 * of its properties, and applied whole or not at all (corpus finding 121).
 	 */
 	private update(
+		entityType: string,
+		field: string,
 		held: Held,
 		properties: readonly { property_name: string; value: unknown }[],
 		projectId?: number
@@ -668,7 +827,9 @@ export class FakeSite implements SchemaWritePort {
 		properties.forEach((property, index) => {
 			const { property_name: name, value } = property;
 			if (name === 'unique') {
-				// 500 on a text field, 400 on the others measured (corpus finding 116).
+				// 500 on a text field created unique, 400 on a list and a currency field (corpus finding 116). Not
+				// measured: a text field created without `unique`, and the other types. The 500 is given to every
+				// text field and the 400 to the rest.
 				if (held.dataType === 'text') throw new FakeSiteError(500, { code: 105, title: `API ${api}() does not support updating 'unique'.` });
 				throw invalidProperty(api, name, valid);
 			}
@@ -681,6 +842,8 @@ export class FakeSite implements SchemaWritePort {
 				if (!this.projects.has(projectId)) {
 					throw new FakeSiteError(400, { code: 105, title: `API ${api}(): The Project with the given project_id does not exist.` });
 				}
+				// Not measured: a `visible` write on a field the site may not hide (`visible.editable` false, a stock
+				// field). The fake applies it. The app never sends one: `visibility-run` reads `editable` first.
 				// The string "false" hides too (corpus finding 115).
 				if (value === false || value === 'false') next.hiddenIn.add(projectId);
 				else next.hiddenIn.delete(projectId);
@@ -743,12 +906,16 @@ export class FakeSite implements SchemaWritePort {
 			}
 		});
 
-		// The state the whole request would leave.
+		// The state the whole request would leave. Not measured: which refusal wins when a request earns several. The
+		// order here is the order of the code: a property's own refusal, in the order sent, then the valid types, the
+		// status codes, the default and the values.
 		if (sent.has('valid_types') && next.validTypes && this.checkTypes(api, next.validTypes) === 'wrong-case') {
-			// The trap of finding 121: a 500, and the field is gone, its valid types stored as sent.
+			// The trap of finding 121: a 500, and the field is gone, its valid types stored as sent and its reverse
+			// fields retired.
 			held.validTypes = next.validTypes;
 			held.retired = true;
 			held.broken = true;
+			this.retireReverse(entityType, field);
 			throw new FakeSiteError(500, { code: 100, title: 'Shotgun Server Error' });
 		}
 		if (VALUE_CARRIERS.includes(held.dataType)) {
@@ -771,7 +938,9 @@ export class FakeSite implements SchemaWritePort {
 				});
 			}
 		}
+		const before = held.validTypes ?? [];
 		Object.assign(held, next);
+		if (sent.has('valid_types') && held.dataType === 'entity') this.syncReverse(entityType, field, before, held.validTypes ?? []);
 	}
 
 	private start(op: FakeOp, info: { entityType?: string; field?: string; projectId?: number; body?: unknown }): FakeCall {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanItem } from './plan';
-import { INITIAL_RUN_STATE, needsVisibilityRetry, reduceRun, resumeIds, retryIds, runCounters, type RunEvent, type RunState } from './run';
+import { INITIAL_RUN_STATE, madeByRun, needsVisibilityRetry, reduceRun, resumeIds, retryIds, runCounters, type RunEvent, type RunState } from './run';
 
 function item(entryId: string, planClass: PlanItem['class'] = 'create'): PlanItem {
 	return {
@@ -167,5 +167,20 @@ describe('reduceRun', () => {
 		reduceRun(before, { type: 'item-started', entryId: 'a' });
 		reduceRun(before, { type: 'field-changed', entryId: 'a', effect: { kind: 'created', name: 'sg_a' } });
 		expect(before).toEqual(frozen);
+	});
+});
+
+describe('madeByRun (VIS-4, VIS-6)', () => {
+	it.each([
+		['nothing', [], false],
+		['a create', [{ kind: 'created', name: 'sg_a' }], true],
+		['a revive', [{ kind: 'revived', name: 'sg_a' }], true],
+		['a revive then an update', [{ kind: 'revived', name: 'sg_a' }, { kind: 'updated', name: 'sg_a' }], true],
+		['an update alone', [{ kind: 'updated', name: 'sg_a' }], false],
+		['a revive then a re-trash', [{ kind: 'revived', name: 'sg_a' }, { kind: 'retired', name: 'sg_a' }], false],
+		['a create under another name', [{ kind: 'created', name: 'sg_a_1' }, { kind: 'retired', name: 'sg_a_1' }], false],
+		['a re-trash then a create', [{ kind: 'revived', name: 'sg_a' }, { kind: 'retired', name: 'sg_a' }, { kind: 'created', name: 'sg_a' }], true]
+	] as const)('after %s', (_, effects, expected) => {
+		expect(madeByRun(effects, 'sg_a')).toBe(expected);
 	});
 });

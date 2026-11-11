@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import type { Entry, EntryDraft } from '$lib/pure/model';
-import type { SaveRequest } from '$lib/pure/working-copy-save';
+import { refusalMessage } from '$lib/pure/set-plan';
+import { editRow, openWorkingCopy, removeRow, setDescription, type WorkingCopy } from '$lib/pure/working-copy';
+import { afterSave, draftsOf, saveRequest, type SaveRequest } from '$lib/pure/working-copy-save';
 import {
 	DB_NAME,
 	DB_VERSION,
@@ -525,6 +527,129 @@ describe('saveSet', () => {
 	});
 });
 
+describe('two tabs on one set (audit H1, M3)', () => {
+	/** One set with two fields, and a second store on the same database: the other tab. */
+	async function twoTabs() {
+		const here = await open();
+		const there = await openSetStore({ idb: here.idb });
+		const created = await here.store.createSet({
+			name: 'Camera report',
+			description: 'Lens fields',
+			origin: 'import',
+			originDetails: { sourceFiles: 'report.csv', importedAt: T0 },
+			entries: [draft({ programmaticName: 'sg_lens' }), draft({ programmaticName: 'sg_slate', displayName: 'Slate' })]
+		});
+		if (!created.ok) throw new Error('seed failed');
+		const load = () => openWorkingCopy(created.set, created.entries);
+		const key = (wc: WorkingCopy, name: string) => wc.rows.find((row) => row.programmaticName === name)!.key;
+		return { a: there, b: here.store, idb: here.idb, set: created.set, load, key };
+	}
+
+	it('H1: a save from a tab on the old state does not write over a newer save of the same field', async () => {
+		const { a, b, set, load, key } = await twoTabs();
+		// Both tabs load the set. Tab A renames the lens and saves.
+		const tabA = load();
+		const tabB = load();
+		const savedA = await a.saveSet(set.id, saveRequest(editRow(tabA, key(tabA, 'sg_lens'), { displayName: 'Lens B' })));
+		expect(savedA.ok).toBe(true);
+
+		// Tab B, still showing "Lens", edits its description and saves.
+		const editedB = editRow(tabB, key(tabB, 'sg_lens'), { description: 'Which lens.' });
+		const savedB = await b.saveSet(set.id, saveRequest(editedB));
+		expect(savedB).toEqual({ ok: false, reason: 'stale', details: false, fields: ['Lens'] });
+		if (savedB.ok) return;
+		expect(refusalMessage(savedB)).toBe(
+			'The field "Lens" was changed in another tab. Nothing was saved. Reload to see it, or duplicate this set to keep your changes.'
+		);
+		// A's rename is still there, and nothing of B's was written.
+		const now = await b.getSet(set.id);
+		expect(now?.entries.map((e) => [e.displayName, e.description])).toEqual([
+			['Lens B', null],
+			['Slate', null]
+		]);
+		expect(savedA.ok && now?.set.changedAt).toBe(savedA.ok && savedA.set.changedAt);
+
+		// What B can do next: its working copy is kept, and a duplicate of it stores its work.
+		const copy = await b.duplicateSet(set.id, { name: editedB.name, description: editedB.description, entries: draftsOf(editedB) });
+		expect(copy).toMatchObject({ ok: true, set: { name: 'Camera report copy' } });
+		expect(copy.ok && copy.entries.map((e) => [e.displayName, e.description])).toEqual([
+			['Lens', 'Which lens.'],
+			['Slate', null]
+		]);
+	});
+
+	it('H1: the other tab changed the description, this one changes it too: refused, and a removal of a field changed there as well', async () => {
+		const { a, b, set, load, key } = await twoTabs();
+		const tabA = load();
+		const tabB = load();
+		await a.saveSet(set.id, saveRequest(setDescription(editRow(tabA, key(tabA, 'sg_slate'), { displayName: 'Slate number' }), 'Theirs.')));
+		const result = await b.saveSet(set.id, saveRequest(setDescription(removeRow(tabB, key(tabB, 'sg_slate')), 'Mine.')));
+		expect(result).toEqual({ ok: false, reason: 'stale', details: true, fields: ['Slate number'] });
+		expect((await b.getSet(set.id))?.entries).toHaveLength(2);
+	});
+
+	it('M3: a set deleted in another tab cannot be saved, and its open working copy is duplicated all the same', async () => {
+		const { a, b, idb, set, load, key } = await twoTabs();
+		const tabB = load();
+		const editedB = setDescription(editRow(tabB, key(tabB, 'sg_lens'), { description: 'Which lens.' }), 'Edited.');
+		await a.deleteSet(set.id);
+
+		expect(await b.saveSet(set.id, saveRequest(editedB))).toEqual({ ok: false, reason: 'set_missing' });
+		// The whole working copy is given: the stored set is not needed. Origin comes from what the tab loaded.
+		const copy = await b.duplicateSet(set.id, {
+			name: editedB.name,
+			description: editedB.description,
+			entries: draftsOf(editedB),
+			origin: editedB.saved.origin,
+			originDetails: editedB.saved.originDetails
+		});
+		expect(copy).toMatchObject({
+			ok: true,
+			set: { name: 'Camera report copy', description: 'Edited.', origin: 'import', originDetails: { sourceFiles: 'report.csv', importedAt: T0 } }
+		});
+		expect(copy.ok && copy.entries.map((e) => [e.programmaticName, e.description])).toEqual([
+			['sg_lens', 'Which lens.'],
+			['sg_slate', null]
+		]);
+		expect((await dump(idb)).sets).toMatchObject([{ name: 'Camera report copy' }]);
+
+		// A selection of it is rescued the same way.
+		const part = await b.duplicateSet(set.id, { name: editedB.name, description: editedB.description, entries: draftsOf(editedB, [key(editedB, 'sg_slate')]) });
+		expect(part).toMatchObject({ ok: true, set: { name: 'Camera report copy 2', origin: 'manual', originDetails: null } });
+		expect(part.ok && part.entries.map((e) => e.programmaticName)).toEqual(['sg_slate']);
+	});
+
+	it('M3: a deleted set is still missing when the working copy is not all given', async () => {
+		const { a, b, idb, set, load } = await twoTabs();
+		const tabB = load();
+		await a.deleteSet(set.id);
+		const entries = draftsOf(tabB);
+		expect(await b.duplicateSet(set.id)).toEqual({ ok: false, reason: 'set_missing' });
+		expect(await b.duplicateSet(set.id, { entries })).toEqual({ ok: false, reason: 'set_missing' });
+		expect(await b.duplicateSet(set.id, { name: 'Camera report', entries })).toEqual({ ok: false, reason: 'set_missing' });
+		expect(await b.duplicateSet(set.id, { name: 'Camera report', description: null })).toEqual({ ok: false, reason: 'set_missing' });
+		expect(await b.duplicateSet(set.id, { name: '  ', description: null, entries })).toEqual({ ok: false, reason: 'set_missing' });
+		expect((await dump(idb)).sets).toEqual([]);
+	});
+
+	it('H1: changes to different fields from two tabs are both kept', async () => {
+		const { a, b, set, load, key } = await twoTabs();
+		const tabA = load();
+		const tabB = load();
+		await a.saveSet(set.id, saveRequest(editRow(tabA, key(tabA, 'sg_lens'), { displayName: 'Lens B' })));
+		const result = await b.saveSet(set.id, saveRequest(editRow(tabB, key(tabB, 'sg_slate'), { description: 'Board.' })));
+		expect(result.ok && result.entries.map((e) => [e.displayName, e.description])).toEqual([
+			['Lens B', null],
+			['Slate', 'Board.']
+		]);
+		// The tab reloads from what was stored, so its next save is on the new state.
+		if (!result.ok) return;
+		const next = afterSave(tabB, result.set, result.entries);
+		const again = await b.saveSet(set.id, saveRequest(editRow(next, key(next, 'sg_lens'), { description: 'Which lens.' })));
+		expect(again).toMatchObject({ ok: true });
+	});
+});
+
 describe('duplicateSet', () => {
 	async function seeded() {
 		const opened = await open();
@@ -648,6 +773,25 @@ describe('preferences', () => {
 		await again.setPreference('skipDeleteSetConfirm', false);
 		expect(await again.getPreferences()).toEqual({ skipDeleteSetConfirm: false });
 	});
+
+	it('SET-22: a stored value that is not a boolean reads as "ask"', async () => {
+		const { store, idb } = await open();
+		store.close();
+		// Written behind the store's back, as an older or a broken build might have.
+		const db = await new Promise<IDBDatabase>((resolve, reject) => {
+			const req = idb.open(DB_NAME);
+			req.onsuccess = () => resolve(req.result);
+			req.onerror = () => reject(req.error);
+		});
+		await new Promise<void>((resolve, reject) => {
+			const tx = db.transaction('preferences', 'readwrite');
+			tx.objectStore('preferences').put({ key: 'skipDeleteSetConfirm', value: 'yes' });
+			tx.oncomplete = () => resolve();
+			tx.onabort = () => reject(tx.error);
+		});
+		db.close();
+		expect(await store.getPreferences()).toEqual({ skipDeleteSetConfirm: false });
+	});
 });
 
 describe('storage faults', () => {
@@ -683,6 +827,28 @@ describe('storage faults', () => {
 		const failed = openSetStore({ idb, version: DB_VERSION + 1 });
 		await expect(failed).rejects.toMatchObject({ kind: 'blocked', message: storageMessage('blocked') });
 		old.close();
+	});
+
+	it('a database that opens after the blocked open gave up is let go: a later upgrade is not blocked by it', async () => {
+		const idb = new IDBFactory();
+		const old = await new Promise<IDBDatabase>((resolve) => {
+			const req = idb.open(DB_NAME, DB_VERSION);
+			req.onsuccess = () => resolve(req.result);
+		});
+		await expect(openSetStore({ idb, version: DB_VERSION + 1 })).rejects.toMatchObject({ kind: 'blocked' });
+		// The other tab lets go. The open that was given up on now succeeds, with nobody holding it.
+		old.close();
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		const later = await new Promise<'opened' | 'blocked'>((resolve, reject) => {
+			const req = idb.open(DB_NAME, DB_VERSION + 2);
+			req.onblocked = () => resolve('blocked');
+			req.onerror = () => reject(req.error);
+			req.onsuccess = () => {
+				req.result.close();
+				resolve('opened');
+			};
+		});
+		expect(later).toBe('opened');
 	});
 
 	it('the store lets a newer tab upgrade, then says this tab is out of date', async () => {
