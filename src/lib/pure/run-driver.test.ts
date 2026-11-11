@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createFakeSite, type FakeSite } from './fixtures/fake-site';
+import { createFakeSite, type FakeSite } from '$lib/testing/fake-site';
 import type { PlanEntry } from './plan';
 import { createRun, replan, type Run, type RunDeps } from './run-driver';
 import { reportText, runReport } from './run-report';

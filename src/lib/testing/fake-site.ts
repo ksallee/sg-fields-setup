@@ -34,12 +34,12 @@
  * The object is a `SchemaWritePort` as it stands, and its three reads have the shape of
  * `SchemaSource` (`src/lib/io/schema.ts`). `reader()` gives the run's `RunReader`.
  */
-import { readEntityTypes } from '../live-entity-types';
-import { readFieldReply, readFields, type FieldReply } from '../live-field';
-import { predictFieldName } from '../field-name';
-import type { CreatePayload, PropertyWrite } from '../plan';
-import type { ReviveAnswer, RunReader, SchemaWritePort } from '../run-port';
-import { isRecord } from '../is-record';
+import { readEntityTypes } from '$lib/pure/live-entity-types';
+import { readFieldReply, readFields, type FieldReply } from '$lib/pure/live-field';
+import { predictFieldName } from '$lib/pure/field-name';
+import type { CreatePayload, PropertyWrite } from '$lib/pure/plan';
+import type { ReviveAnswer, RunReader, SchemaWritePort } from '$lib/pure/run-port';
+import { isRecord } from '$lib/pure/is-record';
 
 export const FAKE_OPS = [
 	'readRawEntityTypes',

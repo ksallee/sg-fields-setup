@@ -15,7 +15,7 @@ import { asRefusal } from '$lib/pure/run-port';
 import { decodeSetFile } from '$lib/pure/set-file';
 import { createApplyVisibility } from '$lib/pure/visibility-run';
 import { resolveScope } from '$lib/pure/visibility-scope';
-import { FAKE_PROJECT_IDS, FAKE_TRASH_PAGE_URL, fakeInstallSite, fakeOptions, seededFakeSite } from './install-site-fake';
+import { FAKE_PROJECT_IDS, FAKE_TRASH_PAGE_URL, fakeInstallSite, fakeOptions, seededFakeSite } from '$lib/testing/install-site-fake';
 
 const SRC = join(process.cwd(), 'src');
 
@@ -37,15 +37,15 @@ function filesWith(pattern: RegExp): string[] {
 
 describe('the fake site stays out of a production build', () => {
 	it('is imported by one module, and that module by install-site alone', () => {
-		expect(filesWith(/from '[^']*fixtures\/fake-site'/)).toEqual(['lib/io/install-site-fake.ts']);
+		expect(filesWith(/from '[^']*testing\/fake-site'|from '\.\/fake-site'/)).toEqual(['lib/testing/install-site-fake.ts']);
 		expect(filesWith(/install-site-fake'/)).toEqual(['lib/io/install-site.ts']);
-		expect(filesWith(/sg-widgets-core\/mock/)).toEqual(['lib/io/install-site-fake.ts']);
+		expect(filesWith(/sg-widgets-core\/mock/)).toEqual(['lib/testing/install-site-fake.ts']);
 	});
 
 	it('is reached only through a dynamic import behind import.meta.env.DEV', () => {
 		const source = readFileSync(join(SRC, 'lib/io/install-site.ts'), 'utf8');
 		expect(source).not.toMatch(/^import[^;]*install-site-fake/m);
-		const uses = source.match(/[^\n]*\n[^\n]*import\('\.\/install-site-fake'\)/g) ?? [];
+		const uses = source.match(/[^\n]*\n[^\n]*import\('\$lib\/testing\/install-site-fake'\)/g) ?? [];
 		expect(uses).toHaveLength(1);
 		expect(uses[0]).toMatch(/^\s*if \(import\.meta\.env\.DEV && /);
 	});

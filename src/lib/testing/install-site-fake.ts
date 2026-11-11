@@ -1,6 +1,6 @@
 /**
  * A site held in memory for the install screen, under `vite dev` only (`install-site.ts`, the
- * `?fake` flag). It is `$lib/pure/fixtures/fake-site`, which answers as the corpus measured, seeded
+ * `?fake` flag). It is `$lib/testing/fake-site`, which answers as the corpus measured, seeded
  * for the set in `fixtures/install-drive/install-drive.fieldset.json`: every class of the plan and
  * every branch of the run. Nothing here reaches a network. `docs/development.md` says how to
  * drive it.
@@ -29,12 +29,12 @@
  */
 import { MockClient } from 'sg-widgets-core/mock';
 import { createSgContext } from 'sg-widgets-core';
-import { FakeSite, FakeSiteError } from '$lib/pure/fixtures/fake-site';
+import { FakeSite, FakeSiteError } from './fake-site';
 import type { RunReader, SchemaWritePort } from '$lib/pure/run-port';
 import type { VisibilityPort } from '$lib/pure/visibility-run';
-import type { InstallSite } from './install-site';
-import { onceLoaded } from './read-once';
-import { createVisibilityAnalyser, loadProjects, visibilityPort } from './visibility';
+import type { InstallSite } from '$lib/io/install-site';
+import { onceLoaded } from '$lib/io/read-once';
+import { createVisibilityAnalyser, loadProjects, visibilityPort } from '$lib/io/visibility';
 
 /** The projects of the mock client: the picker and the fake site share them. */
 export const FAKE_PROJECT_IDS = [70, 71, 72] as const;

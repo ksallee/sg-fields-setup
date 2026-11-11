@@ -86,7 +86,7 @@ export function liveInstallSite(): InstallSite {
 /** The site the install screen works on: the connected one, or why there is none. */
 export async function installSite(url: URL): Promise<InstallSiteResult> {
 	if (import.meta.env.DEV && url.searchParams.has(FAKE_FLAG)) {
-		const { fakeInstallSite } = await import('./install-site-fake');
+		const { fakeInstallSite } = await import('$lib/testing/install-site-fake');
 		return { ok: true, site: fakeInstallSite(url.searchParams) };
 	}
 	const state = await prepareLive();

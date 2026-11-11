@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { asRefusal, isRetiredNameRefusal, readRevive, retiredNameIn } from '../run-port';
+import { asRefusal, isRetiredNameRefusal, readRevive, retiredNameIn } from '$lib/pure/run-port';
 import { createFakeSite, DEFAULT_STATUSES, FakeSiteError } from './fake-site';
 
 /** The refusal a call rejects with. */

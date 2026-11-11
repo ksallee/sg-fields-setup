@@ -14,8 +14,8 @@ import { fileURLToPath } from 'node:url';
 export const DEV_ONLY_PATTERNS = [
 	{ pattern: 'FPT_API_', source: 'src/routes/live/dev-token/+server.ts', what: 'the script key variables' },
 	{ pattern: 'client_credentials', source: 'src/routes/live/dev-token/+server.ts', what: 'the dev token grant' },
-	{ pattern: '__installFake', source: 'src/lib/io/install-site-fake.ts', what: 'the fake site handle' },
-	{ pattern: 'fake.shotgrid', source: 'src/lib/io/install-site-fake.ts', what: 'the fake site address' },
+	{ pattern: '__installFake', source: 'src/lib/testing/install-site-fake.ts', what: 'the fake site handle' },
+	{ pattern: 'fake.shotgrid', source: 'src/lib/testing/install-site-fake.ts', what: 'the fake site address' },
 	{ pattern: 'install-site-fake', source: 'src/lib/io/install-site.ts', what: 'the fake site module' }
 ];
 

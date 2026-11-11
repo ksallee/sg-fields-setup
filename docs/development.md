@@ -96,8 +96,8 @@ nothing written anywhere, under `vite dev` only:
 1. On the list, "Import set file": `fixtures/install-drive/install-drive.fieldset.json`.
 2. Open its install screen and add `?fake` to the address.
 
-The screen then works on a site held in memory (`src/lib/io/install-site-fake.ts`, on
-`src/lib/pure/fixtures/fake-site.ts`), seeded for that set: every class of the plan, a revive, a
+The screen then works on a site held in memory (`src/lib/testing/install-site-fake.ts`, on
+`src/lib/testing/fake-site.ts`), seeded for that set: every class of the plan, a revive, a
 retired field of another type, a create refused once, a visibility write that fails once. The
 header of `install-site-fake.ts` lists them. `?fake&delay=400` slows each call so a cancel can
 land mid-run. `?fake&faults=0` turns the two faults off. `window.__installFake` is the fake.
@@ -105,6 +105,11 @@ land mid-run. `?fake&faults=0` turns the two faults off. `window.__installFake` 
 A production build cannot reach it: the flag is read behind `import.meta.env.DEV`, and the
 build drops the branch and the module. `src/lib/io/install-site.test.ts` holds the source to
 that. To check a build: `pnpm build`, then `pnpm check:build`.
+
+Code that exists for tests and the fake site lives in `src/lib/testing/`: the fake site, the
+install screen's fake provider, `makeLiveField`. Only tests and the dev-only branch of
+`src/lib/io/install-site.ts` import it (`pnpm lint` holds that). JSON samples shaped like the
+corpus stay in `src/lib/pure/fixtures/`.
 
 ## The sandbox
 
