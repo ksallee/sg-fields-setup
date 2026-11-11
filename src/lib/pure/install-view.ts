@@ -17,7 +17,7 @@
  */
 import { dataTypeLabel } from './data-types';
 import { entityTypeDisplayName, type LiveEntityType } from './live-entity-types';
-import type { PlanClass, PlanItem } from './plan';
+import type { PlanClass, PlanItem, PropertyName } from './plan';
 import type { DiffSetting, Difference } from './plan-diff';
 import { formatValue, reasonParts, reverseFieldsText, settingLabel, type ReasonPart } from './plan-reason';
 import type { RowState, RunRow, RunState } from './run';
@@ -79,6 +79,63 @@ export function differenceLine(difference: Pick<Difference, 'setting' | 'live' |
 	return { setting: difference.setting, label, live, wanted, text: `${label}: ${live} → ${wanted}` };
 }
 
+/** The setting each property of a schema write is shown as. Every property has one, so none can go unshown. */
+const PROPERTY_SETTINGS: Readonly<Record<PropertyName, DiffSetting>> = {
+	name: 'displayName',
+	description: 'description',
+	valid_values: 'validValues',
+	default_value: 'defaultValue',
+	valid_types: 'validTypes',
+	unique: 'unique'
+};
+
+/** How many values of a list a create line shows before it is cut. */
+export const CREATE_LIST_SHOWN = 8;
+/** How many characters a create line's value shows before it is cut. */
+export const CREATE_TEXT_SHOWN = 160;
+
+export interface CreateLine {
+	setting: DiffSetting;
+	/** "Valid values". */
+	label: string;
+	/** The whole value, as `showValue` words it. */
+	value: string;
+	/** The value cut for the row when it is long, else null. The row offers the whole one. */
+	short: string | null;
+	/** "Valid values: [Wide, Long]", whole. */
+	text: string;
+}
+
+function cut(value: unknown, whole: string): string | null {
+	// One value more than the limit is shown: "and 1 more" is no shorter than the value.
+	if (Array.isArray(value) && value.length > CREATE_LIST_SHOWN + 1) {
+		const head = value.slice(0, CREATE_LIST_SHOWN).map((each) => String(each)).join(', ');
+		const listed = `[${head}, and ${value.length - CREATE_LIST_SHOWN} more]`;
+		if (listed.length <= CREATE_TEXT_SHOWN) return listed;
+	}
+	return whole.length > CREATE_TEXT_SHOWN ? `${whole.slice(0, CREATE_TEXT_SHOWN)}…` : null;
+}
+
+/**
+ * What a create writes beside the names the row already shows, one line per property of its
+ * payload (RUN-3: nothing is written that the plan has not shown). Read from the payload itself,
+ * the request that is sent, so the two cannot drift. The display name has a line only if the
+ * payload's is not the one the row shows.
+ */
+export function createLines(item: Pick<PlanItem, 'create' | 'displayName'>): CreateLine[] {
+	if (item.create === null) return [];
+	const lines: CreateLine[] = [];
+	for (const property of item.create.properties) {
+		if (property.property_name === 'name' && property.value === item.displayName) continue;
+		const setting = PROPERTY_SETTINGS[property.property_name];
+		const name = settingLabel(setting);
+		const label = `${name[0].toUpperCase()}${name.slice(1)}`;
+		const value = showValue(setting, property.value);
+		lines.push({ setting, label, value, short: cut(property.value, value), text: `${label}: ${value}` });
+	}
+	return lines;
+}
+
 /** Both data types of a conflict row (RUN-3). */
 export function typeConflictText(liveDataType: string, wantedDataType: string): string {
 	return `${dataTypeLabel(liveDataType)} on the site, ${dataTypeLabel(wantedDataType)} in the set`;
@@ -100,6 +157,8 @@ export interface ViewRow {
 	selectable: boolean;
 	/** An update's differences. */
 	differences: DifferenceLine[];
+	/** What a create writes beside the names above: one line per property of its payload. */
+	creates: CreateLine[];
 	/** A blocked row's blocked differences. */
 	blocked: DifferenceLine[];
 	/** A conflict row's two data types, else null. */
@@ -141,6 +200,7 @@ export function viewRows(
 			group: groupOf(planClass),
 			selectable: SELECTABLE.includes(planClass),
 			differences: current && item.class === 'update' ? item.differences.map(differenceLine) : [],
+			creates: current && item.class === 'create' ? createLines(item) : [],
 			blocked: current ? item.blocked.map(differenceLine) : [],
 			conflict: current && item.class === 'type-conflict' && item.liveDataType !== null ? typeConflictText(item.liveDataType, item.dataType) : null,
 			reasons: current ? item.reasons.map((reason) => reasonParts(reason)) : [],

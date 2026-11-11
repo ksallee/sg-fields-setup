@@ -161,7 +161,9 @@ filler. Sentence case everywhere, no capitals for labels.
 - **Groups.** A bordered block per group, the header a row that folds it: chevron, title, count.
   A group with no row is not shown.
 - **Rows.** The two lines of a list row, then one line per difference (`text-xs`, values in
-  mono, an empty value as `∅`), then the reason or the run's note. A failure is
+  mono, an empty value as `∅`), then the reason or the run's note. A create has one line per
+  property its request writes, "setting: value". A value over 8 list items or 160 characters is
+  cut, with the whole of it in `title` and behind "Show all". A failure is
   `text-destructive`. A visibility warning carries the warning icon and its retry, `outline`,
   `xs`. No row is a link.
 - **State.** A `Badge variant="outline"` with an icon, on the right: Pending, In progress, Done,

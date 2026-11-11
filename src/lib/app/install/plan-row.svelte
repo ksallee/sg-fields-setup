@@ -2,6 +2,9 @@
 	One row of the install plan (RUN-3, RUN-4, RUN-22, VIS-7, VIS-9): the checkbox, the field, its
 	differences or its reason, its visibility counters, and what a run did to it. Everything it
 	shows is worked out in `$lib/pure` (`install-view`, `run-text`, `visibility-text`).
+
+	A create lists every property its request writes (`row.creates`). A long value is cut, with
+	the whole of it in `title` and behind "Show all", so the row stays short and hides nothing.
 -->
 <script lang="ts">
 	import Check from '@lucide/svelte/icons/check';
@@ -61,6 +64,8 @@
 	const said = $derived(row.run && ended ? rowParts(row.run) : []);
 	const warning = $derived(row.run !== null && ended && needsVisibilityRetry(row.run));
 	const checkId = $props.id();
+	/** The create lines whose whole value is showing. */
+	let whole = $state<Record<string, boolean>>({});
 </script>
 
 <li
@@ -112,6 +117,29 @@
 						<span class="font-mono">{line.live}</span>
 						<span class="text-muted-foreground" aria-label="becomes">→</span>
 						<span class="font-mono">{line.wanted}</span>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+		{#if row.creates.length > 0}
+			<ul class="flex flex-col gap-0.5 text-xs" data-slot="row-creates">
+				{#each row.creates as line (line.setting)}
+					{@const open = whole[line.setting] === true}
+					<li class="break-words">
+						<span class="text-muted-foreground">{line.label}:</span>
+						<span class="font-mono" title={line.short && !open ? line.value : undefined}>{line.short && !open ? line.short : line.value}</span>
+						{#if line.short}
+							<button
+								type="button"
+								class="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-sm underline decoration-dotted underline-offset-2 outline-none focus-visible:ring-2"
+								aria-expanded={open}
+								aria-label={`${open ? 'Show less' : 'Show all'} of ${line.label.toLowerCase()}`}
+								onclick={() => (whole[line.setting] = !open)}
+								data-slot="row-create-more"
+							>
+								{open ? 'Show less' : 'Show all'}
+							</button>
+						{/if}
 					</li>
 				{/each}
 			</ul>
