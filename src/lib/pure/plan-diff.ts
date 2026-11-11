@@ -14,14 +14,17 @@
  * | valid types   | same types in the same order                                                     |
  * | unique        | same boolean; missing is off                                                     |
  *
- * Two points the table leaves open, settled here:
+ * Three points the table leaves open, settled here:
  *
  * - A checkbox always has a default on the site: its create fails without one, and a create sends
  *   false for an entry with none (PLN-13). So an entry with no checkbox default wants false. Without
  *   this a field the tool just created would not read as matching (PLN-20).
- * - Valid types keep "order matters". The corpus measured one read-back, `["Shot", "Asset"]`, and
- *   it came back in the order sent (`findings/116_field_settings_create_update`). Nothing measured
- *   contradicts the spec. What a write that only reorders does is unmeasured.
+ * - Valid types keep "order matters". The site keeps the order sent and a write that only reorders
+ *   is applied: a reorder is a change (`findings/121_field_settings_edges`).
+ * - Repeats. The site drops a repeated value from a list's valid values and from valid types, and
+ *   stores a repeated code of a status list twice (finding 121). So the entry is compared, and
+ *   sent, with its repeats removed: `wantedEntry`. Without this an entry holding a repeat would be
+ *   written, read back without it, and differ for ever (PLN-20). The live side is compared as read.
  */
 import { cleanEntry } from './clean';
 import { carries } from './data-types';
@@ -72,6 +75,20 @@ function sameSet(a: readonly string[], b: readonly string[]): boolean {
 	return a.length === b.length && a.every((item) => b.includes(item)) && b.every((item) => a.includes(item));
 }
 
+/** A list with its repeats removed: the first occurrence is kept, the order otherwise preserved. Exact match. */
+export function withoutRepeats(items: readonly string[]): string[] {
+	return items.filter((item, index) => items.indexOf(item) === index);
+}
+
+/**
+ * The entry as it is compared and sent: cleaned (`cleanEntry`), with no repeat in its valid values
+ * or its valid types (finding 121). The entry given is never altered.
+ */
+export function wantedEntry<T extends EntryDefinition>(entry: T): T {
+	const cleaned = cleanEntry(entry);
+	return { ...cleaned, validValues: withoutRepeats(cleaned.validValues), validTypes: withoutRepeats(cleaned.validTypes) };
+}
+
 /**
  * The default value an entry asks for: a boolean on a checkbox (none is false, PLN-13), trimmed
  * text or null on a list or a status list, null on every other type (PLN-12).
@@ -87,11 +104,11 @@ export function wantedDefault(entry: EntryDefinition): boolean | string | null {
  * they match. The data types are not compared: a field of another type is a type conflict, not a
  * difference (PLN-7).
  *
- * The entry is cleaned first (`cleanEntry`), so text is trimmed and a setting its type does not
- * carry counts as none. Neither argument is altered.
+ * The entry is cleaned first (`wantedEntry`), so text is trimmed, a setting its type does not
+ * carry counts as none and a repeated value counts once. Neither argument is altered.
  */
 export function diffEntry(entry: EntryDefinition, live: LiveField): Difference[] {
-	const wanted = cleanEntry(entry);
+	const wanted = wantedEntry(entry);
 	const differences: Difference[] = [];
 
 	const liveName = live.displayName.trim();
