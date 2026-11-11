@@ -44,6 +44,17 @@ The browser calls the site itself, writes included. The site answers the preflig
 `authorization,content-type`. Measured from `localhost` in the drive below. No server route sits
 between the page and the site.
 
+## Which sites are accepted
+
+A site is an https address with no user name, no password and no port, on a host ending
+`.shotgrid.autodesk.com` or `.shotgunstudio.com`. `src/lib/pure/site-host.ts` is the rule. The
+`/live/` endpoints refuse anything else with a 400, follow no redirect, wait ten seconds, and answer
+only the fields the page reads. The dev token route holds `FPT_API_SITE_URL` to the same rule.
+
+A site on another domain needs `FPT_EXTRA_SITE_SUFFIXES`: comma-separated host names, such as
+`flow.example.com`. Each is allowed with its subdomains. An entry that is no plain host name of two
+labels or more is dropped. The variable is server only and never reaches the page's code.
+
 ## The fake site
 
 The install screen is the only one that writes to a site. To drive its run with no network and
@@ -138,6 +149,7 @@ Set in the Vercel project, value never in the repo:
 | var | what it does deployed |
 |---|---|
 | `PUBLIC_FPT_SITE_URL` | fills the site field on the connect page. It never connects by itself. |
+| `FPT_EXTRA_SITE_SUFFIXES` | optional. Extra site hosts the `/live/` endpoints accept. See "Which sites are accepted". |
 
 `FPT_API_SITE_URL`, `FPT_API_SCRIPT_NAME` and `FPT_API_API_KEY` are dev only, in `.env.local`. Never
 set them on Vercel.
