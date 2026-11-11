@@ -827,6 +827,89 @@ describe('the visibility seam (VIS-4, VIS-5, VIS-7, Q5, RUN-22)', () => {
 		expect(row(retried)).toMatchObject({ state: 'skipped', visibility: { status: 'applied', done: 1, total: 1, failures: [] } });
 	});
 
+	/* A field the run made stays new for the whole run, whatever a later re-plan finds (VIS-4, M1 of the audit). */
+
+	const CHOSEN = {
+		scope: { kind: 'chosen' as const, projects: [{ id: 70, name: 'Alpha' }] },
+		eligible: [
+			{ id: 70, name: 'Alpha' },
+			{ id: 71, name: 'Beta' }
+		]
+	};
+
+	it.each([
+		['a 502', (site: FakeSite) => site.failNext('readField', { status: 502, message: 'Bad Gateway' }), null],
+		['a dropped connection', (site: FakeSite) => site.dropNext('readField'), 'Failed to fetch']
+	])('VIS-4, RUN-19: a field created before a read-back that got %s is still hidden outside the chosen projects on retry', async (_, fault, runError) => {
+		const site = createFakeSite({ projects: [70, 71] });
+		onRead(site, 3, () => fault(site));
+		const run = engine(site, { applyVisibility: createApplyVisibility(site, CHOSEN) });
+		const first = await run.start([entry()]);
+		expect(row(first)).toMatchObject({ state: 'failed', note: { code: 'unreadable', after: 'create' }, effects: [{ kind: 'created', name: 'sg_lens' }], visibility: null });
+		expect(first.error).toBe(runError);
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([]);
+
+		const state = await run.retry();
+		// The re-plan finds the field live. The run made it all the same.
+		expect(row(state)).toMatchObject({ class: 'already-matches', state: 'skipped', visibility: { origin: 'new', status: 'applied', failures: [] } });
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([71]);
+	});
+
+	it('VIS-4, RUN-10, RUN-19: a field revived before a read that failed is still hidden outside the chosen projects on retry', async () => {
+		const site = createFakeSite({ projects: [70, 71] }).seedRetired('Version', 'sg_lens', { displayName: 'Lens' });
+		onRead(site, 3, () => site.failNext('readField', { status: 502, message: 'Bad Gateway' }));
+		const run = engine(site, { applyVisibility: createApplyVisibility(site, CHOSEN) });
+		const first = await run.start([entry()]);
+		expect(row(first)).toMatchObject({ state: 'failed', note: { code: 'unreadable', after: 'revive' }, effects: [{ kind: 'revived' }] });
+
+		const state = await run.retry();
+		expect(row(state)).toMatchObject({ state: 'skipped', visibility: { origin: 'new' } });
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([71]);
+	});
+
+	it('VIS-4, RUN-19: a created field that failed its read-back and is updated on retry is new all the same', async () => {
+		const site = createFakeSite({ projects: [70, 71] });
+		// Someone edits the field between the create and its read-back: the row fails, the retry plans an update.
+		onRead(site, 3, () => site.seed('Version', 'sg_lens', { displayName: 'Lens', description: 'Theirs.' }));
+		const run = engine(site, { applyVisibility: createApplyVisibility(site, CHOSEN) });
+		await run.start([entry({ description: 'Ours.' })]);
+		const state = await run.retry();
+		expect(row(state)).toMatchObject({ class: 'update', state: 'done', visibility: { origin: 'new' } });
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([71]);
+	});
+
+	it('VIS-5, VIS-6, RUN-10: a field the run revived and put back in the trash is not its own: found live on retry, it is hidden nowhere', async () => {
+		const site = createFakeSite({ projects: [70, 71] }).seedRetired('Version', 'sg_lens', { displayName: 'Lens', dataType: 'number' });
+		const run = engine(site, { applyVisibility: createApplyVisibility(site, CHOSEN) });
+		const first = await run.start([entry()]);
+		expect(row(first).effects.map((effect) => effect.kind)).toEqual(['revived', 'retired']);
+		// Someone deletes the retired field for good and makes the field by hand.
+		site.deleteForGood('Version', 'sg_lens').seed('Version', 'sg_lens', { displayName: 'Lens' });
+		const state = await run.retry();
+		expect(row(state)).toMatchObject({ class: 'already-matches', state: 'skipped', visibility: { origin: 'existing' } });
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([]);
+	});
+
+	it('VIS-4, RUN-18, RUN-20: a cancel between a create and its visibility keeps the field new: Resume leaves the row, its own retry hides it', async () => {
+		const site = createFakeSite({ projects: [70, 71] });
+		const run = engine(site, { applyVisibility: createApplyVisibility(site, CHOSEN) });
+		site.beforeNext('createField', () => run.cancel());
+		const first = await run.start([entry(), entry({ id: 'b', programmaticName: 'sg_b', displayName: 'B' })]);
+		expect(row(first)).toMatchObject({ state: 'done', visibility: { origin: 'new', status: 'cancelled' } });
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([]);
+
+		const resumed = await run.resume();
+		expect(resumed.rows.map((item) => item.state)).toEqual(['done', 'done']);
+		// Resume runs the pending rows only. The first row still says its visibility was not applied.
+		expect(row(resumed)).toMatchObject({ visibility: { origin: 'new', status: 'cancelled' } });
+		expect(runCounters(resumed).visibilityWarnings).toBe(1);
+		expect(site.get('Version', 'sg_b')?.hiddenIn).toEqual([71]);
+
+		const state = await run.retryVisibility('lens');
+		expect(row(state)).toMatchObject({ visibility: { origin: 'new', status: 'applied' } });
+		expect(site.get('Version', 'sg_lens')?.hiddenIn).toEqual([71]);
+	});
+
 	it('a visibility step that throws leaves the row done with the error, and the run goes on', async () => {
 		const site = createFakeSite();
 		const run = engine(site, {

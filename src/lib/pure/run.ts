@@ -357,6 +357,17 @@ export function runCounters(state: RunState): RunCounters {
 	};
 }
 
+/**
+ * Whether the run itself made the field of this name and it is still its own: the latest of the
+ * row's `created`, `revived` and `retired` effects for it is a `created` or a `revived`. Effects
+ * are kept across retries, so a field made by an attempt that then failed stays new when a retry
+ * finds it live (VIS-4). One the run put back in the trash is not its own any more (VIS-6).
+ */
+export function madeByRun(effects: readonly FieldEffect[], name: string): boolean {
+	const last = effects.findLast((effect) => effect.name === name && effect.kind !== 'updated');
+	return last !== undefined && last.kind !== 'retired';
+}
+
 /** The entry ids a retry runs again: the failed rows, in order (RUN-19). */
 export function retryIds(state: RunState): string[] {
 	return state.rows.filter((row) => row.state === 'failed').map((row) => row.entryId);
