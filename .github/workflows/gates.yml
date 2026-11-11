@@ -1,0 +1,85 @@
+# The gates a branch passes before it merges, on every pull request and on the two branches
+# anything lands on. After sg-task-templates' gates.yml.
+
+name: Gates
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: check, test and build
+    runs-on: ubuntu-latest
+    steps:
+      # Actions are pinned by commit, the tag beside it. The token is not left in the checkout.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      # The version package.json's packageManager names, the one the lockfile was written with.
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: 12.5.1
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm check
+
+      - run: pnpm lint
+
+      - run: pnpm test
+
+      - run: pnpm build
+
+      # The build carries no dev-only code: no dev token route body, no script key name, no fake
+      # site. Fails on the first match (scripts/check-build.mjs).
+      - run: pnpm check:build
+
+
+  e2e:
+    name: browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: 12.5.1
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # On the dev server and the fake site. No secret: the site variables are blanked for the
+      # server (playwright.config.ts), and the tests fail on any request off the machine.
+      - run: pnpm e2e
+
+      # The HTML report, with the trace of each retried test, when a test failed.
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

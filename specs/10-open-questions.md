@@ -64,10 +64,30 @@ Things that looked like bugs or accidents. The requirements above already avoid 
 
 ## Not verified
 
-- The baseline's reading of where description, unique and default value sit in a field's schema
+- ~~The baseline's reading of where description, unique and default value sit in a field's schema
   record (PLN-6) was taken from its code and tests, not checked against a live response or the
-  corpus sample.
-- Whether the baseline's assumptions in G3 to G8 were ever true on a real site. Its one live test
-  covered creating a text field and re-planning it as "already matches".
+  corpus sample.~~ Confirmed against live responses, 2026-11-10: the read-back table of
+  `findings/116_field_settings_create_update.md`. PLN-6 stands as written.
+- ~~Whether the baseline's assumptions in G3 to G8 were ever true on a real site. Its one live test
+  covered creating a text field and re-planning it as "already matches".~~ Answered by probes 115
+  to 121, 2026-11-10, except G7: G3 by 116 and 117, G4 by 116, G5 by 116 and 121, G6 by 115, G8 by
+  116. See the "Answered by probes" table in `09-api-and-widgets.md`. G7, the permission check,
+  is still unmeasured; RUN-27's fallback stands.
 - The revive call's exact request form differs between the baseline and the corpus. The corpus form
   is the one to build on.
+
+## Found while building
+
+Two hazards measured by probe 121 (`findings/121_field_settings_edges.md`, 2026-11-10). The plan
+stops both before any write (PLN-7, PLN-8, PLN-13).
+
+- H1. A valid type in the wrong case, `"shot"` for `"Shot"`, sent in an update answered 500 and
+  left the field retired. A name that is no entity type at all is a clean 400. The plan sends valid
+  types only when each is an entity type of the site by exact name. Otherwise the entry is refused
+  (create) or blocked (update), and the reason names the API name probably meant. The wrong case on
+  a create was not measured; the plan refuses it all the same.
+- H2. An entity link holds a reverse field on each of its valid types. Adding a type makes a new
+  field there. Removing a type retires that field, and the name stays taken. Removing and adding
+  back spends a new name each time. The plan blocks an update that removes a type: it is done by
+  hand in FPT if wanted. An update that adds a type, and a create of any link, say which types gain
+  a field. A reorder alone is written and spent no name in the probe's run.

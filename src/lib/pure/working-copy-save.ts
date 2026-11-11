@@ -1,0 +1,141 @@
+/**
+ * What leaves the working copy: the save request (EDT-44, EDT-45) and the entries handed to
+ * Duplicate and Install (EDT-9, EDT-10, PLN-1). Rows are cleaned on the way out (MOD-7, MOD-9).
+ *
+ * After a successful save the working copy is `openWorkingCopy` on what the store answered
+ * (EDT-46): clean, every row stored and so in manual mode (EDT-25). On a failed save the caller
+ * keeps its working copy as it is (EDT-47).
+ */
+import { cleanEntry } from './clean';
+import type { Entry, EntryDraft, Timestamp } from './model';
+import {
+	cleanedDescription,
+	cleanedName,
+	definitionOf,
+	detailsChanged,
+	sameCleanedDefinition,
+	savedById,
+	type Row,
+	type WorkingCopy
+} from './working-copy';
+
+/**
+ * One save, as the store applies it, in this order (EDT-44): details, removals, changes,
+ * additions. Removals come before additions so a pair deleted and added again does not trip MOD-5.
+ */
+export interface SaveRequest {
+	/** The cleaned name and description, both, when either changed once cleaned; else null. */
+	details: { name: string; description: string | null } | null;
+	/** Ids of the stored entries whose rows were removed, in saved order. */
+	removedIds: string[];
+	/**
+	 * The stored entries whose cleaned definition changed, only those (EDT-45), in row order:
+	 * the saved entry (id, set, timestamps) with the row's cleaned definition and the row's
+	 * snapshot over it. The snapshot is the row's because a re-sync refreshes it (EDT-42); on a
+	 * row never re-synced it is the saved one.
+	 */
+	changed: Entry[];
+	/** The added rows as cleaned drafts, in row order. `keysAfterSave` pairs them with their row keys. */
+	added: EntryDraft[];
+	/**
+	 * What the working copy was loaded from, so the store can tell a save made elsewhere since
+	 * (another tab) and refuse to write over it (`planSave`, the `stale` refusal). `saveRequest`
+	 * always gives it. Left out, the request is applied as it stands, with no such check.
+	 */
+	loaded?: LoadedState;
+}
+
+/** The stored state a save request was built on. */
+export interface LoadedState {
+	/** The set's `changedAt` as loaded. Unchanged in storage: nothing was saved elsewhere. */
+	setChangedAt: Timestamp;
+	/** The set's name and description as loaded: what tells a change of the details from one of a field. */
+	name: string;
+	description: string | null;
+	/** `changedAt` as loaded, by id, of each entry the request changes or removes. */
+	entryChangedAt: Record<string, Timestamp>;
+}
+
+function draftOf(row: Row): EntryDraft {
+	return cleanEntry({
+		...definitionOf(row),
+		snapshot: row.snapshot,
+		snapshotSite: row.snapshotSite,
+		snapshotTime: row.snapshotTime
+	});
+}
+
+/** What Save sends (EDT-44, EDT-45). A clean working copy gives an empty request. */
+export function saveRequest(workingCopy: WorkingCopy): SaveRequest {
+	const saved = savedById(workingCopy);
+	const kept = new Set<string>();
+	const changed: Entry[] = [];
+	const added: EntryDraft[] = [];
+	for (const row of workingCopy.rows) {
+		if (row.entryId === null) {
+			added.push(draftOf(row));
+			continue;
+		}
+		kept.add(row.entryId);
+		const entry = saved.get(row.entryId);
+		if (entry && !sameCleanedDefinition(row, entry)) {
+			changed.push({
+				...entry,
+				...cleanEntry(definitionOf(row)),
+				snapshot: row.snapshot,
+				snapshotSite: row.snapshotSite,
+				snapshotTime: row.snapshotTime
+			});
+		}
+	}
+	const removedIds = workingCopy.saved.entries.filter((entry) => !kept.has(entry.id)).map((entry) => entry.id);
+	const entryChangedAt: Record<string, Timestamp> = {};
+	for (const id of [...changed.map((entry) => entry.id), ...removedIds]) {
+		const entry = saved.get(id);
+		if (entry) entryChangedAt[id] = entry.changedAt;
+	}
+	return {
+		details: detailsChanged(workingCopy)
+			? { name: cleanedName(workingCopy), description: cleanedDescription(workingCopy) }
+			: null,
+		removedIds,
+		changed,
+		added,
+		loaded: {
+			setChangedAt: workingCopy.saved.changedAt,
+			name: workingCopy.saved.name,
+			description: workingCopy.saved.description,
+			entryChangedAt
+		}
+	};
+}
+
+function pick(workingCopy: WorkingCopy, keys: readonly string[] | undefined): readonly Row[] {
+	if (keys === undefined) return workingCopy.rows;
+	const wanted = new Set(keys);
+	return workingCopy.rows.filter((row) => wanted.has(row.key));
+}
+
+/**
+ * What Duplicate copies (EDT-9): every row, or only those with the given keys, as cleaned drafts
+ * in row order. Unsaved edits are included and snapshots kept. Unknown keys are ignored.
+ */
+export function draftsOf(workingCopy: WorkingCopy, keys?: readonly string[]): EntryDraft[] {
+	return pick(workingCopy, keys).map(draftOf);
+}
+
+/**
+ * What Install considers (EDT-10, PLN-1): the stored entries of every row, or only of the rows
+ * with the given keys, in row order, as stored. Install is offered only for a clean set (EDT-10,
+ * PLN-2), so these match the rows; a row not stored is left out. Mirror entries are included:
+ * the planner sets them aside (PLN-10). Unknown keys are ignored.
+ */
+export function installEntries(workingCopy: WorkingCopy, keys?: readonly string[]): Entry[] {
+	const saved = savedById(workingCopy);
+	const entries: Entry[] = [];
+	for (const row of pick(workingCopy, keys)) {
+		const entry = row.entryId === null ? undefined : saved.get(row.entryId);
+		if (entry) entries.push(entry);
+	}
+	return entries;
+}

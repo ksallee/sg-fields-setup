@@ -38,6 +38,7 @@ metaphors, no "not X, Y", no filler.
 
 - Pure modules in `src/lib/pure/`, each with its test beside it as `<module>.test.ts`.
 - I/O (storage, site calls) in `src/lib/io/`.
+- Test support code (the fake site, fixture builders) in `src/lib/testing/`, imported only by tests and the dev-only fake.
 - `fixtures/`: the source spreadsheet and hand-built sets used by tests.
 - `docs/development.md`: running the app, the ports, the sandbox and the deploy.
 
@@ -51,4 +52,4 @@ metaphors, no "not X, Y", no filler.
 
 ## Commands
 
-    pnpm install / pnpm dev / pnpm check / pnpm test / pnpm build
+    pnpm install / pnpm dev / pnpm check / pnpm lint / pnpm test / pnpm build

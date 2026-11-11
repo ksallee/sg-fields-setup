@@ -1,0 +1,480 @@
+{
+	"camera-report-slate.json": {
+		"source": "FlowStudioDemo.xlsx, sheet Sheet1 (wrangler camera report export, 72 columns, 5 takes)",
+		"entries": [
+			{
+				"programmaticName": "sg_slate",
+				"sourceHeader": "Slates::Slate",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_take",
+				"sourceHeader": "Tk Take",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_shoot_day",
+				"sourceHeader": "Slates::Shoot Day",
+				"onProbedSite": "exists",
+				"review": "The file holds a code such as SD01; the site field is a link to a Shoot Day record."
+			},
+			{
+				"programmaticName": "sg_shoot_date",
+				"sourceHeader": "Slates::Shoot Date",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_unique_slate_id",
+				"sourceHeader": "Slates::Unique Slate ID",
+				"onProbedSite": "new"
+			},
+			{
+				"programmaticName": "sg_slates_uuid",
+				"sourceHeader": "Slates::SlatesUUID",
+				"onProbedSite": "new",
+				"review": "Database key from the wrangler's app. Keep only if re-imports need to match rows."
+			},
+			{
+				"programmaticName": "sg_takes_uuid",
+				"sourceHeader": "Tk TakesUUID",
+				"onProbedSite": "new",
+				"review": "Database key from the wrangler's app. Keep only if re-imports need to match rows."
+			},
+			{
+				"programmaticName": "sg_vfx_shot",
+				"sourceHeader": "Slates::VFX Shot",
+				"onProbedSite": "new",
+				"review": "Column is empty in the sample; link to Shot is a guess."
+			},
+			{
+				"programmaticName": "sg_scene",
+				"sourceHeader": "Slates::Scene Number",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true,
+				"review": "The file holds a scene number as text; the site field is a link to a Scene record."
+			},
+			{
+				"programmaticName": "sg_shoot_timestamp",
+				"sourceHeader": "Slates::Shoot Timestamp",
+				"onProbedSite": "new",
+				"review": "Column is empty in the sample; type is a guess from the name."
+			},
+			{
+				"programmaticName": "sg_unit",
+				"sourceHeader": "Slates::Unit",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_element_type",
+				"sourceHeader": "Slates::Element Type",
+				"onProbedSite": "new",
+				"review": "Column is empty in the sample."
+			},
+			{
+				"programmaticName": "sg_plate_type",
+				"sourceHeader": "Slates::Plate Type",
+				"onProbedSite": "new",
+				"review": "Column is empty in the sample."
+			},
+			{
+				"programmaticName": "sg_vfx_work",
+				"sourceHeader": "Slates::VFX Work",
+				"onProbedSite": "new",
+				"review": "Several choices in one cell, one per line. Flow PT has no multi-choice list a tool can create, so text."
+			},
+			{
+				"programmaticName": "sg_set_notes",
+				"sourceHeader": "Slates::Notes",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true
+			},
+			{
+				"programmaticName": "sg_set_media",
+				"sourceHeader": "Slates::Set Media",
+				"onProbedSite": "new",
+				"review": "Several choices in one cell, one per line, so text. Column appears twice in the file."
+			},
+			{
+				"programmaticName": "sg_set_location",
+				"sourceHeader": "Slates::Set Location",
+				"onProbedSite": "new"
+			},
+			{
+				"programmaticName": "sg_script_location",
+				"sourceHeader": "Slates::Script Location",
+				"onProbedSite": "exists",
+				"review": "The file holds text such as ext_Battleground; the site field is a link."
+			},
+			{
+				"programmaticName": "sg_day___night",
+				"sourceHeader": "Slates::Script Time",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true,
+				"review": "The wrangler's app offers Day, Night, Dusk and Dawn. Check the site list holds all four."
+			},
+			{
+				"programmaticName": "sg_int___ext",
+				"sourceHeader": "Slates::Interior Exterior",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true,
+				"review": "The file holds Int and Ext. Check they match the site list's spelling."
+			},
+			{
+				"programmaticName": "sg_wrangler",
+				"sourceHeader": "Slates::Wrangler",
+				"onProbedSite": "new"
+			},
+			{
+				"programmaticName": "sg_camera_body",
+				"sourceHeader": "Slates::Camera Body",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_camera_id_1",
+				"sourceHeader": "Slates::Camera Letter",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true
+			},
+			{
+				"programmaticName": "sg_camera_move",
+				"sourceHeader": "Slates::Camera Move Description",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true
+			},
+			{
+				"programmaticName": "sg_camera_support",
+				"sourceHeader": "Slates::Camera Mount",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true
+			},
+			{
+				"programmaticName": "sg_camera_head",
+				"sourceHeader": "Slates::Camera Head",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_asa",
+				"sourceHeader": "Slates::ASA",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_hdri_filename",
+				"sourceHeader": "Slates::HDRI Filename",
+				"onProbedSite": "new"
+			},
+			{
+				"programmaticName": "sg_ball_and_chart_captured",
+				"sourceHeader": "Slates::Ball and Chart Captured",
+				"onProbedSite": "new"
+			},
+			{
+				"programmaticName": "sg_asset_reference_number",
+				"sourceHeader": "Slates::Asset Reference Number",
+				"onProbedSite": "new",
+				"review": "Column is empty in the sample."
+			},
+			{
+				"programmaticName": "sg_white_balance",
+				"sourceHeader": "Slates::White Balance",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_tilt_start",
+				"sourceHeader": "Tk Camera Tilt",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true
+			},
+			{
+				"programmaticName": "sg_tilt_end",
+				"sourceHeader": "Tk Camera Tilt End",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true
+			},
+			{
+				"programmaticName": "sg_lens",
+				"sourceHeader": "Tk Lens ID",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true,
+				"review": "The file holds a lens description as text; the site field is a link to a Lenses record."
+			},
+			{
+				"programmaticName": "sg_focal_length",
+				"sourceHeader": "Tk Focal Length Start",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true,
+				"review": "The file also has Focal Length End, which stays a new field."
+			},
+			{
+				"programmaticName": "sg_focal_length_end",
+				"sourceHeader": "Tk Focal Length End",
+				"onProbedSite": "new",
+				"review": "No matching field on the site; its start value maps to an existing field."
+			},
+			{
+				"programmaticName": "sg_fps",
+				"sourceHeader": "Tk FPS",
+				"onProbedSite": "exists",
+				"review": "The site field holds whole numbers; 23.976 would not fit."
+			},
+			{
+				"programmaticName": "sg_focus",
+				"sourceHeader": "Tk Lens Focus",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true,
+				"review": "The file also has Lens Focus End, which stays a new field."
+			},
+			{
+				"programmaticName": "sg_lens_focus_end",
+				"sourceHeader": "Tk Lens Focus End",
+				"onProbedSite": "new",
+				"review": "No matching field on the site; its start value maps to an existing field."
+			},
+			{
+				"programmaticName": "sg_camera_height_start",
+				"sourceHeader": "Tk Lens Height",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true
+			},
+			{
+				"programmaticName": "sg_camera_height_end",
+				"sourceHeader": "Tk Lens Height End",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true
+			},
+			{
+				"programmaticName": "sg_roll",
+				"sourceHeader": "Tk Roll",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_filter_1",
+				"sourceHeader": "Tk Filter",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true
+			},
+			{
+				"programmaticName": "sg_shutter_speed",
+				"sourceHeader": "Tk Shutter Angle",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true,
+				"review": "The file holds a shutter angle in degrees; the site field is named for speed."
+			},
+			{
+				"programmaticName": "sg_fstop",
+				"sourceHeader": "Tk Stop",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true
+			},
+			{
+				"programmaticName": "sg_take_notes",
+				"sourceHeader": "Tk Notes",
+				"onProbedSite": "exists",
+				"review": "Matched by meaning, not by header text: the header is Notes on the take table."
+			}
+		],
+		"skippedColumns": [
+			{
+				"header": "Slates::Job",
+				"why": "The production name. That is the project."
+			},
+			{
+				"header": "Slates::Creation Date",
+				"why": "Stock Date Created covers it."
+			},
+			{
+				"header": "Slates::Modification Date",
+				"why": "Stock Date Updated covers it."
+			},
+			{
+				"header": "Slates::Diagram1 to Slates::Diagram8",
+				"why": "Images. An image field cannot be created through the API."
+			},
+			{
+				"header": "Slates::Scene Number, Slates::Set Media, Slates::Diagram4 (second occurrences)",
+				"why": "Duplicate column headers in the file."
+			}
+		]
+	},
+	"camera-report-lens.json": {
+		"source": "FlowStudioDemo.xlsx, sheet Sheet1 (wrangler camera report export, 72 columns, 5 takes)",
+		"entries": [
+			{
+				"programmaticName": "sg_lens_serial_number",
+				"sourceHeader": "Tk Lens Serial Num",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true,
+				"review": "Exported per take, but it belongs to the lens, so it sits in this set."
+			},
+			{
+				"programmaticName": "sg_anamorphic_desqueeze_ratio",
+				"sourceHeader": "Lens::Anamorphic Desqueeze Ratio",
+				"onProbedSite": "new",
+				"review": "Values such as 1.8X, so text."
+			},
+			{
+				"programmaticName": "sg_maximum_aperture",
+				"sourceHeader": "Lens::Maximum Aperture",
+				"onProbedSite": "new"
+			},
+			{
+				"programmaticName": "sg_closed_focus",
+				"sourceHeader": "Lens::Closed Focus",
+				"onProbedSite": "new",
+				"review": "Feet and inches, so text."
+			},
+			{
+				"programmaticName": "sg_grid_date",
+				"sourceHeader": "Lens::Grid Date",
+				"onProbedSite": "new",
+				"review": "Column is empty in the sample; type is a guess from the name. The entity has a Gridded? checkbox."
+			}
+		],
+		"skippedColumns": []
+	},
+	"camera-report-virtual-production.json": {
+		"source": "FlowStudioDemo.xlsx, sheet Sheet1 (wrangler camera report export, 72 columns, 5 takes)",
+		"entries": [
+			{
+				"programmaticName": "sg_unreal_environment",
+				"sourceHeader": "Unreal Environment",
+				"onProbedSite": "new"
+			},
+			{
+				"programmaticName": "sg_unreal_snapshot_name",
+				"sourceHeader": "Unreal Snapshot Name",
+				"onProbedSite": "new"
+			},
+			{
+				"programmaticName": "sg_unreal_take_name",
+				"sourceHeader": "Unreal Take Name",
+				"onProbedSite": "new"
+			},
+			{
+				"programmaticName": "sg_vicon_take_name",
+				"sourceHeader": "Vicon Take Name",
+				"onProbedSite": "new"
+			},
+			{
+				"programmaticName": "sg_ndisplay_color_correction",
+				"sourceHeader": "nDisplay Color Correction",
+				"onProbedSite": "new"
+			},
+			{
+				"programmaticName": "sg_additional_notes_vp",
+				"sourceHeader": "Additional Notes VP",
+				"onProbedSite": "new"
+			},
+			{
+				"programmaticName": "sg_distance_to_volume",
+				"sourceHeader": "Distance to Volume",
+				"onProbedSite": "new",
+				"review": "Kept as a new field. Distance to Subject exists on the site but measures something else: this is the distance to the LED volume."
+			}
+		],
+		"skippedColumns": []
+	},
+	"weekly-status-report.json": {
+		"source": "20260429_WSR_Test_v1.xlsx, first sheet, read from the Drive preview only (headers and first rows)",
+		"entries": [
+			{
+				"programmaticName": "sg_reel",
+				"sourceHeader": "Reel",
+				"onProbedSite": "exists",
+				"review": "The site also has a stock Reel field (reel)."
+			},
+			{
+				"programmaticName": "sg_sequence",
+				"sourceHeader": "Sequence",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "code",
+				"sourceHeader": "Shot Code",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_status_list",
+				"sourceHeader": "Status",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_turnover_date",
+				"sourceHeader": "Turnover Date",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_vendor_groups",
+				"sourceHeader": "Vendor",
+				"onProbedSite": "exists",
+				"mappedFromNearDuplicate": true,
+				"review": "The file holds a vendor name as text; the site field is a link."
+			},
+			{
+				"programmaticName": "sg_turnover",
+				"sourceHeader": "Turnover",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_latest_vendor_status",
+				"sourceHeader": "Latest Vendor Status",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_vendor_percentage_complete",
+				"sourceHeader": "Vendor Percentage Complete",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_date_next_version_expected",
+				"sourceHeader": "Date Next Version Expected",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_layout_due",
+				"sourceHeader": "Layout Due",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_final_anim_due",
+				"sourceHeader": "Final Anim Due",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_wip_comp_due",
+				"sourceHeader": "WIP Comp Due",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_final_notes_due",
+				"sourceHeader": "Final Notes Due",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_creative_final_due",
+				"sourceHeader": "Creative Final Due",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_tech_check_final_due",
+				"sourceHeader": "Tech Check Final Due",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_vfx_production_notes",
+				"sourceHeader": "VFX Production Notes",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_latest_vendor_notes",
+				"sourceHeader": "Latest Vendor Notes",
+				"onProbedSite": "exists"
+			},
+			{
+				"programmaticName": "sg_report_date",
+				"sourceHeader": "Report Date",
+				"onProbedSite": "exists"
+			}
+		],
+		"skippedColumns": []
+	}
+}

@@ -1,0 +1,216 @@
+import { describe, expect, it } from 'vitest';
+import type { Entry, FieldSet } from './model';
+import {
+	addRow,
+	editRow,
+	isDirty,
+	openWorkingCopy,
+	removeRow,
+	replaceDefinition,
+	setDescription,
+	setName
+} from './working-copy';
+import { draftsOf, installEntries, saveRequest } from './working-copy-save';
+import { keysAfterSave } from './editor-session';
+
+const SET: FieldSet = {
+	id: 'set-1',
+	name: 'Lens',
+	description: 'Camera data',
+	origin: 'manual',
+	originDetails: null,
+	createdAt: '2026-11-01T09:00:00.000Z',
+	changedAt: '2026-11-01T09:00:00.000Z'
+};
+
+function storedEntry(id: string, overrides: Partial<Entry> = {}): Entry {
+	return {
+		id,
+		setId: 'set-1',
+		targetEntityType: 'Shot',
+		programmaticName: `sg_${id}`,
+		displayName: id,
+		dataType: 'text',
+		validTypes: [],
+		validValues: [],
+		defaultValue: null,
+		description: null,
+		uniquePerProject: false,
+		snapshot: null,
+		snapshotSite: null,
+		snapshotTime: null,
+		createdAt: '2026-11-01T09:00:00.000Z',
+		changedAt: '2026-11-01T09:00:00.000Z',
+		...overrides
+	};
+}
+
+const snapshotted = storedEntry('b', {
+	snapshot: { data_type: { value: 'text', editable: false } },
+	snapshotSite: 'https://example.shotgrid.autodesk.com',
+	snapshotTime: '2026-11-01T08:00:00.000Z'
+});
+
+function open() {
+	return openWorkingCopy(SET, [storedEntry('a'), snapshotted, storedEntry('c')]);
+}
+
+describe('saveRequest', () => {
+	it('EDT-44: a clean working copy asks for nothing', () => {
+		expect(saveRequest(open())).toEqual({
+			details: null,
+			removedIds: [],
+			changed: [],
+			added: [],
+			loaded: { setChangedAt: SET.changedAt, name: 'Lens', description: 'Camera data', entryChangedAt: {} }
+		});
+	});
+
+	it('H1: carries what the set and each changed or removed field read when loaded, never what was typed since', () => {
+		const loadedAt = '2026-11-02T10:00:00.000Z';
+		let wc = openWorkingCopy({ ...SET, changedAt: loadedAt }, [storedEntry('a', { changedAt: loadedAt }), snapshotted, storedEntry('c')]);
+		const key = (id: string) => wc.rows.find((row) => row.entryId === id)!.key;
+		wc = setName(wc, 'Lens kit');
+		wc = editRow(wc, key('a'), { description: 'Edited.' });
+		wc = removeRow(wc, key('c'));
+		wc = addRow(wc, 'new-1', 'Shot');
+		expect(saveRequest(wc).loaded).toEqual({
+			setChangedAt: loadedAt,
+			name: 'Lens',
+			description: 'Camera data',
+			// The changed one and the removed one. Not the untouched one, not the added one.
+			entryChangedAt: { a: loadedAt, c: '2026-11-01T09:00:00.000Z' }
+		});
+	});
+
+	it('EDT-44, MOD-1, MOD-7: a changed name or description sends both, cleaned', () => {
+		expect(saveRequest(setName(open(), ' Lens data ')).details).toEqual({
+			name: 'Lens data',
+			description: 'Camera data'
+		});
+		expect(saveRequest(setDescription(open(), '  ')).details).toEqual({ name: 'Lens', description: null });
+	});
+
+	it('EDT-44: name and description cleaned back to the saved ones send nothing', () => {
+		expect(saveRequest(setName(open(), 'Lens ')).details).toBe(null);
+	});
+
+	it('EDT-44: removed stored rows are sent by entry id', () => {
+		const wc = removeRow(removeRow(open(), 'a'), 'c');
+		expect(saveRequest(wc).removedIds).toEqual(['a', 'c']);
+	});
+
+	it('EDT-45: only entries whose cleaned form changed are written, cleaned, with their stored fields', () => {
+		let wc = editRow(open(), 'b', { displayName: ' Lens B ', validValues: ['dropped'] });
+		wc = editRow(wc, 'c', { description: '  ' });
+		expect(saveRequest(wc).changed).toEqual([{ ...snapshotted, displayName: 'Lens B' }]);
+	});
+
+	it('EDT-42, EDT-45: a re-synced row that changed is sent with its refreshed snapshot, not the saved one', () => {
+		const fresh = { snapshot: { data_type: { value: 'list', editable: false } }, snapshotSite: 'https://site.example', snapshotTime: null };
+		const wc = replaceDefinition(open(), 'b', { ...snapshotted, displayName: 'Lens B', dataType: 'list', validValues: ['x'] }, fresh);
+		expect(saveRequest(wc).changed).toEqual([{ ...snapshotted, displayName: 'Lens B', dataType: 'list', validValues: ['x'], ...fresh }]);
+	});
+
+	it('EDT-42, EDT-45: a re-synced row whose definition did not move is not written', () => {
+		const wc = replaceDefinition(open(), 'b', snapshotted, { snapshot: { other: true }, snapshotSite: 'https://site.example', snapshotTime: null });
+		expect(saveRequest(wc).changed).toEqual([]);
+	});
+
+	it('EDT-44, EDT-18: added rows are sent as cleaned drafts, in row order', () => {
+		let wc = addRow(addRow(open(), 'new-1', 'Shot'), 'new-2', 'Asset');
+		wc = editRow(wc, 'new-2', { displayName: 'Focal ', dataType: 'list', validValues: [' 35 ', ''] });
+		wc = editRow(wc, 'new-1', { displayName: 'Lens' });
+		expect(saveRequest(wc).added).toEqual([
+			{
+				targetEntityType: 'Shot',
+				programmaticName: 'sg_lens',
+				displayName: 'Lens',
+				dataType: 'text',
+				validTypes: [],
+				validValues: [],
+				defaultValue: null,
+				description: null,
+				uniquePerProject: false,
+				snapshot: null,
+				snapshotSite: null,
+				snapshotTime: null
+			},
+			{
+				targetEntityType: 'Asset',
+				programmaticName: 'sg_focal',
+				displayName: 'Focal',
+				dataType: 'list',
+				validTypes: [],
+				validValues: ['35'],
+				defaultValue: null,
+				description: null,
+				uniquePerProject: false,
+				snapshot: null,
+				snapshotSite: null,
+				snapshotTime: null
+			}
+		]);
+		// The store answers one entry per added draft, in this order; the editor pairs them back by row order.
+		expect(keysAfterSave(wc, [{ id: 'e1' }, { id: 'e2' }])).toEqual(new Map([['a', 'a'], ['b', 'b'], ['c', 'c'], ['new-1', 'e1'], ['new-2', 'e2']]));
+	});
+
+	it('EDT-44: deleting an entry and adding one with the same pair sends both', () => {
+		let wc = removeRow(open(), 'a');
+		wc = editRow(addRow(wc, 'new-1', 'Shot'), 'new-1', { displayName: 'a' });
+		const request = saveRequest(wc);
+		expect(request.removedIds).toEqual(['a']);
+		expect(request.added.map((draft) => draft.programmaticName)).toEqual(['sg_a']);
+	});
+});
+
+describe('after a save: `openWorkingCopy` on what the store answered', () => {
+	it('EDT-46: returns a clean working copy on the reloaded state', () => {
+		const stored = [storedEntry('a', { displayName: 'Lens A' }), storedEntry('n1', { programmaticName: 'sg_lens' })];
+		const wc = openWorkingCopy({ ...SET, name: 'Lens data' }, stored);
+		expect(isDirty(wc)).toBe(false);
+		expect(wc.name).toBe('Lens data');
+		expect(wc.rows.map((row) => [row.key, row.nameMode])).toEqual([
+			['a', 'manual'],
+			['n1', 'manual']
+		]);
+	});
+});
+
+describe('entries for Duplicate and Install', () => {
+	it('EDT-9: drafts of every row, unsaved edits included, cleaned, snapshots kept', () => {
+		let wc = editRow(open(), 'b', { displayName: ' B2 ' });
+		wc = addRow(wc, 'new-1', 'Asset');
+		const drafts = draftsOf(wc);
+		expect(drafts).toHaveLength(4);
+		expect(drafts[1]).toEqual({
+			targetEntityType: 'Shot',
+			programmaticName: 'sg_b',
+			displayName: 'B2',
+			dataType: 'text',
+			validTypes: [],
+			validValues: [],
+			defaultValue: null,
+			description: null,
+			uniquePerProject: false,
+			snapshot: snapshotted.snapshot,
+			snapshotSite: snapshotted.snapshotSite,
+			snapshotTime: snapshotted.snapshotTime
+		});
+	});
+
+	it('EDT-9: only the selected rows, in row order', () => {
+		const drafts = draftsOf(open(), ['c', 'a', 'nope']);
+		expect(drafts.map((draft) => draft.programmaticName)).toEqual(['sg_a', 'sg_c']);
+	});
+
+	it('EDT-10, PLN-1: the stored entries of every row, or of the selected rows', () => {
+		const wc = open();
+		expect(installEntries(wc)).toEqual([storedEntry('a'), snapshotted, storedEntry('c')]);
+		expect(installEntries(wc, ['c'])).toEqual([storedEntry('c')]);
+	});
+
+	it('PLN-2: rows not stored are never offered to Install', () => {
+		expect(installEntries(addRow(open(), 'new-1', 'Shot')).map((entry) => entry.id)).toEqual(['a', 'b', 'c']);
+	});
+});

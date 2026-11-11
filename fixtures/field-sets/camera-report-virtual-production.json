@@ -1,67 +1,111 @@
 {
-  "format": "provisional, hand-built 2026-11-10; the spec does not fix an export format yet",
-  "name": "On-set camera report: virtual production",
-  "description": "Columns the wrangler added for one virtual production shoot, to merge VFX data with engine tracking data. All empty in the sample, so every type is text.",
-  "origin": "import",
-  "origin_details": "FlowStudioDemo.xlsx, sheet Sheet1 (wrangler camera report export, 72 columns, 5 takes)",
-  "entries": [
-    {
-      "source_header": "Unreal Environment",
-      "target_entity_type": "Slate",
-      "programmatic_name": "sg_unreal_environment",
-      "display_name": "Unreal Environment",
-      "data_type": "text",
-      "on_probed_site": "new"
-    },
-    {
-      "source_header": "Unreal Snapshot Name",
-      "target_entity_type": "Slate",
-      "programmatic_name": "sg_unreal_snapshot_name",
-      "display_name": "Unreal Snapshot Name",
-      "data_type": "text",
-      "on_probed_site": "new"
-    },
-    {
-      "source_header": "Unreal Take Name",
-      "target_entity_type": "Slate",
-      "programmatic_name": "sg_unreal_take_name",
-      "display_name": "Unreal Take Name",
-      "data_type": "text",
-      "on_probed_site": "new"
-    },
-    {
-      "source_header": "Vicon Take Name",
-      "target_entity_type": "Slate",
-      "programmatic_name": "sg_vicon_take_name",
-      "display_name": "Vicon Take Name",
-      "data_type": "text",
-      "on_probed_site": "new"
-    },
-    {
-      "source_header": "nDisplay Color Correction",
-      "target_entity_type": "Slate",
-      "programmatic_name": "sg_ndisplay_color_correction",
-      "display_name": "nDisplay Color Correction",
-      "data_type": "text",
-      "on_probed_site": "new"
-    },
-    {
-      "source_header": "Additional Notes VP",
-      "target_entity_type": "Slate",
-      "programmatic_name": "sg_additional_notes_vp",
-      "display_name": "Additional Notes VP",
-      "data_type": "text",
-      "on_probed_site": "new"
-    },
-    {
-      "source_header": "Distance to Volume",
-      "target_entity_type": "Slate",
-      "programmatic_name": "sg_distance_to_volume",
-      "display_name": "Distance to Volume",
-      "data_type": "text",
-      "on_probed_site": "new",
-      "review": "Kept as a new field. Distance to Subject exists on the site but measures something else: this is the distance to the LED volume."
-    }
-  ],
-  "skipped_columns": []
+	"format": "sg-fields-setup/set",
+	"version": 1,
+	"name": "On-set camera report: virtual production",
+	"description": "Columns the wrangler added for one virtual production shoot, to merge VFX data with engine tracking data. All empty in the sample, so every type is text.",
+	"origin": "import",
+	"originDetails": {
+		"sourceFiles": "FlowStudioDemo.xlsx",
+		"importedAt": "2026-11-10T00:00:00.000Z"
+	},
+	"entries": [
+		{
+			"targetEntityType": "Slate",
+			"programmaticName": "sg_unreal_environment",
+			"displayName": "Unreal Environment",
+			"dataType": "text",
+			"validTypes": [],
+			"validValues": [],
+			"defaultValue": null,
+			"description": null,
+			"uniquePerProject": false,
+			"snapshot": null,
+			"snapshotSite": null,
+			"snapshotTime": null
+		},
+		{
+			"targetEntityType": "Slate",
+			"programmaticName": "sg_unreal_snapshot_name",
+			"displayName": "Unreal Snapshot Name",
+			"dataType": "text",
+			"validTypes": [],
+			"validValues": [],
+			"defaultValue": null,
+			"description": null,
+			"uniquePerProject": false,
+			"snapshot": null,
+			"snapshotSite": null,
+			"snapshotTime": null
+		},
+		{
+			"targetEntityType": "Slate",
+			"programmaticName": "sg_unreal_take_name",
+			"displayName": "Unreal Take Name",
+			"dataType": "text",
+			"validTypes": [],
+			"validValues": [],
+			"defaultValue": null,
+			"description": null,
+			"uniquePerProject": false,
+			"snapshot": null,
+			"snapshotSite": null,
+			"snapshotTime": null
+		},
+		{
+			"targetEntityType": "Slate",
+			"programmaticName": "sg_vicon_take_name",
+			"displayName": "Vicon Take Name",
+			"dataType": "text",
+			"validTypes": [],
+			"validValues": [],
+			"defaultValue": null,
+			"description": null,
+			"uniquePerProject": false,
+			"snapshot": null,
+			"snapshotSite": null,
+			"snapshotTime": null
+		},
+		{
+			"targetEntityType": "Slate",
+			"programmaticName": "sg_ndisplay_color_correction",
+			"displayName": "nDisplay Color Correction",
+			"dataType": "text",
+			"validTypes": [],
+			"validValues": [],
+			"defaultValue": null,
+			"description": null,
+			"uniquePerProject": false,
+			"snapshot": null,
+			"snapshotSite": null,
+			"snapshotTime": null
+		},
+		{
+			"targetEntityType": "Slate",
+			"programmaticName": "sg_additional_notes_vp",
+			"displayName": "Additional Notes VP",
+			"dataType": "text",
+			"validTypes": [],
+			"validValues": [],
+			"defaultValue": null,
+			"description": null,
+			"uniquePerProject": false,
+			"snapshot": null,
+			"snapshotSite": null,
+			"snapshotTime": null
+		},
+		{
+			"targetEntityType": "Slate",
+			"programmaticName": "sg_distance_to_volume",
+			"displayName": "Distance to Volume",
+			"dataType": "text",
+			"validTypes": [],
+			"validValues": [],
+			"defaultValue": null,
+			"description": null,
+			"uniquePerProject": false,
+			"snapshot": null,
+			"snapshotSite": null,
+			"snapshotTime": null
+		}
+	]
 }
