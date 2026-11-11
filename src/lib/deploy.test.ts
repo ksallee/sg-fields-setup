@@ -42,3 +42,10 @@ describe('package.json', () => {
 		expect(devDependencies['@sveltejs/adapter-node']).toBeUndefined();
 	});
 });
+
+describe('package.json engines', () => {
+	it('keeps Vercel on a Node the adapter builds for: 22 or 24, never a newer one', () => {
+		// Vercel takes the newest Node the range allows. An open range lands on one the adapter refuses.
+		expect(pkg.engines.node).toBe('>=22 <25');
+	});
+});
