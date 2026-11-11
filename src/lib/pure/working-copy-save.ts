@@ -28,7 +28,9 @@ export interface SaveRequest {
 	removedIds: string[];
 	/**
 	 * The stored entries whose cleaned definition changed, only those (EDT-45), in row order:
-	 * the saved entry (id, set, timestamps, snapshot) with the row's cleaned definition over it.
+	 * the saved entry (id, set, timestamps) with the row's cleaned definition and the row's
+	 * snapshot over it. The snapshot is the row's because a re-sync refreshes it (EDT-42); on a
+	 * row never re-synced it is the saved one.
 	 */
 	changed: Entry[];
 	/** The added rows as cleaned drafts, in row order. `addedKeys` gives their row keys. */
@@ -58,7 +60,13 @@ export function saveRequest(workingCopy: WorkingCopy): SaveRequest {
 		kept.add(row.entryId);
 		const entry = saved.get(row.entryId);
 		if (entry && !sameCleanedDefinition(row, entry)) {
-			changed.push({ ...entry, ...cleanEntry(definitionOf(row)) });
+			changed.push({
+				...entry,
+				...cleanEntry(definitionOf(row)),
+				snapshot: row.snapshot,
+				snapshotSite: row.snapshotSite,
+				snapshotTime: row.snapshotTime
+			});
 		}
 	}
 	return {

@@ -137,6 +137,12 @@ describe('editRow', () => {
 		expect(rowByKey(wc, 'new-1')?.programmaticName).toBe('sg_lens_serial__');
 	});
 
+	it('EDT-25, MOD-7, MOD-17: the name is derived from the display name as it will be stored, trimmed', () => {
+		// The display name is trimmed on save, and the site derives the name from what it is sent.
+		const wc = editRow(addRow(open(), 'new-1', 'Shot'), 'new-1', { displayName: ' Lens serial ' });
+		expect(rowByKey(wc, 'new-1')).toMatchObject({ displayName: ' Lens serial ', programmaticName: 'sg_lens_serial' });
+	});
+
 	it('MOD-18: the derived name shows a doubled prefix', () => {
 		const wc = editRow(addRow(open(), 'new-1', 'Shot'), 'new-1', { displayName: 'sg_lens' });
 		expect(rowByKey(wc, 'new-1')?.programmaticName).toBe('sg_sg_lens');
@@ -251,6 +257,20 @@ describe('replaceDefinition', () => {
 	it('EDT-42 seam: an unknown row key changes nothing', () => {
 		const wc = open();
 		expect(replaceDefinition(wc, 'nope', storedEntry('x'))).toBe(wc);
+	});
+
+	it('EDT-42 seam: a snapshot given beside the definition replaces the row\'s three snapshot fields', () => {
+		const wc = open([storedEntry('a', { snapshot: { x: 1 }, snapshotSite: 'https://old.example', snapshotTime: '2026-11-01T08:00:00.000Z' })]);
+		const fresh = { snapshot: { x: 2 }, snapshotSite: 'https://site.example', snapshotTime: null };
+		const row = rowByKey(replaceDefinition(wc, 'a', storedEntry('a', { displayName: 'Lens A' }), fresh), 'a');
+		expect(row).toMatchObject({ displayName: 'Lens A', key: 'a', entryId: 'a', nameMode: 'manual', ...fresh });
+	});
+
+	it('EDT-42 seam, EDT-3: a refreshed snapshot alone does not make the set dirty', () => {
+		const wc = open([storedEntry('a', { snapshot: { x: 1 } })]);
+		const next = replaceDefinition(wc, 'a', storedEntry('a'), { snapshot: { x: 2 }, snapshotSite: 'https://site.example', snapshotTime: null });
+		expect(rowByKey(next, 'a')?.snapshot).toEqual({ x: 2 });
+		expect(isDirty(next)).toBe(false);
 	});
 });
 

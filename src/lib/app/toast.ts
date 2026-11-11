@@ -33,6 +33,10 @@ export const notify = {
 		if (title) toast.error(title, { description: message, duration: 10_000 });
 		else toast.error(message, { duration: 10_000 });
 	},
+	/** A thing was done and found nothing, or only part of it. Stays as long as a failure. */
+	warning(message: string, description?: string): void {
+		toast.warning(message, { description, duration: 10_000 });
+	},
 	/** Something to know that is neither. */
 	info(message: string, description?: string): void {
 		toast(message, { description });
