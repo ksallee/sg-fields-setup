@@ -5,16 +5,16 @@ import {
 	buildEditorView,
 	groupCountText,
 	type EditorViewInput,
-	type ViewRow
+	type EditorRow
 } from './editor-view';
 
-function row(key: string, targetEntityType = 'Shot', displayName = key, programmaticName = `sg_${key}`): ViewRow {
+function row(key: string, targetEntityType = 'Shot', displayName = key, programmaticName = `sg_${key}`): EditorRow {
 	return { key, targetEntityType, programmaticName, displayName };
 }
 
 const SITE_NAMES: Record<string, string> = { Shot: 'Shot', CustomEntity01: 'Vendor', Asset: 'Asset' };
 
-function input(rows: ViewRow[], over: Partial<EditorViewInput> = {}, categories: Record<string, EntryCategory> = {}): EditorViewInput {
+function input(rows: EditorRow[], over: Partial<EditorViewInput> = {}, categories: Record<string, EntryCategory> = {}): EditorViewInput {
 	return {
 		rows,
 		categoryOf: (key) => categories[key] ?? 'new',
@@ -106,7 +106,7 @@ describe('grouping', () => {
 describe('the search on one row', () => {
 	const shot = row('a', 'CustomEntity01', 'Lens Serial', 'sg_lens_serial');
 	/** Whether the row stays in the view under the search. Its type shows on the site as "Vendor". */
-	const matchesSearch = (one: ViewRow, search: string) =>
+	const matchesSearch = (one: EditorRow, search: string) =>
 		buildEditorView(input([one], { search })).groups.some((group) => group.keys.includes(one.key));
 
 	it('EDT-34: a blank search matches everything', () => {
@@ -299,7 +299,7 @@ describe('purity and speed', () => {
 	it('does not mutate its input', () => {
 		const rows = [row('b', 'Shot'), row('a', 'Asset')];
 		const added = ['CustomEntity01'];
-		const frozen = input(Object.freeze(rows.map((r) => Object.freeze(r))) as ViewRow[], {
+		const frozen = input(Object.freeze(rows.map((r) => Object.freeze(r))) as EditorRow[], {
 			addedGroups: Object.freeze(added) as string[],
 			onSiteFirst: true
 		});

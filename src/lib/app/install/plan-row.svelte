@@ -17,7 +17,7 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
-	import { rowStatus, statusLabel, type RowStatus, type ViewRow } from '$lib/pure/install-view';
+	import { rowStatus, statusLabel, type RowStatus, type InstallRow } from '$lib/pure/install-view';
 	import { needsVisibilityRetry, type RunState } from '$lib/pure/run';
 	import { rowParts, visibilityProgress } from '$lib/pure/run-text';
 	import type { VisibilityCounter } from '$lib/pure/visibility-text';
@@ -35,7 +35,7 @@
 		ontoggle,
 		onretryvisibility
 	}: {
-		row: ViewRow;
+		row: InstallRow;
 		run: RunState;
 		ticked: boolean;
 		/** Nothing left to do: unticked and disabled (RUN-4). */

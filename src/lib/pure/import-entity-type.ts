@@ -9,15 +9,11 @@
  *   name, plural-tolerant API name, plural-tolerant display name. Within a tier, the list's order.
  * - The fallback is used trimmed and as given. It is not checked against the site's types.
  */
+import type { LiveEntityType } from './live-entity-types';
 import { trimFold } from './fold';
 
-/** The fields this module needs of a site's entity type. */
-export interface SiteEntityType {
-	/** API name, such as CustomEntity19. */
-	name: string;
-	/** Display name, such as Lens. */
-	displayName: string;
-}
+/** The two fields this module reads of a site's entity type: its API name and its display name. */
+type NamedType = Pick<LiveEntityType, 'name' | 'displayName'>;
 
 /** The modes, the default first (IMP-17). */
 export const IMPORT_MODES = ['automatic', 'worksheet', 'header_prefix'] as const;
@@ -40,7 +36,7 @@ function pluralTolerant(a: string, b: string): boolean {
  * The API name of the site type a hint or worksheet name names, or `null` (IMP-21). Precedence
  * is in the module comment.
  */
-export function resolveEntityType(text: string, types: readonly SiteEntityType[]): string | null {
+export function resolveEntityType(text: string, types: readonly NamedType[]): string | null {
 	const wanted = trimFold(text);
 	if (wanted === '') return null;
 	const tiers: [(a: string, b: string) => boolean, 'name' | 'displayName'][] = [
@@ -65,7 +61,7 @@ export interface TargetInput {
 	/** The bucket's fallback entity type. '' when none is set. */
 	fallback: string;
 	/** The site's entity types. Absent when no site is connected. */
-	types?: readonly SiteEntityType[];
+	types?: readonly NamedType[];
 }
 
 /**

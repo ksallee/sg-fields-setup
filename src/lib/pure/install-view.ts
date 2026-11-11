@@ -141,7 +141,7 @@ export function typeConflictText(liveDataType: string, wantedDataType: string): 
 	return `${dataTypeLabel(liveDataType)} on the site, ${dataTypeLabel(wantedDataType)} in the set`;
 }
 
-export interface ViewRow {
+export interface InstallRow {
 	entryId: string;
 	entityType: string;
 	/** "Lenses (CustomEntity19)" when the site names the type otherwise, else the API name. */
@@ -181,7 +181,7 @@ export function viewRows(
 	items: readonly PlanItem[],
 	run: Pick<RunState, 'rows'>,
 	entityTypes: readonly Pick<LiveEntityType, 'name' | 'displayName'>[] = []
-): ViewRow[] {
+): InstallRow[] {
 	const runRows = new Map(run.rows.map((row) => [row.entryId, row]));
 	return items.map((item) => {
 		const runRow = runRows.get(item.entryId) ?? null;
@@ -210,14 +210,14 @@ export function viewRows(
 	});
 }
 
-export interface ViewGroup extends GroupSpec {
+export interface InstallGroup extends GroupSpec {
 	/** The header's count (RUN-2). */
 	count: number;
-	rows: ViewRow[];
+	rows: InstallRow[];
 }
 
 /** The groups that have rows, in order, each with its rows in plan order (RUN-2). */
-export function groupRows(rows: readonly ViewRow[]): ViewGroup[] {
+export function groupRows(rows: readonly InstallRow[]): InstallGroup[] {
 	return GROUPS.map((group) => {
 		const own = rows.filter((row) => row.group === group.id);
 		return { ...group, count: own.length, rows: own };
@@ -227,7 +227,7 @@ export function groupRows(rows: readonly ViewRow[]): ViewGroup[] {
 /** What a row's badge says: a run's state, `skipped` for a row the plan skips, `not-selected`, or nothing yet. */
 export type RowStatus = RowState | 'not-selected';
 
-export function rowStatus(row: Pick<ViewRow, 'selectable' | 'run'>, run: Pick<RunState, 'status'>): RowStatus | null {
+export function rowStatus(row: Pick<InstallRow, 'selectable' | 'run'>, run: Pick<RunState, 'status'>): RowStatus | null {
 	if (row.run) return row.run.state;
 	if (!row.selectable) return 'skipped';
 	return run.status === 'idle' ? null : 'not-selected';

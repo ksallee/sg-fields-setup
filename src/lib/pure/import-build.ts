@@ -19,7 +19,7 @@
  */
 import { columnValues, guessDataType } from './import-guess';
 import { DEFAULT_DELIMITER, splitHeader } from './import-header';
-import { targetEntityType, type ImportMode, type SiteEntityType } from './import-entity-type';
+import { targetEntityType, type ImportMode } from './import-entity-type';
 import { createMatcher, type LiveFieldsByType } from './import-match';
 import { predictFieldName } from './field-name';
 import { draftFromLiveField } from './live-to-entry';
@@ -27,6 +27,7 @@ import type { EntryDraft, OriginDetails, Timestamp } from './model';
 import type { ParsedTable } from './table';
 import type { WorkbookSheet } from './xlsx';
 import { countText } from './set-text';
+import type { LiveEntityType } from './live-entity-types';
 
 /* Buckets. */
 
@@ -100,7 +101,7 @@ function columnsOf(buckets: readonly ImportBucket[], delimiter: string): Column[
 	return columns;
 }
 
-function targetOf(column: Column, mode: ImportMode, types: readonly SiteEntityType[] | undefined): string {
+function targetOf(column: Column, mode: ImportMode, types: readonly Pick<LiveEntityType, 'name' | 'displayName'>[] | undefined): string {
 	return targetEntityType({
 		mode,
 		hint: column.hint,
@@ -118,7 +119,7 @@ export function resolvedEntityTypes(
 	buckets: readonly ImportBucket[],
 	mode: ImportMode,
 	delimiter: string,
-	types: readonly SiteEntityType[] | null
+	types: readonly Pick<LiveEntityType, 'name' | 'displayName'>[] | null
 ): string[] {
 	if (!types) return [];
 	const seen = new Set<string>();
@@ -162,7 +163,7 @@ export function inferFallback(
 export interface ImportSite {
 	/** The site's URL, for each snapshot. */
 	url: string;
-	entityTypes: readonly SiteEntityType[];
+	entityTypes: readonly Pick<LiveEntityType, 'name' | 'displayName'>[];
 	/** Live fields of the types `resolvedEntityTypes` named. A type missing has no fields. */
 	fieldsByType: LiveFieldsByType;
 }

@@ -18,7 +18,7 @@ import { compareCodeUnits, nameCollator } from './text-order';
 import { trimFold } from './fold';
 
 /** What the view reads from a row of the working copy. Rows keep their own other fields. */
-export interface ViewRow {
+export interface EditorRow {
 	/** Stable and unique within the working copy. */
 	key: string;
 	targetEntityType: string;
@@ -36,7 +36,7 @@ export const UNASSIGNED_LABEL = 'Unassigned';
 
 export interface EditorViewInput {
 	/** The working copy's rows, in its order. */
-	rows: readonly ViewRow[];
+	rows: readonly EditorRow[];
 	/** Each row's category against the site (CMP-8). Asked once per row. */
 	categoryOf: (key: string) => EntryCategory;
 	/** The site's display name for an entity type API name, or undefined when not known. */
@@ -61,7 +61,7 @@ export interface GroupCount {
 	partial: boolean;
 }
 
-export interface ViewGroup extends GroupCount {
+export interface EditorGroup extends GroupCount {
 	/** The trimmed stored type name; `''` for the unassigned group. Unique among the groups. */
 	type: string;
 	/** The header text: the site display name when known, else the stored name (EDT-17). */
@@ -86,7 +86,7 @@ export type EmptyState = 'no_entries' | 'no_matches' | null;
 
 export interface EditorView {
 	/** The visible groups, in order (EDT-16, EDT-37). */
-	groups: ViewGroup[];
+	groups: EditorGroup[];
 	/** Every visible row's key, in on-screen order, across groups. Selection ranges over it. */
 	visibleKeys: string[];
 	counts: FilterCounts;
@@ -123,7 +123,7 @@ function labelFor(type: string, typeDisplayName: (apiName: string) => string | u
  * programmatic name, target entity type, or the type's site display name when given. A blank
  * query matches every row. The query comes trimmed and lowercased (`trimFold`).
  */
-function matchesQuery(row: ViewRow, query: string, typeLabel: string | undefined): boolean {
+function matchesQuery(row: EditorRow, query: string, typeLabel: string | undefined): boolean {
 	if (query === '') return true;
 	return (
 		row.displayName.toLowerCase().includes(query) ||
@@ -181,7 +181,7 @@ export function buildEditorView(input: EditorViewInput): EditorView {
 		bucketFor(type);
 	}
 
-	const groups: ViewGroup[] = [];
+	const groups: EditorGroup[] = [];
 	const visibleKeys: string[] = [];
 	const ordered = [...buckets.values()].sort((a, b) => compareTypes(a.type, b.type));
 	for (const bucket of ordered) {

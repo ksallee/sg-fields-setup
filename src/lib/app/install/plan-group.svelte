@@ -6,9 +6,9 @@
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import type { Snippet } from 'svelte';
 	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
-	import type { ViewGroup } from '$lib/pure/install-view';
+	import type { InstallGroup } from '$lib/pure/install-view';
 
-	let { group, children }: { group: ViewGroup; children: Snippet } = $props();
+	let { group, children }: { group: InstallGroup; children: Snippet } = $props();
 
 	// svelte-ignore state_referenced_locally
 	let open = $state(group.open);
