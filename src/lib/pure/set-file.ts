@@ -493,7 +493,7 @@ function wrongValue(key: string, expected: Expected, found: Found): string {
 }
 
 function entryLabel(entry: number, programmaticName: string | null): string {
-	return programmaticName === null ? `Entry ${entry}` : `Entry ${entry} (${programmaticName})`;
+	return programmaticName === null ? `Field ${entry}` : `Field ${entry} (${programmaticName})`;
 }
 
 /** The sentence a person reads for a refusal. */
@@ -511,7 +511,7 @@ export function refusalMessage(refusal: SetFileRefusal): string {
 			if (refusal.found === 'missing') return `The file has no "${refusal.key}".`;
 			return wrongValue(refusal.key, refusal.expected, refusal.found);
 		case 'entryNotObject':
-			return `Entry ${refusal.entry} is ${FOUND[refusal.found]}. It should be an object.`;
+			return `Field ${refusal.entry} is ${FOUND[refusal.found]}. It should be an object.`;
 		case 'entryKeyMissing':
 			return `${entryLabel(refusal.entry, refusal.programmaticName)} has no "${refusal.key}".`;
 		case 'snapshotTooDeep':

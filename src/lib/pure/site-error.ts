@@ -9,10 +9,7 @@
  * Not for the set store: its errors go through `errorMessage` in `$lib/app/toast`, which never
  * shows a raw error text.
  */
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
+import { isRecord } from './is-record';
 
 function said(value: unknown): string | null {
 	return typeof value === 'string' && value.trim() !== '' ? value : null;

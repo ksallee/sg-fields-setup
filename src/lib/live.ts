@@ -29,7 +29,7 @@ import { coreSchemaSource } from '$lib/io/core-schema-source';
 import { createLiveSchema, type LiveSchema } from '$lib/io/schema';
 import { connectedSite } from '$lib/pure/site';
 import { approvalUrl, checkSite, siteRefusalText, type SiteCheck } from '$lib/pure/site-host';
-import { createSessionTokenAuth, createSgContext, RestClient, type EntityRow, type RestClientOptions, type SgContext } from 'sg-widgets-core';
+import { createSessionTokenAuth, createSgContext, RestClient, type RestClientOptions, type SgContext } from 'sg-widgets-core';
 
 const KEYS = {
 	site: 'sg-fields-setup:site',
@@ -175,7 +175,6 @@ function devTokenAuth(first: DevToken): () => Promise<string> {
 
 /* The context, built once per page load. */
 
-let state: LiveState = { siteUrl: '', session: null, devToken: false, problem: null };
 let context: SgContext | null = null;
 let writer: RestClient | null = null;
 let schema: LiveSchema | null = null;
@@ -208,15 +207,8 @@ async function resolve(): Promise<LiveState> {
 
 /** Settle the site and its auth. The connect screen and the rest of the app both wait on this. */
 export function prepareLive(): Promise<LiveState> {
-	ready ??= resolve().then((next) => {
-		state = next;
-		return next;
-	});
+	ready ??= resolve();
 	return ready;
-}
-
-export function liveState(): LiveState {
-	return state;
 }
 
 /** The one context every widget on the page shares, so two widgets cost one read. */
@@ -245,22 +237,6 @@ export function liveSchema(): LiveSchema {
 export function liveClientOptions(): RestClientOptions {
 	if (!clientOptions) throw new Error('Not connected to Flow PT. Await prepareLive() first.');
 	return clientOptions;
-}
-
-/** The person behind the session: their HumanUser row, by login, read once. */
-let me: Promise<EntityRow | null> | null = null;
-export function whoAmI(): Promise<EntityRow | null> {
-	me ??= (async () => {
-		const login = state.session?.login;
-		if (!login || !context) return null;
-		const result = await context.client.search('HumanUser', {
-			filters: { logical_operator: 'and', conditions: [['login', 'is', login]] },
-			fields: ['name', 'image', 'login'],
-			page: { size: 1, number: 1 }
-		});
-		return result.data[0] ?? null;
-	})();
-	return me;
 }
 
 /* The App Session Launcher, through this app's endpoints. */

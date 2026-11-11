@@ -33,9 +33,9 @@ import { readFieldReply, readFields, type FieldReply, type LiveField, type LiveF
 export const COMMON_ENTITY_TYPES = ['Shot', 'Asset', 'Sequence', 'Task', 'Version', 'Note', 'Project'] as const;
 
 /**
- * The three reads, as raw as the site sends them. `readField` and `readRawFields` are named and
- * shaped after the schema client sg-widgets-core is growing (sg-widgets #357), so that client can
- * stand in here once it ships.
+ * The three reads, as raw as the site sends them. `coreSchemaSource` (`./core-schema-source`)
+ * answers `readRawFields` and `readField` with sg-widgets core's `RestSchemaClient`, and
+ * `readRawEntityTypes` with a copy of `RestClient`'s body.
  */
 export interface SchemaSource {
 	/** The `data` of `GET /schema`: one entry per type, keyed by API name. */
@@ -53,8 +53,6 @@ export interface SchemaSource {
 export interface LiveSchema {
 	/** The site's entity types, in the listing's order. Read once (CMP-1). Rejects when the read fails. */
 	entityTypes(): Promise<readonly LiveEntityType[]>;
-	/** The type list if it is held, else null. Never reads. */
-	cachedEntityTypes(): readonly LiveEntityType[] | null;
 	/** Reads the type list again and keeps the new one: the re-check of CMP-10. Rejects when the read fails. */
 	refreshEntityTypes(): Promise<readonly LiveEntityType[]>;
 
@@ -152,7 +150,6 @@ export function createLiveSchema(source: SchemaSource): LiveSchema {
 
 	return {
 		entityTypes: () => (types ?? loadTypes()).promise,
-		cachedEntityTypes: () => types?.value ?? null,
 		refreshEntityTypes: () => loadTypes().promise,
 
 		fields,

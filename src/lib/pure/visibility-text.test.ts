@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { RowVisibility } from './visibility-analysis';
+import type { VisibilityForecast } from './visibility-analysis';
 import type { ScopeProject } from './visibility-scope';
 import { NEVER_REMOVED, nothingLeftToDo, projectNames, rowCounters, visibilityCount } from './visibility-text';
 
 const projects = (count: number, from = 1): ScopeProject[] => Array.from({ length: count }, (_, index) => ({ id: from + index, name: `P${from + index}` }));
 
-const state = (over: Partial<RowVisibility> = {}): RowVisibility => ({
+const state = (over: Partial<VisibilityForecast> = {}): VisibilityForecast => ({
 	entryId: 'e1',
 	class: 'update',
 	applies: true,

@@ -7,11 +7,12 @@
  * generation: the caller supplies the keys of new rows. What is visible, selected or expanded is
  * the view's business, not held here.
  */
-import { cleanEntry } from './clean';
+import { cleanDescription, cleanEntry } from './clean';
 import { isMirror } from './data-types';
 import { hasNonAscii, predictFieldName } from './field-name';
 import type { Entry, EntryDefinition, EntrySnapshot, FieldSet, Origin, OriginDetails, Timestamp } from './model';
 import { validateSet, type SetValidity } from './validity';
+import { compareCodeUnits } from './text-order';
 
 /**
  * How a row's programmatic name moves (EDT-25). Derived: it follows the display name and cannot
@@ -23,8 +24,8 @@ export type NameMode = 'derived' | 'manual';
 export interface Row extends EntryDefinition, EntrySnapshot {
 	/**
 	 * Stable for the life of the working copy. The stored entry's id for a row loaded from
-	 * storage; the caller's client key for a row added here. It does not change when an added
-	 * row is stored (`adoptStored`).
+	 * storage; the caller's client key for a row added here. After a save every row is keyed by
+	 * its entry id (`keysAfterSave` in `editor-session.ts`).
 	 */
 	key: string;
 	/** The stored entry's id, or null while the row is not stored. */
@@ -58,19 +59,6 @@ export interface WorkingCopy {
 	rows: readonly Row[];
 }
 
-/** The nine keys of a definition, the part dirtiness and the save compare (EDT-3). */
-export const DEFINITION_KEYS = [
-	'targetEntityType',
-	'programmaticName',
-	'displayName',
-	'dataType',
-	'validTypes',
-	'validValues',
-	'defaultValue',
-	'description',
-	'uniquePerProject'
-] as const satisfies readonly (keyof EntryDefinition)[];
-
 /** Just the definition of an entry or a row, as a fresh object. Lists are shared, not copied. */
 export function definitionOf(source: EntryDefinition): EntryDefinition {
 	return {
@@ -84,11 +72,6 @@ export function definitionOf(source: EntryDefinition): EntryDefinition {
 		description: source.description,
 		uniquePerProject: source.uniquePerProject
 	};
-}
-
-/** Code unit order: deterministic in every locale. */
-function compareText(a: string, b: string): number {
-	return a < b ? -1 : a > b ? 1 : 0;
 }
 
 function storedRow(entry: Entry): Row {
@@ -114,8 +97,8 @@ export function openWorkingCopy(set: FieldSet, entries: readonly Entry[]): Worki
 		.map(storedRow)
 		.sort(
 			(a, b) =>
-				compareText(a.targetEntityType, b.targetEntityType) ||
-				compareText(a.programmaticName, b.programmaticName)
+				compareCodeUnits(a.targetEntityType, b.targetEntityType) ||
+				compareCodeUnits(a.programmaticName, b.programmaticName)
 		);
 	return {
 		setId: set.id,
@@ -292,8 +275,7 @@ export function cleanedName(workingCopy: WorkingCopy): string {
 
 /** The description as it would be stored: trimmed, blank as none (MOD-7). */
 export function cleanedDescription(workingCopy: WorkingCopy): string | null {
-	const description = workingCopy.description.trim();
-	return description === '' ? null : description;
+	return cleanDescription(workingCopy.description);
 }
 
 /** Whether the name or description differs from the saved one once cleaned. */

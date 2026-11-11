@@ -154,6 +154,35 @@ filler. Sentence case everywhere, no capitals for labels.
 - Words that a screen shows live in a pure module with tests, not in markup, once they take an
   argument.
 
+## Names across the seams
+
+One thing goes by a different name in each layer. Each is a port, so the names stay; this is the
+map.
+
+| what | editor (`working-copy.ts`, `editor-view.ts`) | store and plan input (`model.ts`, `set-plan.ts`, `PlanEntry`) | plan items, run and views (`plan.ts`, `run.ts`, `install-view.ts`) |
+|---|---|---|---|
+| an entry | `key` (a row; the entry's id once stored, `entryId` beside it) | `id` | `entryId` |
+| its type | `targetEntityType` | `targetEntityType` | `entityType` |
+
+Two rows and two visibilities that read alike are not the same thing: `EditorRow` and
+`EditorGroup` are the editor list's; `InstallRow` and `InstallGroup` the install plan's.
+`VisibilityForecast` is what a row's visibility will be before a run (`visibility-analysis.ts`);
+`RunVisibility` is its progress during one (`run.ts`). A site's entity type is `LiveEntityType`
+everywhere, or a `Pick` of its `name` and `displayName` where a module reads only those.
+
+## Comparing names
+
+Names are folded before they are compared, and the rule differs on purpose by what is compared.
+Tests pin each difference.
+
+| folding | rule | where |
+|---|---|---|
+| `trimFold` (`$lib/pure/fold`) | trim, lowercase | the planner's label check (`labelKey` in `plan.ts`, CMP-6, PLN-16), the type meant by a valid type, the editor search (EDT-34), the import's entity type match (IMP-21) |
+| `setNameKey` (`copy-name.ts`) | trim, NFC, lowercase | set names: the clash check and copy names (MOD-2) |
+| `fold` (`set-query.ts`) | NFC, lowercase; the search is trimmed first | the set list search (SET-2) |
+| `normaliseName` (`import-normalise.ts`) | NFC, trim, lowercase, one space per run of other characters | the import's field match (IMP-27, IMP-28): "Shot-Code" matches "Shot Code" there, and is no label clash in the plan |
+| none | exact, case included | API names: entity types, field names, valid types (finding 121) |
+
 ## The install screen
 
 `app/install/`, held to everything above, with these rules of its own.
@@ -195,12 +224,13 @@ the form), `install/` (screen, session, plan group, plan row, summary, picker pa
 confirm).
 
 `src/lib/components/ui/` (shadcn-svelte, added with its CLI): alert-dialog, badge, button,
-checkbox, collapsible, dialog, dropdown-menu, input, label, progress, scroll-area, select,
-separator, skeleton, sonner, tabs, textarea, tooltip. `sonner` is edited to follow `$lib/theme`
+checkbox, collapsible, dialog, dropdown-menu, hover-card, input, label, progress, scroll-area,
+select, separator, skeleton, sonner, switch, tabs, textarea, tooltip. `sonner` is edited to follow `$lib/theme`
 in place of mode-watcher. `Tooltip.Provider` is in the root layout.
 
 `src/lib/components/` (sg-widgets registry copies, added with the same CLI from
 `https://sg-widgets.vercel.app/r/svelte/<name>.json`, never edited here): entity-type-picker,
-entity-type-multi-picker, entity-glyphs, state-line, data-type-picker, valid-values-editor, and
-what they install with them. The editor's data type and valid values are those two widgets. The
+entity-type-multi-picker, project-multi-picker, entity-glyphs, state-line, data-type-picker,
+valid-values-editor, and what they install with them. `docs/development.md` says how to refresh
+them. The editor's data type and valid values are those two widgets. The
 registry's `checkbox` replaces shadcn's: it draws the mixed state.

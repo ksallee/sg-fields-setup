@@ -117,6 +117,6 @@ export function reportText(report: RunReport, head: { siteUrl?: string; at?: str
 		for (const [name, note] of linked) lines.push(`  ${name}: ${note}`);
 		lines.push('');
 	}
-	lines.push('Install has no undo. To remove a field, delete it in FPT.', '');
+	lines.push('Install has no undo. To remove a field, delete it in Flow PT.', '');
 	return lines.join('\n');
 }

@@ -129,7 +129,7 @@ describe('small texts', () => {
 	});
 
 	it('says what leaving a run in progress does', () => {
-		expect(leaveQuestion()).toBe('An install is running. If you leave now it stops after the step in flight and the rest is not applied.');
+		expect(leaveQuestion()).toBe('An install is running. If you leave now it stops after the step that is running and the rest is not applied.');
 	});
 
 	it('names the report file after the set and the day', () => {

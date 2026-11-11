@@ -4,9 +4,10 @@
  * without a read (VIS-11).
  */
 import type { PlanScope } from './plan';
-import type { RowVisibility } from './visibility-analysis';
+import type { VisibilityForecast } from './visibility-analysis';
 import type { ScopeProject } from './visibility-scope';
 import { NOT_EDITABLE_MESSAGE } from './visibility-run';
+import { countText } from './set-text';
 
 /** How many names a tooltip lists before "and N more" (VIS-9). */
 export const TOOLTIP_NAMES = 20;
@@ -48,7 +49,7 @@ const COUNTERS: readonly { kind: Exclude<CounterKind, 'newVisible'>; word: strin
  * `findings/115`), so "visible on N" for the projects in scope, and "hidden on M" where a chosen
  * scope hides it. It has nothing "to add".
  */
-export function rowCounters(row: RowVisibility): VisibilityCounter[] {
+export function rowCounters(row: VisibilityForecast): VisibilityCounter[] {
 	if (!row.applies) return [];
 	const counters: VisibilityCounter[] = [];
 	if (row.class === 'create') {
@@ -83,7 +84,7 @@ export function rowCounters(row: RowVisibility): VisibilityCounter[] {
  * being analysed. Such a row is unticked and disabled (RUN-4). While the analysis is out, or
  * after it failed (VIS-12), the row stays ticked: the run reads each project anyway (VIS-7).
  */
-export function nothingLeftToDo(row: RowVisibility): boolean {
+export function nothingLeftToDo(row: VisibilityForecast): boolean {
 	return row.class === 'already-matches' && row.toAdd.length === 0 && row.analysing.length === 0;
 }
 
@@ -101,7 +102,7 @@ export interface VisibilityCount {
 }
 
 function changes(count: number): string {
-	return `${count} visibility ${count === 1 ? 'change' : 'changes'}`;
+	return countText(count, 'visibility change');
 }
 
 /**
@@ -111,7 +112,7 @@ function changes(count: number): string {
  * projects (VIS-4). While a selected row is still being analysed the adds are an upper bound,
  * the existing rows that take visibility times the projects in scope, marked as such.
  */
-export function visibilityCount(selected: readonly RowVisibility[], scope: PlanScope): VisibilityCount {
+export function visibilityCount(selected: readonly VisibilityForecast[], scope: PlanScope): VisibilityCount {
 	const rows = selected.filter((row) => row.applies);
 	const existing = rows.filter((row) => row.class !== 'create');
 	const upperBound = existing.some((row) => row.analysing.length > 0);

@@ -113,7 +113,7 @@ export type RowNote =
 	| { code: 'error'; message: string };
 
 /** Per-project visibility of one row's field (VIS-4, VIS-5, VIS-7, RUN-22). */
-export interface RowVisibility {
+export interface RunVisibility {
 	/** `new`: the run created or revived the field. `existing`: it was there. What a retry passes again. */
 	origin: FieldOrigin;
 	/** `applying`: in flight. `applied`: ran to its last step. `cancelled`: a cancel cut it short, or kept it from starting. */
@@ -143,7 +143,7 @@ export interface RunRow {
 	/** Every schema change the run made for this row, oldest first, across retries (RUN-20). */
 	effects: FieldEffect[];
 	/** Null when no visibility was applied. */
-	visibility: RowVisibility | null;
+	visibility: RunVisibility | null;
 }
 
 export interface RunState {
@@ -216,7 +216,7 @@ function withRow(state: RunState, entryId: string, change: (row: RunRow) => RunR
 	return { ...state, rows: state.rows.map((row) => (row.entryId === entryId ? change(row) : row)) };
 }
 
-function visibilityOf(origin: FieldOrigin): RowVisibility {
+function visibilityOf(origin: FieldOrigin): RunVisibility {
 	return { origin, status: 'applying', done: 0, total: 0, written: 0, failures: [], error: null };
 }
 

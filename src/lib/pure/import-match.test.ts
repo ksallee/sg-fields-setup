@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { makeLiveField } from './fixtures/make-live-field';
+import { makeLiveField } from '$lib/testing/make-live-field';
 import { createMatcher, indexLiveFields, matchLiveField } from './import-match';
 
 const lensHeight = makeLiveField('Shot', 'sg_tk_lens_height_start', { displayName: 'Tk Lens Height (Start)' });

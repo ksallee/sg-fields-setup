@@ -151,7 +151,7 @@ export function analysisStatus(analysis: VisibilityAnalysis): 'analysing' | 'loa
 }
 
 /** One row against the picker (VIS-9). Each project of the scope is in exactly one of the first four lists. */
-export interface RowVisibility {
+export interface VisibilityForecast {
 	entryId: string;
 	class: PlanClass;
 	/** False for rows the run skips: every list is empty. */
@@ -179,8 +179,8 @@ function stateOf(analysis: VisibilityAnalysis | null, row: AnalysisRow, projectI
  * One row's visibility against the scope. `analysis` is null before any exists: every picker
  * project of an existing row is then still being analysed.
  */
-export function rowVisibility(row: AnalysisRow, resolved: VisibilityScope, analysis: VisibilityAnalysis | null): RowVisibility {
-	const result: RowVisibility = {
+export function rowVisibility(row: AnalysisRow, resolved: VisibilityScope, analysis: VisibilityAnalysis | null): VisibilityForecast {
+	const result: VisibilityForecast = {
 		entryId: row.entryId,
 		class: row.class,
 		applies: row.class === 'create' || isAnalysed(row),

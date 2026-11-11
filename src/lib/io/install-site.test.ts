@@ -15,8 +15,7 @@ import { asRefusal } from '$lib/pure/run-port';
 import { decodeSetFile } from '$lib/pure/set-file';
 import { createApplyVisibility } from '$lib/pure/visibility-run';
 import { resolveScope } from '$lib/pure/visibility-scope';
-import { FAKE_PROJECT_IDS, FAKE_TRASH_PAGE_URL, fakeInstallSite, fakeOptions, seededFakeSite } from './install-site-fake';
-import { onceLoaded } from './install-site';
+import { FAKE_PROJECT_IDS, FAKE_TRASH_PAGE_URL, fakeInstallSite, fakeOptions, seededFakeSite } from '$lib/testing/install-site-fake';
 
 const SRC = join(process.cwd(), 'src');
 
@@ -24,7 +23,7 @@ function sources(dir: string): string[] {
 	return readdirSync(dir).flatMap((name) => {
 		const path = join(dir, name);
 		if (statSync(path).isDirectory()) return sources(path);
-		return /\.(ts|js|svelte)$/.test(name) && !/\.test\.ts$/.test(name) ? [path] : [];
+		return /\.(ts|js|svelte)$/.test(name) && !name.endsWith('.test.ts') ? [path] : [];
 	});
 }
 
@@ -38,15 +37,15 @@ function filesWith(pattern: RegExp): string[] {
 
 describe('the fake site stays out of a production build', () => {
 	it('is imported by one module, and that module by install-site alone', () => {
-		expect(filesWith(/from '[^']*fixtures\/fake-site'/)).toEqual(['lib/io/install-site-fake.ts']);
+		expect(filesWith(/from '[^']*testing\/fake-site'|from '\.\/fake-site'/)).toEqual(['lib/testing/install-site-fake.ts']);
 		expect(filesWith(/install-site-fake'/)).toEqual(['lib/io/install-site.ts']);
-		expect(filesWith(/sg-widgets-core\/mock/)).toEqual(['lib/io/install-site-fake.ts']);
+		expect(filesWith(/sg-widgets-core\/mock/)).toEqual(['lib/testing/install-site-fake.ts']);
 	});
 
 	it('is reached only through a dynamic import behind import.meta.env.DEV', () => {
 		const source = readFileSync(join(SRC, 'lib/io/install-site.ts'), 'utf8');
 		expect(source).not.toMatch(/^import[^;]*install-site-fake/m);
-		const uses = source.match(/[^\n]*\n[^\n]*import\('\.\/install-site-fake'\)/g) ?? [];
+		const uses = source.match(/[^\n]*\n[^\n]*import\('\$lib\/testing\/install-site-fake'\)/g) ?? [];
 		expect(uses).toHaveLength(1);
 		expect(uses[0]).toMatch(/^\s*if \(import\.meta\.env\.DEV && /);
 	});
@@ -133,17 +132,5 @@ describe('the fake options', () => {
 		const site = fakeInstallSite(FAST);
 		const failure = await site.port.createField('Shot', { data_type: 'text', properties: [{ property_name: 'name', value: 'Drive Refused' }] }).catch((error: unknown) => error);
 		expect(asRefusal(failure)).toMatchObject({ status: 403 });
-	});
-});
-
-describe('onceLoaded (VIS-3)', () => {
-	it('reads the project list once, and again after a read that failed', async () => {
-		let reads = 0;
-		const answers = [{ status: 'failed' as const, message: 'No.' }, { status: 'loaded' as const, projects: [] }];
-		const load = onceLoaded(async () => answers[Math.min(reads++, 1)]!);
-		expect((await load()).status).toBe('failed');
-		expect((await load()).status).toBe('loaded');
-		expect((await load()).status).toBe('loaded');
-		expect(reads).toBe(2);
 	});
 });

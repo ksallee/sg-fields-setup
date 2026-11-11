@@ -298,16 +298,9 @@ describe('visibilityPort', () => {
 				asked.push(args);
 				return found;
 			}
-		});
+		}, { updateField: async () => null });
 		expect(await port.readField('Version', 'sg_lens', 70)).toBe(found);
 		expect(asked).toEqual([['Version', 'sg_lens', 70]]);
-	});
-
-	it('refuses to write until a writer is wired, and the step fails without throwing', async () => {
-		const port = visibilityPort({ readField: async () => found });
-		const outcome = await createApplyVisibility(port, plan)(field, 'existing', hooks);
-		expect(outcome.failures).toEqual([{ projectId: 70, projectName: 'Zebra', message: 'Visibility writes are not wired yet.' }]);
-		expect(outcome.written).toBe(0);
 	});
 
 	it('writes through a client shaped like core\'s schema client: properties, then the project', async () => {

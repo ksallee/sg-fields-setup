@@ -6,6 +6,7 @@
  * that project shows the field, `editable` whether the site lets it be hidden or shown
  * (`findings/056`). Without a project every field reads true. A hidden field is still returned.
  */
+import { isRecord } from './is-record';
 
 /** One field in one project. */
 export interface FieldVisibility {
@@ -16,10 +17,6 @@ export interface FieldVisibility {
 
 /** The one property a visibility write sends. */
 export type VisibleWrite = [{ property_name: 'visible'; value: boolean }];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 /**
  * The visibility in one field record. Only a value that is `false` hides: a missing value means

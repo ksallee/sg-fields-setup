@@ -32,7 +32,7 @@ import { CONFIRM_CHANGED_TEXT, mintConfirmation, redeemConfirmation, type Confir
 import { installEntries } from '$lib/pure/install-entries';
 import { footerActions, type Footer } from '$lib/pure/install-footer';
 import { confirmText, installSummary, planContext, reportFileName, screenSummary, type ConfirmText, type SummaryItem } from '$lib/pure/install-text';
-import { analysisRows, groupRows, viewRows, type ViewGroup, type ViewRow } from '$lib/pure/install-view';
+import { analysisRows, groupRows, viewRows, type InstallGroup, type InstallRow } from '$lib/pure/install-view';
 import type { LiveEntityType } from '$lib/pure/live-entity-types';
 import { emptyPlanText, type PlanEntry, type PlanItem } from '$lib/pure/plan';
 import { ALL_TICKED, ranSelectAllState, selectAllState, setAllTicked, tickedIds, toggleTick, type PlanSelection, type SelectAllState, type TickRow } from '$lib/pure/plan-selection';
@@ -41,7 +41,7 @@ import { createRun, replan, type Run } from '$lib/pure/run-driver';
 import { reportIsEmpty, reportText, runReport } from '$lib/pure/run-report';
 import { summaryText } from '$lib/pure/run-text';
 import { siteErrorMessage } from '$lib/pure/site-error';
-import { analysisStatus, rowVisibility, type RowVisibility, type VisibilityAnalysis } from '$lib/pure/visibility-analysis';
+import { analysisStatus, rowVisibility, type VisibilityForecast, type VisibilityAnalysis } from '$lib/pure/visibility-analysis';
 import { createApplyVisibility, retryVisibility } from '$lib/pure/visibility-run';
 import { analysisProjects, resolveScope, scopeNotes, scopeSummary, type ProjectsRead, type VisibilityScope } from '$lib/pure/visibility-scope';
 import { nothingLeftToDo, visibilityCount, type VisibilityCount } from '$lib/pure/visibility-text';
@@ -96,9 +96,9 @@ export class InstallSession {
 	/* What the screen reads. Each line is one call into a pure module. */
 
 	readonly resolved: VisibilityScope = $derived(resolveScope(this.projects, this.chosen.map((project) => project.id)));
-	readonly rows: ViewRow[] = $derived(viewRows(this.items, this.run, this.entityTypes));
-	readonly groups: ViewGroup[] = $derived(groupRows(this.rows));
-	readonly visibility: ReadonlyMap<string, RowVisibility> = $derived(
+	readonly rows: InstallRow[] = $derived(viewRows(this.items, this.run, this.entityTypes));
+	readonly groups: InstallGroup[] = $derived(groupRows(this.rows));
+	readonly visibility: ReadonlyMap<string, VisibilityForecast> = $derived(
 		new Map(analysisRows(this.items, this.run).map((row) => [row.entryId, rowVisibility(row, this.resolved, this.analysis)]))
 	);
 	readonly tickRows: TickRow[] = $derived(

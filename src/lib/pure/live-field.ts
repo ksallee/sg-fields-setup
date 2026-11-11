@@ -26,6 +26,7 @@
  * The reading is defensive all the same. A missing key, a null or a value of the wrong kind reads
  * as none, never as a throw. A value that came bare, without its wrapper, is taken as the value.
  */
+import { isRecord } from './is-record';
 
 /** A field's schema record exactly as the site sent it. */
 export type RawFieldRecord = Record<string, unknown>;
@@ -59,10 +60,6 @@ export interface LiveField {
 	hideable: boolean | null;
 	/** The record verbatim, the same object that was read. For snapshots (W2). Do not change it. */
 	raw: RawFieldRecord;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /** The value of a wrapped setting. A setting that came bare is its own value. */

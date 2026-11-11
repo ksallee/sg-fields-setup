@@ -50,7 +50,6 @@ describe('afterSiteWrite', () => {
 
 		afterSiteWrite({ schema, context: widgets() });
 		expect(schema.cachedFields('Version')).toBeNull();
-		expect(schema.cachedEntityTypes()).toBeNull();
 
 		site.calls.length = 0;
 		await schema.fieldsOrEmpty('Version');

@@ -7,6 +7,7 @@ import type { PlanClass } from './plan';
 import { runCounters, type RunCounters, type RunState } from './run';
 import { fileSlug } from './set-file';
 import { countText, fieldCount } from './set-text';
+import { siteHost } from './site-host';
 
 /** A plan row as the summary needs it. */
 export interface SummaryRow {
@@ -89,15 +90,6 @@ export function screenSummary(plan: InstallSummary, run: RunState): SummaryItem[
 	return run.status === 'idle' ? summaryItems(plan) : runSummaryItems(runCounters(run));
 }
 
-/** The site as a person names it: its host. A text that is no address shows as it is. */
-export function siteHost(siteUrl: string): string {
-	try {
-		return new URL(siteUrl).host || siteUrl;
-	} catch {
-		return siteUrl;
-	}
-}
-
 export interface ConfirmInput {
 	summary: InstallSummary;
 	siteUrl: string;
@@ -149,7 +141,7 @@ export function planContext(input: { whole: boolean; entries: number; siteUrl: s
 
 /** Said before leaving the page while a run is in progress, under "Leave the install?". */
 export function leaveQuestion(): string {
-	return 'An install is running. If you leave now it stops after the step in flight and the rest is not applied.';
+	return 'An install is running. If you leave now it stops after the step that is running and the rest is not applied.';
 }
 
 /**

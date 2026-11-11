@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approvalUrl, checkSite, connectSources, extraSuffixes, KNOWN_SITE_SUFFIXES, siteRefusalText, type SiteCheck } from './site-host';
+import { approvalUrl, checkSite, connectSources, extraSuffixes, KNOWN_SITE_SUFFIXES, siteHost, siteRefusalText, type SiteCheck } from './site-host';
 
 const origin = (check: SiteCheck): string | null => (check.ok ? check.origin : null);
 const reason = (check: SiteCheck): string | null => (check.ok ? null : check.reason);
@@ -146,5 +146,20 @@ describe('siteRefusalText', () => {
 		}
 		expect(siteRefusalText('host')).toContain('.shotgrid.autodesk.com');
 		expect(siteRefusalText('host')).toContain('.shotgunstudio.com');
+	});
+});
+
+describe('siteHost', () => {
+	it('is the whole host, the suffix included', () => {
+		expect(siteHost('https://studio.shotgrid.autodesk.com')).toBe('studio.shotgrid.autodesk.com');
+		expect(siteHost('https://www.old.shotgunstudio.com/')).toBe('www.old.shotgunstudio.com');
+	});
+
+	it('keeps any other host whole', () => {
+		expect(siteHost('https://fpt.example.com')).toBe('fpt.example.com');
+	});
+
+	it('gives back what is not a URL', () => {
+		expect(siteHost('not a url')).toBe('not a url');
 	});
 });

@@ -6,6 +6,7 @@
  * enabled test, in both directions: a custom entity slot that is not listed answers 404 everywhere
  * else. `visible` is not the test, it read true on every listed type (corpus `findings/008`).
  */
+import { isRecord } from './is-record';
 
 export interface LiveEntityType {
 	/** API name, the one a URL takes: `Version`, `CustomEntity19`. */
@@ -27,10 +28,6 @@ const CUSTOM_SLOT = /^Custom(?:NonProject|Threaded)?Entity\d+$/;
 
 export function isCustomEntityName(name: string): boolean {
 	return CUSTOM_SLOT.test(name);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /**

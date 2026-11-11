@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import statusList from './fixtures/live-field-status-list.json';
-import { makeLiveField } from './fixtures/make-live-field';
+import { makeLiveField } from '$lib/testing/make-live-field';
 import { readField, type LiveField } from './live-field';
 import {
 	definitionFromLiveField,

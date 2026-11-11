@@ -13,6 +13,7 @@ import { dataTypeLabel } from './data-types';
 import type { Difference } from './plan-diff';
 import { formatValue, reasonParts, settingLabel, trashParts, type PlanReason, type ReasonPart } from './plan-reason';
 import { needsVisibilityRetry, runCounters, type Retrash, type RowNote, type RunAction, type RunRow, type RunState, type WriteKind } from './run';
+import { countText } from './set-text';
 
 type Named = Pick<RunRow, 'entityType' | 'programmaticName' | 'displayName' | 'dataType'>;
 
@@ -37,10 +38,6 @@ function sentence(...runs: ReasonPart[][]): ReasonPart[] {
 
 function fieldLabel(row: Named): string {
 	return `"${row.displayName}" (${row.entityType}.${row.programmaticName})`;
-}
-
-function count(n: number, one: string, many: string): string {
-	return `${n} ${n === 1 ? one : many}`;
 }
 
 function show(setting: Difference['setting'], value: unknown): string {
@@ -80,7 +77,7 @@ function retrashParts(row: Named, name: string, back: Retrash, trashPageUrl: str
 	}
 	return sentence(
 		text(
-			`Install could not put ${field} back in the trash${back.retireError ? `: ${back.retireError}` : '.'} It is live on the site now. Delete it in FPT, then delete it for good from`
+			`Install could not put ${field} back in the trash${back.retireError ? `: ${back.retireError}` : '.'} It is live on the site now. Delete it in Flow PT, then delete it for good from`
 		),
 		trashParts(trashPageUrl),
 		text('Then install again.')
@@ -106,24 +103,24 @@ export function noteParts(row: Named, note: RowNote | null): ReasonPart[] {
 			const lead = `${field} already exists on the site. Install did not create it.`;
 			if (note.differences.length === 0) return text(lead);
 			return text(
-				`${lead} ${count(note.differences.length, 'setting differs', 'settings differ')} from the set and ${note.differences.length === 1 ? 'was' : 'were'} left as on the site. ${differenceLines(note.differences)} Refresh to plan an update.`
+				`${lead} ${countText(note.differences.length, 'setting differs', 'settings differ')} from the set and ${note.differences.length === 1 ? 'was' : 'were'} left as on the site. ${differenceLines(note.differences)} Refresh to plan an update.`
 			);
 		}
 		case 'unknown-valid-types': {
 			const names = note.names.map((name) => `"${name}"`).join(', ');
 			return text(
-				`${field} was not sent to the site. ${note.names.length === 1 ? `The valid type ${names} is` : `The valid types ${names} are`} not on this site. A type name must match the site's exactly, capitals included. Fix the entry's valid types, or enable the entity in FPT's admin screens, then refresh.`
+				`${field} was not sent to the site. ${note.names.length === 1 ? `The valid type ${names} is` : `The valid types ${names} are`} not on this site. A type name must match the site's exactly, capitals included. Fix the field's valid types, or enable the entity in Flow PT's admin screens, then refresh.`
 			);
 		}
 		case 'gone':
 			return text(`${field} is no longer on the site. It was there when the plan was made. Refresh to plan it again.`);
 		case 'not-applied':
 			return text(
-				`${field} ${AFTER[note.after]}. The site answered success and the field does not read back as wanted. ${differenceLines(note.differences)} Check the field in FPT, then retry.`
+				`${field} ${AFTER[note.after]}. The site answered success and the field does not read back as wanted. ${differenceLines(note.differences)} Check the field in Flow PT, then retry.`
 			);
 		case 'unreadable':
 			return text(
-				`${field} ${AFTER[note.after]}, then could not be read${note.message ? `: ${note.message}` : '.'} Check the field in FPT, then retry.`
+				`${field} ${AFTER[note.after]}, then could not be read${note.message ? `: ${note.message}` : '.'} Check the field in Flow PT, then retry.`
 			);
 		case 'refused': {
 			const said = note.status === null ? `No answer came: ${note.message}` : `The site answered ${note.status}: ${note.message}`;
@@ -154,13 +151,13 @@ export function noteParts(row: Named, note: RowNote | null): ReasonPart[] {
 		case 'wrong-name': {
 			if (note.assigned === '') {
 				return text(
-					`The site created a field for ${field} and did not say under which name. Install left it. Find it in FPT's field list for ${row.entityType} and check its name.`
+					`The site created a field for ${field} and did not say under which name. Install left it. Find it in Flow PT's field list for ${row.entityType} and check its name.`
 				);
 			}
 			const lead = `The site named the new field ${row.entityType}.${note.assigned}. The set wants ${row.entityType}.${row.programmaticName} for "${row.displayName}".`;
-			if (note.retired) return text(`${lead} Install deleted the new field. The name ${note.assigned} is spent on this site.`);
+			if (note.retired) return text(`${lead} Install deleted the new field. The name ${note.assigned} stays taken on this site.`);
 			return text(
-				`${lead} Install could not delete the new field${note.retireError ? `: ${note.retireError}` : '.'} It is live on the site. Delete it in FPT.`
+				`${lead} Install could not delete the new field${note.retireError ? `: ${note.retireError}` : '.'} It is live on the site. Delete it in Flow PT.`
 			);
 		}
 		case 'error':
@@ -172,7 +169,7 @@ export function noteParts(row: Named, note: RowNote | null): ReasonPart[] {
 export function visibilityProgress(row: Pick<RunRow, 'visibility'>): string | null {
 	const visibility = row.visibility;
 	if (!visibility || visibility.status !== 'applying') return null;
-	return `${visibility.done} of ${count(visibility.total, 'project', 'projects')}`;
+	return `${visibility.done} of ${countText(visibility.total, 'project')}`;
 }
 
 const CHANGED = 'Visibility changed on';
@@ -182,17 +179,17 @@ const MADE_VISIBLE = 'Made visible on';
 /** The lines of a row's visibility once it has run, in reading order. Empty when there is nothing to say. */
 function visibilityLines(visibility: NonNullable<RunRow['visibility']>, wrote: string): string[] {
 	const lines: string[] = [];
-	if (visibility.written > 0) lines.push(`${wrote} ${count(visibility.written, 'project', 'projects')}.`);
+	if (visibility.written > 0) lines.push(`${wrote} ${countText(visibility.written, 'project')}.`);
 	if (visibility.status === 'cancelled') {
 		lines.push(
 			visibility.total === 0
 				? 'Visibility was not applied. The install was cancelled first.'
-				: `Visibility was cancelled after ${visibility.done} of ${count(visibility.total, 'project', 'projects')}.`
+				: `Visibility was cancelled after ${visibility.done} of ${countText(visibility.total, 'project')}.`
 		);
 	}
 	if (visibility.error !== null) lines.push(`Visibility could not be applied. ${visibility.error}`);
 	if (visibility.failures.length > 0) {
-		lines.push(`Visibility was not set on ${count(visibility.failures.length, 'project', 'projects')}.`);
+		lines.push(`Visibility was not set on ${countText(visibility.failures.length, 'project')}.`);
 		for (const failure of visibility.failures) lines.push(`${failure.projectName}: ${failure.message}`);
 	}
 	return lines;
@@ -271,7 +268,7 @@ export function summaryText(state: RunState): string | null {
 	if (counters.pending > 0) parts.push(`${counters.pending} not started`);
 	const counts = `${parts.join(', ')}.`;
 	const warnings =
-		counters.visibilityWarnings > 0 ? ` Visibility is incomplete on ${count(counters.visibilityWarnings, 'field', 'fields')}.` : '';
+		counters.visibilityWarnings > 0 ? ` Visibility is incomplete on ${countText(counters.visibilityWarnings, 'field')}.` : '';
 	if (state.error !== null) return `Install stopped. ${state.error} ${counts}${warnings}`;
 	if (state.status === 'cancelled') return `Install cancelled. ${counts}${warnings}`;
 	return `${counts[0].toUpperCase()}${counts.slice(1)}${warnings}`;

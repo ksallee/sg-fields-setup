@@ -1,5 +1,5 @@
 /**
- * The site calls of per-project visibility (issue #19). Thin: every rule is in `$lib/pure`.
+ * The site calls of per-project visibility. Thin: every rule is in `$lib/pure`.
  *
  * | call                                         | here                    | for                         |
  * |----------------------------------------------|-------------------------|-----------------------------|
@@ -36,6 +36,7 @@ import type { VisibilityPort } from '$lib/pure/visibility-run';
 import type { ProjectRow, ProjectsRead, ScopeProject } from '$lib/pure/visibility-scope';
 import { readVisibilityListing, type VisibleWrite } from '$lib/pure/visibility-value';
 import type { SchemaSource } from './schema';
+import { isSchemaName } from '$lib/pure/schema-name';
 
 /* The project list. */
 
@@ -101,14 +102,11 @@ export interface VisibilitySource {
 	readRawFields(entityType: string, projectId: number): Promise<unknown>;
 }
 
-/** A name that is one path segment. Refused before asking, so a bad name never reaches the site. */
-const NAME = /^[A-Za-z0-9_]+$/;
-
 export function coreVisibilitySource(options: RestClientOptions): VisibilitySource {
 	const schema = new RestSchemaClient(options);
 	return {
 		async readRawFields(entityType, projectId) {
-			if (!NAME.test(entityType)) throw new Error(`'${entityType}' is not an entity type name.`);
+			if (!isSchemaName(entityType)) throw new Error(`'${entityType}' is not an entity type name.`);
 			// Without a project every field reads visible. Never ask that way.
 			if (!Number.isInteger(projectId) || projectId <= 0) throw new Error(`'${String(projectId)}' is not a project id.`);
 			// A refusal is core's SchemaApiError, its message the site's detail.
@@ -221,17 +219,14 @@ export interface VisibilityWriter {
 	updateField(entityType: string, field: string, properties: VisibleWrite, projectId: number): Promise<unknown>;
 }
 
-export const WRITE_NOT_WIRED = 'Visibility writes are not wired yet.';
-
 /**
  * The port the executor runs on (`createApplyVisibility`). The read is the schema source's
- * one-field read (`coreSchemaSource(...)`, or core's schema client). The writer is core's schema
- * client once a release has it. Without one every write rejects and nothing reaches the site.
+ * one-field read (`coreSchemaSource(...)`). The writer is core's schema client
+ * (`visibilityWriter` in `schema-client.ts`).
  */
-export function visibilityPort(reader: Pick<SchemaSource, 'readField'>, writer: VisibilityWriter | null = null): VisibilityPort {
+export function visibilityPort(reader: Pick<SchemaSource, 'readField'>, writer: VisibilityWriter): VisibilityPort {
 	return {
 		readField: (entityType, field, projectId) => reader.readField(entityType, field, projectId),
-		updateField: (entityType, field, properties, projectId) =>
-			writer ? writer.updateField(entityType, field, properties, projectId) : Promise.reject(new Error(WRITE_NOT_WIRED))
+		updateField: (entityType, field, properties, projectId) => writer.updateField(entityType, field, properties, projectId)
 	};
 }

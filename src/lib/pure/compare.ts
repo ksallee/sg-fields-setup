@@ -351,23 +351,23 @@ export function explanationText(explanation: Explanation): string {
 			return 'This field already exists on the site. Install will leave it or update it.';
 		case 'type_mismatch':
 			return (
-				`The field on the site is ${dataTypeLabel(explanation.liveDataType)}, not ` +
+				`The field on the site is ${dataTypeLabel(explanation.liveDataType)}. The set wants ` +
 				`${dataTypeLabel(explanation.wantedDataType)}. A field's type cannot be changed. Install will skip it.`
 			);
 		case 'unique_differs':
 			return (
-				`The API cannot change unique per project. To change it by hand in FPT, open a ` +
+				`The API cannot change unique per project. To change it by hand in Flow PT, open a ` +
 				`${explanation.entityTypeLabel} page, configure the ${explanation.fieldLabel} column and ` +
 				`turn it ${explanation.turnOn ? 'on' : 'off'}.`
 			);
 		case 'valid_types_differ':
 			return (
-				`On the site this field links to ${typeList(explanation.live)}. This entry links to ` +
+				`On the site this field links to ${typeList(explanation.live)}. The set wants ` +
 				`${typeList(explanation.wanted)}. The API cannot change them. Install will skip this field. ` +
 				`To reinstall it, delete the field on the site, then remove it from the site's trash for good.`
 			);
 		case 'type_not_on_site':
-			return `${explanation.entityType} is not on this site. Enable it in FPT's admin screens, then re-check.`;
+			return `${explanation.entityType} is not on this site. Enable it in Flow PT's admin screens, then re-check.`;
 		case 'plan':
 			// The planner's own words: the same on the install screen (PLN-18, RUN-21).
 			return reasonText(explanation.reason);
